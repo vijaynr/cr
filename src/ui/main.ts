@@ -1,8 +1,20 @@
-import { printHorizontalLine } from "./console.js";
-import { computed, effect, signal } from "@preact/signals-core";
+import { EventEmitter } from "node:events";
 import ora from "ora";
-import type { StatusReporter, WorkflowEventReporter, WorkflowName } from "../types/workflows.js";
+import type {
+  StatusReporter,
+  WorkflowEventReporter,
+  WorkflowName,
+  WorkflowMode,
+  ReviewChatContext,
+  ReviewChatHistoryEntry,
+  CreateMrWorkflowInput,
+  CreateMrWorkflowResult,
+  CreateMrDraft,
+} from "../types/workflows.js";
 import { COLORS, DOT } from "./constants.js";
+import { printChatAnswer, printDivider, printReviewSummary, printWarning } from "./console.js";
+import { askForOptionalFeedback, promptWithFrame } from "./prompt.js";
+import { buildCreateMrResultBody } from "../utils/reviewCommandHelper.js";
 
 type LiveLevel = "info" | "success" | "warning" | "error";
 
@@ -26,14 +38,12 @@ export type WorkflowStatusController = {
 };
 
 export class LiveController {
-  private readonly maxLines = 12;
-  private readonly eventStream = signal<LiveEvent[]>([]);
-  readonly visibleLines = computed<LiveEvent[]>(() => this.eventStream.value.slice(-this.maxLines));
-  readonly resultData = signal<LiveResult | null>(null);
-  private isDone = false;
+  private readonly emitter = new EventEmitter();
+  private _result: LiveResult | null = null;
+  private _isDone = false;
 
   private pushEvent(event: LiveEvent): void {
-    this.eventStream.value = [...this.eventStream.value, event];
+    this.emitter.emit("data", event);
   }
 
   info(message: string): void {
@@ -53,22 +63,78 @@ export class LiveController {
   }
 
   setResult(title: string, body: string): void {
-    this.resultData.value = { title, body } satisfies LiveResult;
+    this._result = { title, body };
+  }
+
+  get resultData(): { value: LiveResult | null } {
+    return { value: this._result };
   }
 
   done(): void {
-    if (this.isDone) {
-      return;
-    }
-    this.isDone = true;
+    if (this._isDone) return;
+    this._isDone = true;
+    this.emitter.emit("end");
   }
 
-  events(): readonly LiveEvent[] {
-    return this.eventStream.value;
+  /**
+   * Returns an AsyncIterable that streams LiveEvents as they are pushed.
+   * Events are buffered internally so none are lost between the call to
+   * eventStream() and the first iteration step.
+   */
+  eventStream(): AsyncIterable<LiveEvent> {
+    const { emitter } = this;
+    const buffer: LiveEvent[] = [];
+    let notify: (() => void) | null = null;
+    let ended = this._isDone;
+
+    const onData = (event: LiveEvent): void => {
+      buffer.push(event);
+      notify?.();
+      notify = null;
+    };
+
+    const onEnd = (): void => {
+      ended = true;
+      notify?.();
+      notify = null;
+    };
+
+    emitter.on("data", onData);
+    emitter.once("end", onEnd);
+
+    return {
+      [Symbol.asyncIterator](): AsyncIterator<LiveEvent> {
+        return {
+          async next(): Promise<IteratorResult<LiveEvent>> {
+            for (;;) {
+              if (buffer.length > 0) {
+                return { value: buffer.shift()!, done: false };
+              }
+              if (ended) {
+                emitter.off("data", onData);
+                return { value: undefined as unknown as LiveEvent, done: true };
+              }
+              await new Promise<void>((res) => {
+                notify = res;
+              });
+            }
+          },
+          return(): Promise<IteratorResult<LiveEvent>> {
+            emitter.off("data", onData);
+            emitter.off("end", onEnd);
+            return Promise.resolve({ value: undefined as unknown as LiveEvent, done: true });
+          },
+        };
+      },
+    };
   }
 }
 
 function persistSpinnerSuccess(spinner: ReturnType<typeof ora>, message: string): void {
+  if (message === "") {
+    spinner.stop();
+    return;
+  }
   spinner.stopAndPersist({
     symbol: COLORS.green + `${DOT}` + COLORS.reset,
     text: message,
@@ -78,9 +144,8 @@ function persistSpinnerSuccess(spinner: ReturnType<typeof ora>, message: string)
 export function createWorkflowStatusController(args: {
   ui: LiveController;
   workflow: WorkflowName;
-  lineBreakOnStop?: boolean;
 }): WorkflowStatusController {
-  const { ui, workflow, lineBreakOnStop = false } = args;
+  const { ui, workflow } = args;
   let activeSpinner: ReturnType<typeof ora> | null = null;
 
   const stop = (): void => {
@@ -89,16 +154,13 @@ export function createWorkflowStatusController(args: {
     }
     activeSpinner.stop();
     activeSpinner = null;
-    if (lineBreakOnStop) {
-      console.log();
-    }
   };
 
   const startSpinner = (text: string): ReturnType<typeof ora> => {
     stop();
     activeSpinner = ora({
       text,
-      spinner: "dots",
+      spinner: "aesthetic",
     }).start();
     return activeSpinner;
   };
@@ -123,14 +185,20 @@ export function createWorkflowStatusController(args: {
         return;
       }
       if (event.type === "phase_started") {
-        startSpinner(event.message);
+        console.log(); // add spacing before new phase
+        startSpinner(" " + event.message);
         return;
       }
-      if (activeSpinner) {
-        completeSpinner(activeSpinner, event.message);
+      if (event.type === "phase_completed") {
+        if (activeSpinner) {
+          completeSpinner(activeSpinner, event.message);
+        } else {
+          if (event.workflow !== "reviewChat" && event.phase !== "answering_question") {
+            status.success(event.message);
+          }
+        }
         return;
       }
-      status.success(event.message);
     },
   };
 
@@ -163,6 +231,7 @@ function levelToColor(level: LiveLevel): string {
 
 function printResultWithDots(level: LiveLevel, result: LiveResult): void {
   const color = levelToColor(level);
+  console.log();
   console.log(color + `${DOT} ` + result.title + COLORS.reset);
   for (const line of result.body.split("\n")) {
     if (!line.trim()) {
@@ -170,25 +239,19 @@ function printResultWithDots(level: LiveLevel, result: LiveResult): void {
     }
     console.log(color + `${DOT} ` + line + COLORS.reset);
   }
+  console.log();
 }
 
 function deriveWorkflowLabel(title: string): string {
-  const normalized = title.replace(/^CR\s+/i, "").trim();
-  if (!normalized) {
-    return "WORKFLOW";
-  }
-  return normalized.toUpperCase();
+  return title.replace(/^CR\s+/i, "").trim() || "Workflow";
 }
 
 function printTaskHeader(title: string, description?: string): void {
   const workflowLabel = deriveWorkflowLabel(title);
-  printHorizontalLine();
-  console.log();
   console.log(COLORS.cyan + COLORS.bold + "> " + workflowLabel + COLORS.reset);
   if (description) {
     console.log(COLORS.dim + description + COLORS.reset);
   }
-  console.log();
 }
 
 export async function runLiveTask(
@@ -197,21 +260,21 @@ export async function runLiveTask(
   description?: string
 ): Promise<void> {
   const controller = new LiveController();
-  let renderedEventCount = 0;
   let runError: unknown;
 
   // Print header
   printTaskHeader(title, description);
 
-  const dispose = effect(() => {
-    const events = controller.events();
-    while (renderedEventCount < events.length) {
-      const evt = events[renderedEventCount];
-      renderedEventCount += 1;
+  // Start consuming the event stream concurrently with the workflow run.
+  // Events are buffered inside LiveController so none are dropped between
+  // stream creation and the first iteration step.
+  const stream$ = controller.eventStream();
+  const renderDone = (async () => {
+    for await (const evt of stream$) {
       const color = levelToColor(evt.level);
       console.log(color + `${DOT} ` + evt.message + COLORS.reset);
     }
-  });
+  })();
 
   try {
     await run(controller);
@@ -219,8 +282,10 @@ export async function runLiveTask(
     runError = error;
   } finally {
     controller.done();
-    dispose();
   }
+
+  // Drain any remaining buffered events before printing the final result.
+  await renderDone;
 
   if (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);
@@ -241,3 +306,115 @@ export async function runLiveTask(
     console.log(COLORS.green + `${DOT} Completed` + COLORS.reset);
   }
 }
+
+export async function runLiveChatLoop(args: {
+  chatContext: ReviewChatContext;
+  workflowResultTitle: string;
+  ui: LiveController;
+  answerQuestion: (
+    question: string,
+    history: ReviewChatHistoryEntry[]
+  ) => Promise<{ answer: string; history: ReviewChatHistoryEntry[] }>;
+}): Promise<void> {
+  const { chatContext, workflowResultTitle, ui, answerQuestion } = args;
+
+  printDivider();
+  printWarning(
+    "Entering interactive chat mode. Type your question and press Enter to ask. Type 'exit' to finish."
+  );
+
+  let history: ReviewChatHistoryEntry[] = [];
+  let turns = 0;
+
+  while (true) {
+    const response = await promptWithFrame(
+      { type: "text", name: "question", message: "" },
+      { onCancel: () => true }
+    );
+    const question = String(response.question ?? "").trim();
+    if (!question || question.toLowerCase() === "exit") {
+      break;
+    }
+
+    const turn = await answerQuestion(question, history);
+    history = turn.history;
+    turns += 1;
+    printChatAnswer(turn.answer, chatContext.contextLabel);
+  }
+
+  ui.setResult(workflowResultTitle, `Context: ${chatContext.contextLabel}\nTurns: ${turns}`);
+}
+
+export async function runLiveCreateMrTask(args: {
+  repoPath: string;
+  targetBranch?: string;
+  repoRoot: string;
+  mode: WorkflowMode;
+  ui: LiveController;
+  status: WorkflowStatusController;
+  runWorkflow: (input: CreateMrWorkflowInput) => Promise<CreateMrWorkflowResult>;
+}): Promise<void> {
+  const { repoPath, targetBranch, repoRoot, mode, ui, status, runWorkflow } = args;
+
+  const result = await runWorkflow({
+    repoPath,
+    targetBranch,
+    mode,
+    repoRoot,
+    onDraft: (draft: CreateMrDraft) => {
+      status.stop();
+      printReviewSummary({
+        output: draft.description,
+        contextLabel: `MR Draft v${draft.iteration} (${draft.sourceBranch} -> ${draft.targetBranch})`,
+      });
+    },
+    resolveTargetBranch: async ({ defaultBranch }) => {
+      const response = await promptWithFrame(
+        {
+          type: "text",
+          name: "target",
+          message: `Enter target branch (default: ${defaultBranch})`,
+          initial: defaultBranch,
+        },
+        { onCancel: () => true }
+      );
+      return String(response.target ?? "").trim() || defaultBranch;
+    },
+    requestDraftFeedback: async () =>
+      askForOptionalFeedback({
+        confirmMessage: "Do you want to provide feedback to improve the merge request description?",
+      }),
+    confirmUpsert: async ({ existingMrIid }) => {
+      const response = await promptWithFrame(
+        {
+          type: "confirm",
+          name: "shouldProceed",
+          message: existingMrIid
+            ? `Update existing MR !${existingMrIid}?`
+            : "Create merge request?",
+          initial: true,
+        },
+        { onCancel: () => true }
+      );
+      return Boolean(response.shouldProceed);
+    },
+    status: status.status,
+    events: status.events,
+  }).finally(() => {
+    status.close();
+  });
+
+  const statusText =
+    result.action === "updated"
+      ? "Merge Request Updated"
+      : result.action === "created"
+        ? "Merge Request Created"
+        : "Merge Request Cancelled";
+  ui.setResult("Workflow: Merge Request", buildCreateMrResultBody(result));
+  if (result.action === "cancelled") {
+    ui.warning(statusText);
+  } else {
+    ui.success(statusText);
+  }
+}
+

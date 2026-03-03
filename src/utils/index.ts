@@ -1,7 +1,8 @@
 // Utility function exports
 export { assert } from "./assertions.js";
 export { formatKnownNetworkError, type FormattedError } from "./errors.js";
-export { parseCRSseStream } from "./stream-parser.js";
+export { parseCRSseStream } from "./streamParser.js";
+export { logger, type LogLevel } from "./logger.js";
 
 // Configuration exports
 export { loadCRConfig, saveCRConfig, envOrConfig } from "./config.js";
@@ -50,10 +51,10 @@ export {
   createRuntimeLlmClient,
   createRuntimeGitLabClient,
   type WorkflowRuntime,
-} from "./workflow-runtime.js";
+} from "./workflowRuntime.js";
 
 // Workflow events exports
-export { createWorkflowPhaseReporter } from "./workflow-events.js";
+export { createWorkflowPhaseReporter } from "./workflowEvents.js";
 
 // Review command utilities
 export {
@@ -64,7 +65,7 @@ export {
   getFlag,
   readStdinDiff,
   type ReviewWorkflowKind,
-} from "./review-command.js";
+} from "./reviewCommandHelper.js";
 
 // Review workflow helpers
 export {
@@ -73,4 +74,4 @@ export {
   extractJsonObject,
   parseDiffHunks,
   resolveInlinePosition,
-} from "./review-workflow-helpers.js";
+} from "./reviewWorkflowHelpers.js";

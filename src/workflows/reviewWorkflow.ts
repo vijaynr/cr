@@ -7,20 +7,20 @@ import {
 } from "../clients/gitlabClient.js";
 import { type LlmClient } from "../clients/llmClient.js";
 import { loadPrompt } from "../utils/prompts.js";
-import { createWorkflowPhaseReporter } from "../utils/workflow-events.js";
+import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import {
   injectMergeRequestContextIntoTemplate,
   buildChatPrompt,
   extractJsonObject,
   parseDiffHunks,
   resolveInlinePosition,
-} from "../utils/review-workflow-helpers.js";
+} from "../utils/reviewWorkflowHelpers.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
   loadWorkflowRuntime,
   type WorkflowRuntime,
-} from "../utils/workflow-runtime.js";
+} from "../utils/workflowRuntime.js";
 import { assert } from "../utils/assertions.js";
 import type {
   ReviewWorkflowInput,
@@ -522,7 +522,7 @@ async function runReviewStateGraph(input: ReviewWorkflowInput): Promise<ReviewWo
 
 export async function runReviewWorkflow(input: ReviewWorkflowInput): Promise<ReviewWorkflowResult> {
   if (input.workflow !== WORKFLOW_NAME) {
-    throw new Error("Use review-chat.ts or review-summarize.ts for non-review workflows.");
+    throw new Error("Use reviewChatWorkflow.ts or reviewSummarizeWorkflow.ts for non-review workflows.");
   }
   return runReviewStateGraph(input);
 }

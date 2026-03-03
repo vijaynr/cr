@@ -5,7 +5,6 @@ import { formatKnownNetworkError } from "./utils/errors.js";
 
 async function main(): Promise<void> {
   process.once("SIGINT", () => {
-    console.log();
     printWarning("Operation cancelled by user.");
     process.exit(0);
   });

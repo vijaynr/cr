@@ -1,6 +1,7 @@
-import { createGitLabClient, type GitLabClient } from "../clients/gitlab-client.js";
-import { createLlmClient, type LlmClient } from "../clients/llm-client.js";
+import { createGitLabClient, type GitLabClient } from "../clients/gitlabClient.js";
+import { createLlmClient, type LlmClient } from "../clients/llmClient.js";
 import { envOrConfig, loadCRConfig } from "./config.js";
+import { logger } from "./logger.js";
 
 export type WorkflowRuntime = {
   gitlabUrl: string;
@@ -21,7 +22,7 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
       ? envCustomStreaming.toLowerCase() === "true"
       : (config.useCustomStreaming ?? false);
 
-  return {
+  const runtime = {
     gitlabUrl: envOrConfig("GITLAB_URL", config.gitlabUrl, ""),
     gitlabKey: envOrConfig("GITLAB_KEY", config.gitlabKey, ""),
     openaiApiUrl: envOrConfig("OPENAI_API_URL", config.openaiApiUrl, ""),
@@ -29,6 +30,17 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),
     useCustomStreaming,
   };
+
+  logger.debug("runtime", "workflow runtime loaded", {
+    gitlabUrl: runtime.gitlabUrl,
+    gitlabKey: runtime.gitlabKey ? "***" : "(not set)",
+    openaiApiUrl: runtime.openaiApiUrl,
+    openaiApiKey: runtime.openaiApiKey ? "***" : "(not set)",
+    openaiModel: runtime.openaiModel,
+    useCustomStreaming: runtime.useCustomStreaming,
+  });
+
+  return runtime;
 }
 
 export function createRuntimeLlmClient(runtime: WorkflowRuntime): LlmClient {

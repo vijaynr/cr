@@ -8,17 +8,20 @@ export type ReviewPhase =
   | "generate_summary"
   | "local_review"
   | "local_summary"
-  | "chat_context_summary";
+  | "chat_context_summary"
+  | "answering_question";
 export type CreateMrPhase =
   | "load_remote_branches"
   | "get_branch_diff"
   | "generate_mr_draft"
   | "upsert_merge_request";
 export type WorkflowEventType = "phase_started" | "phase_completed";
-export type WorkflowName = "review" | "create_mr";
+export type WorkflowName = "review" | "reviewSummarize" | "reviewChat" | "createMr";
 export type WorkflowPhaseMap = {
   review: ReviewPhase;
-  create_mr: CreateMrPhase;
+  reviewSummarize: ReviewPhase;
+  reviewChat: ReviewPhase;
+  createMr: CreateMrPhase;
 };
 
 export type StatusReporter = Record<StatusLevel, (message: string) => void>;

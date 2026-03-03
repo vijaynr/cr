@@ -3,13 +3,13 @@ import { type LlmClient } from "../clients/llmClient.js";
 import { getCurrentBranch, getOriginRemoteUrl } from "../utils/git.js";
 import { logger } from "../utils/logger.js";
 import { loadPrompt } from "../utils/prompts.js";
-import { createWorkflowPhaseReporter } from "../utils/workflow-events.js";
+import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
   loadWorkflowRuntime,
   type WorkflowRuntime,
-} from "../utils/workflow-runtime.js";
+} from "../utils/workflowRuntime.js";
 import type {
   CreateMrWorkflowInput,
   CreateMrWorkflowResult,

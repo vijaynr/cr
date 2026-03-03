@@ -1,34 +1,46 @@
-import { printBanner } from "../ui/console.js";
+import { printBanner, printHeaderBox } from "../ui/console.js";
 
 export async function runCommand(args: string[]): Promise<void> {
   const [command = "help", ...rest] = args;
-  await printBanner();
+  const showFullBanner = args.includes("--show-banner");
+  const filteredRest = rest.filter((a) => a !== "--show-banner");
+
+  if (showFullBanner) {
+    await printBanner();
+  }
+  printHeaderBox();
 
   switch (command) {
     case "help":
     case "--help":
     case "-h":
       {
-        const { runHelpCommand } = await import("./help.js");
+        const { runHelpCommand } = await import("./helpCommand.js");
         await runHelpCommand();
       }
       return;
     case "init":
       {
-        const { runInitCommand } = await import("./init.js");
+        const { runInitCommand } = await import("./initCommand.js");
         await runInitCommand();
       }
       return;
     case "review":
       {
-        const { runReviewCommand } = await import("./review.js");
-        await runReviewCommand(rest);
+        const { runReviewCommand } = await import("./reviewCommand.js");
+        await runReviewCommand(filteredRest);
+      }
+      return;
+    case "create-mr":
+      {
+        const { runCreateMergeRequestCommand } = await import("./createMrCommand.js");
+        await runCreateMergeRequestCommand(filteredRest);
       }
       return;
     default:
       console.error(`Unknown command: ${command}`);
       {
-        const { runHelpCommand } = await import("./help.js");
+        const { runHelpCommand } = await import("./helpCommand.js");
         await runHelpCommand();
       }
       process.exitCode = 1;

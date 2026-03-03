@@ -1,9 +1,7 @@
 import path from "node:path";
 import {
   printAlert,
-  printChatAnswer,
   printCommandHelp,
-  printHorizontalLine,
   printReviewComment,
   printReviewSummary,
 } from "../ui/console.js";
@@ -11,6 +9,7 @@ import { askForOptionalFeedback, promptWithFrame } from "../ui/prompt.js";
 import {
   createWorkflowStatusController,
   runLiveTask,
+  runLiveChatLoop,
   type LiveController,
   type WorkflowStatusController,
 } from "../ui/main.js";
@@ -19,31 +18,27 @@ import { getOriginRemoteUrl } from "../utils/git.js";
 import { listMergeRequests, remoteToProjectPath } from "../utils/gitlab.js";
 import { repoRootFromModule } from "../utils/paths.js";
 import {
-  buildCreateMrResultBody,
   getFlag,
   getWorkflowHeadingAndDescription,
   getWorkflowResultTitle,
   hasFlag,
   readStdinDiff,
   type ReviewWorkflowKind,
-} from "../utils/review-command.js";
+} from "../utils/reviewCommandHelper.js";
 import {
   maybePostReviewComment,
   runReviewWorkflow,
   type ReviewWorkflowInput,
-} from "../workflows/review.js";
-import { answerReviewChatQuestion, runReviewChatWorkflow } from "../workflows/review-chat.js";
-import type { ReviewChatHistoryEntry, WorkflowMode } from "../types/workflows.js";
-import { runCreateMrWorkflow } from "../workflows/review-create.js";
-import { runReviewSummarizeWorkflow } from "../workflows/review-summarize.js";
+} from "../workflows/reviewWorkflow.js";
+import { answerReviewChatQuestion, runReviewChatWorkflow } from "../workflows/reviewChatWorkflow.js";
+import type { WorkflowMode } from "../types/workflows.js";
+import { runReviewSummarizeWorkflow } from "../workflows/reviewSummarizeWorkflow.js";
 
 async function askForFeedbackIteration(): Promise<string | null> {
   return askForOptionalFeedback({
     confirmMessage: "Do you want to provide feedback to improve the review comment?",
   });
 }
-
-type ReviewCommandWorkflowKind = ReviewWorkflowKind | "create";
 
 async function resolveInteractiveRemoteSelection(input: ReviewWorkflowInput): Promise<boolean> {
   const config = await loadCRConfig();
@@ -149,40 +144,19 @@ async function runChatFlow(args: {
     status: status.status,
     events: status.events,
   });
-
-  console.log();
-  ui.info(" Type 'exit' to end the chat session.");
-
-  let history: ReviewChatHistoryEntry[] = [];
-  let turns = 0;
-  while (true) {
-    const questionResponse = await promptWithFrame(
-      {
-        type: "text",
-        name: "question",
-        message: "",
-      },
-      { onCancel: () => true }
-    );
-    const question = String(questionResponse.question ?? "").trim();
-    if (!question || question.toLowerCase() === "exit") {
-      break;
-    }
-
-    const spinner = status.startSpinner("Thinking...");
-    const turn = await answerReviewChatQuestion({
-      repoRoot,
-      context: chatContext,
-      question,
-      history,
-    });
-    status.completeSpinner(spinner, "Answer generated.");
-    history = turn.history;
-    turns += 1;
-    printChatAnswer(turn.answer, chatContext.contextLabel);
-  }
-
-  ui.setResult(workflowResultTitle, `Context: ${chatContext.contextLabel}\nTurns: ${turns}`);
+  await runLiveChatLoop({
+    chatContext,
+    workflowResultTitle,
+    ui,
+    answerQuestion: (question, history) =>
+      answerReviewChatQuestion({
+        repoRoot,
+        context: chatContext,
+        question,
+        history,
+        events: status.events,
+      }),
+  });
 }
 
 async function maybePostReviewNotes(args: {
@@ -250,7 +224,6 @@ async function runSummaryFlow(args: {
     events: status.events,
   });
   status.stop();
-  console.log();
   printReviewSummary(result);
   ui.setResult(workflowResultTitle, `Context: ${result.contextLabel}`);
 }
@@ -272,7 +245,6 @@ async function runReviewFlow(args: {
   let result = await runOnce();
   while (true) {
     status.stop();
-    console.log();
     printReviewComment(result);
 
     if (input.mode !== "interactive") {
@@ -324,15 +296,16 @@ async function runReviewWorkflowTask(args: {
       return;
     }
   }
-
-  printHorizontalLine();
-  console.log();
-  const status = createWorkflowStatusController({
+  let status = createWorkflowStatusController({
     ui,
     workflow: "review",
   });
   try {
     if (input.workflow === "chat") {
+      status = createWorkflowStatusController({
+        ui,
+        workflow: "reviewChat",
+      });
       await runChatFlow({
         input,
         repoRoot,
@@ -344,6 +317,10 @@ async function runReviewWorkflowTask(args: {
     }
 
     if (input.workflow === "summarize") {
+      status = createWorkflowStatusController({
+        ui,
+        workflow: "reviewSummarize",
+      });
       await runSummaryFlow({
         input,
         workflowResultTitle,
@@ -363,92 +340,6 @@ async function runReviewWorkflowTask(args: {
   }
 }
 
-function printGeneratedCreateMrDraft(draft: {
-  sourceBranch: string;
-  targetBranch: string;
-  title: string;
-  description: string;
-  iteration: number;
-}): void {
-  printReviewSummary({
-    output: draft.description,
-    contextLabel: `MR Draft v${draft.iteration} (${draft.sourceBranch} -> ${draft.targetBranch})`,
-  });
-}
-
-async function runCreateWorkflowTask(args: {
-  repoPath: string;
-  targetBranch?: string;
-  repoRoot: string;
-  mode: WorkflowMode;
-  ui: LiveController;
-}): Promise<void> {
-  const { repoPath, targetBranch, repoRoot, mode, ui } = args;
-  printHorizontalLine();
-  const live = createWorkflowStatusController({
-    ui,
-    workflow: "create_mr",
-    lineBreakOnStop: true,
-  });
-  const result = await runCreateMrWorkflow({
-    repoPath,
-    targetBranch,
-    mode,
-    repoRoot,
-    onDraft: (draft) => {
-      live.stop();
-      printGeneratedCreateMrDraft(draft);
-    },
-    resolveTargetBranch: async ({ defaultBranch }) => {
-      const response = await promptWithFrame(
-        {
-          type: "text",
-          name: "target",
-          message: `Enter target branch (default: ${defaultBranch})`,
-          initial: defaultBranch,
-        },
-        { onCancel: () => true }
-      );
-      return String(response.target ?? "").trim() || defaultBranch;
-    },
-    requestDraftFeedback: async () =>
-      askForOptionalFeedback({
-        confirmMessage: "Do you want to provide feedback to improve the merge request description?",
-      }),
-    confirmUpsert: async ({ existingMrIid }) => {
-      const response = await promptWithFrame(
-        {
-          type: "confirm",
-          name: "shouldProceed",
-          message: existingMrIid
-            ? `Update existing MR !${existingMrIid}?`
-            : "Create merge request?",
-          initial: true,
-        },
-        { onCancel: () => true }
-      );
-      return Boolean(response.shouldProceed);
-    },
-    status: live.status,
-    events: live.events,
-  }).finally(() => {
-    live.close();
-  });
-
-  const statusText =
-    result.action === "updated"
-      ? "Merge Request Updated"
-      : result.action === "created"
-        ? "Merge Request Created"
-        : "Merge Request Cancelled";
-  ui.setResult("Workflow: Merge Request", buildCreateMrResultBody(result));
-  if (result.action === "cancelled") {
-    ui.warning(statusText);
-  } else {
-    ui.success(statusText);
-  }
-}
-
 export async function runReviewCommand(args: string[]): Promise<void> {
   if (args.includes("--help") || args.includes("-h")) {
     printCommandHelp([
@@ -459,19 +350,17 @@ export async function runReviewCommand(args: string[]): Promise<void> {
       {
         title: "OPTIONS",
         lines: [
-          "--workflow, -w <type>       Workflow type: default, summarize, chat, create",
-          "                            default: Code review for merge request",
-          "                            summarize: Summary of MR changes",
-          "                            chat: Interactive Q&A over MR context",
-          "                            create: Create/update merge request draft",
+          "--workflow, -w <type>  Workflow type: default, summarize, chat",
+          "                       default: Code review for merge request",
+          "                       summarize: Summary of MR changes",
+          "                       chat: Interactive Q&A over MR context",
           "",
-          "--path, -p <path>           Path to repository (default: current directory)",
-          "--url, -u <url>             GitLab merge request URL",
-          "--mode, -m <mode>           Mode: interactive or ci (default: interactive)",
-          "--local                     Review uncommitted changes via git diff",
-          "--state, -s <state>         MR state filter: opened, closed, merged, all (default: opened)",
-          "--target-branch, -t <name>  Target branch for create workflow",
-          "--inline-comments           Post inline review comments to GitLab",
+          "--path, -p <path>      Path to repository (default: current directory)",
+          "--url, -u <url>        GitLab merge request URL",
+          "--mode, -m <mode>      Mode: interactive or ci (default: interactive)",
+          "--local                Review uncommitted changes via git diff",
+          "--state, -s <state>    MR state filter: opened, closed, merged, all (default: opened)",
+          "--inline-comments      Post inline review comments to GitLab",
         ],
       },
       {
@@ -480,7 +369,6 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "cr review",
           "cr review --workflow summarize",
           "cr review --workflow chat",
-          "cr review --workflow create --target-branch main",
           "cr review --path /path/to/repo",
           "cr review --url https://gitlab.com/org/repo/-/merge_requests/123",
           "cr review --local",
@@ -494,7 +382,6 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "default     Analyze merge request and generate detailed review comments",
           "summarize   Generate a concise summary of all changes in the MR",
           "chat        Interactive Q&A session about the merge request",
-          "create      Generate or update merge request description from branch changes",
         ],
       },
     ]);
@@ -506,7 +393,6 @@ export async function runReviewCommand(args: string[]): Promise<void> {
   const repoPath = path.resolve(getFlag(args, "path", ".", "-p"));
   const url = getFlag(args, "url", "", "-u") || undefined;
   const workflowRaw = getFlag(args, "workflow", "default", "-w");
-  const targetBranch = getFlag(args, "target-branch", "", "-t") || undefined;
   const stateRaw = getFlag(args, "state", "opened", "-s");
   const local = hasFlag(args, "local");
   const inlineComments = hasFlag(args, "inline-comments");
@@ -523,36 +409,7 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     return;
   }
 
-  const workflow: ReviewCommandWorkflowKind =
-    workflowRaw === "create"
-      ? "create"
-      : workflowRaw === "chat"
-        ? "chat"
-        : workflowRaw === "summarize"
-          ? "summarize"
-          : "review";
-
-  if (workflow === "create") {
-    try {
-      await runLiveTask(
-        "Merge Request",
-        async (ui) =>
-          runCreateWorkflowTask({
-            repoPath,
-            targetBranch,
-            repoRoot,
-            mode,
-            ui,
-          }),
-        "Generate or update a merge request draft from branch changes."
-      );
-    } catch {
-      process.exitCode = 1;
-    }
-    return;
-  }
-
-  const reviewWorkflow: ReviewWorkflowKind =
+  const workflow: ReviewWorkflowKind =
     workflowRaw === "chat" ? "chat" : workflowRaw === "summarize" ? "summarize" : "review";
   const state = ["opened", "closed", "merged", "all"].includes(stateRaw)
     ? (stateRaw as "opened" | "closed" | "merged" | "all")
@@ -562,15 +419,15 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     repoPath,
     repoRoot,
     mode,
-    workflow: reviewWorkflow,
+    workflow,
     local,
     inlineComments,
     url,
     state,
     stdinDiff,
   };
-  const intro = getWorkflowHeadingAndDescription(reviewWorkflow, local);
-  const workflowResultTitle = getWorkflowResultTitle(reviewWorkflow, local);
+  const intro = getWorkflowHeadingAndDescription(workflow, local);
+  const workflowResultTitle = getWorkflowResultTitle(workflow, local);
 
   try {
     await runLiveTask(

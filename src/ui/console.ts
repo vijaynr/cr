@@ -167,9 +167,8 @@ export function printWorkflowOutput(props: {
   contextLabel?: string;
   metadataLines?: string[];
 }): void {
-  printHorizontalLine();
-  console.log();
-  const rendered = renderMarkdown(props.output);
+  printDivider();
+  const rendered = renderMarkdown(props.output).trimEnd();
   console.log(rendered);
 }
 
@@ -180,7 +179,6 @@ function printSection(
   opts?: { bullet?: boolean }
 ): void {
   const bullet = opts?.bullet ?? true;
-  printHorizontalLine(color);
   console.log();
   console.log(color + COLORS.bold + title + COLORS.reset);
   console.log();
@@ -191,7 +189,6 @@ function printSection(
     }
     console.log(color + `${bullet ? `${DOT} ` : ""}` + line + COLORS.reset);
   }
-  console.log();
 }
 
 function formatHelpRows(rows: Array<{ cmd: string; desc: string }>): string[] {
@@ -202,6 +199,33 @@ function formatHelpRows(rows: Array<{ cmd: string; desc: string }>): string[] {
 export function printHorizontalLine(color: string = COLORS.cyan): void {
   const width = getTerminalWidth() - 1;
   console.log(color + BORDERS.horizontal.repeat(width) + COLORS.reset);
+}
+
+export function printDivider(color: string = COLORS.cyan): void {
+  console.log();
+  printHorizontalLine(color);
+  console.log();
+}
+
+export function printHeaderBox(): void {
+  const titleLine = `  cr  ⬤  code reviewer  ⬤  v0.1.0  `;
+  const descLine  = `  vibecheck your codebase  `;
+  const width = Math.max(titleLine.length, descLine.length);
+  const pad = (s: string) => {
+    const total = width - s.length;
+    const left = Math.floor(total / 2);
+    const right = total - left;
+    return " ".repeat(left) + s + " ".repeat(right);
+  };
+  const top = BORDERS.topLeft + BORDERS.horizontal.repeat(width) + BORDERS.topRight;
+  const bot = BORDERS.bottomLeft + BORDERS.horizontal.repeat(width) + BORDERS.bottomRight;
+  console.log();
+  console.log(COLORS.cyan + COLORS.bold + top + COLORS.reset);
+  console.log(COLORS.cyan + COLORS.bold + BORDERS.vertical + pad(titleLine) + BORDERS.vertical + COLORS.reset);
+  console.log(COLORS.cyan + BORDERS.vertical + " ".repeat(width) + BORDERS.vertical + COLORS.reset);
+  console.log(COLORS.cyan + BORDERS.vertical + COLORS.reset + COLORS.dim + pad(descLine) + COLORS.reset + COLORS.cyan + BORDERS.vertical + COLORS.reset);
+  console.log(COLORS.cyan + COLORS.bold + bot + COLORS.reset);
+  console.log();
 }
 
 export async function printBanner(): Promise<void> {
@@ -265,7 +289,8 @@ export function printCommandHelp(sections: { title: string; lines: string[] }[])
 export function printHelpView(): void {
   const commandRows = formatHelpRows([
     { cmd: "cr init", desc: "Configure API and GitLab settings." },
-    { cmd: "cr review", desc: "Run review, summarize, chat, or create workflows." },
+    { cmd: "cr review", desc: "Run review, summarize, or chat workflows." },
+    { cmd: "cr create-mr", desc: "Generate or update a merge request draft." },
     { cmd: "cr help", desc: "Show this help screen." },
   ]);
 
@@ -273,13 +298,12 @@ export function printHelpView(): void {
     { cmd: "cr review --workflow default", desc: "Code review for a merge request." },
     { cmd: "cr review --workflow summarize", desc: "Summary of merge request changes." },
     { cmd: "cr review --workflow chat", desc: "Interactive Q&A over MR context." },
-    { cmd: "cr review --workflow create", desc: "Create/update merge request draft." },
   ]);
 
   const exampleRows = [
     "cr review --path .",
     "cr review --workflow summarize --path .",
-    "cr review --workflow create --path . --target-branch main",
+    "cr create-mr --target-branch main",
     "git diff | cr review --local",
   ];
 

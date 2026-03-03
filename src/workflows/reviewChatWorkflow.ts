@@ -1,17 +1,25 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "../utils/git.js";
 import { type LlmClient } from "../clients/llmClient.js";
 import { loadPrompt } from "../utils/prompts.js";
-import { createWorkflowPhaseReporter } from "../utils/workflow-events.js";
+import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import { type GitLabClient, remoteToProjectPath } from "../clients/gitlabClient.js";
-import { injectMergeRequestContextIntoTemplate } from "../utils/review-workflow-helpers.js";
+import {
+  buildChatPrompt,
+  injectMergeRequestContextIntoTemplate,
+} from "../utils/reviewWorkflowHelpers.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
   loadWorkflowRuntime,
   type WorkflowRuntime,
-} from "../utils/workflow-runtime.js";
-import type { ReviewWorkflowInput, ReviewWorkflowResult } from "../types/workflows.js";
-import { runWorkflow } from "../utils/workflow.js";
+} from "../utils/workflowRuntime.js";
+import type {
+  ReviewChatContext,
+  ReviewChatHistoryEntry,
+  ReviewWorkflowInput,
+  WorkflowEventReporter,
+} from "../types/workflows.js";
+import { runSequentialWorkflow } from "../utils/workflow.js";
 
 type RemoteMrContext = {
   projectPath: string;
@@ -21,16 +29,17 @@ type RemoteMrContext = {
   commits: Awaited<ReturnType<GitLabClient["getMergeRequestCommits"]>>;
 };
 
-type SummarizeGraphState = {
+type ChatGraphState = {
   input: ReviewWorkflowInput;
   runtime: WorkflowRuntime | null;
   llm: LlmClient | null;
   gitlab: GitLabClient | null;
   remoteContext: RemoteMrContext | null;
-  result: ReviewWorkflowResult | null;
+  summary: string;
+  context: ReviewChatContext | null;
 };
 
-const WORKFLOW_NAME = "reviewSummarize";
+const WORKFLOW_NAME = "reviewChat";
 
 function assertRuntime(runtime: WorkflowRuntime | null): WorkflowRuntime {
   if (!runtime) {
@@ -62,6 +71,25 @@ function assertRemoteContext(context: RemoteMrContext | null): RemoteMrContext {
 
 async function runLlmPrompt(prompt: string, llm: LlmClient): Promise<string> {
   return llm.generate(prompt);
+}
+
+function formatChatHistory(history: ReviewChatHistoryEntry[]): string {
+  return history.map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`).join("\n\n");
+}
+
+async function summarizeChatHistory(
+  history: ReviewChatHistoryEntry[],
+  llm: LlmClient
+): Promise<ReviewChatHistoryEntry[]> {
+  if (history.length <= 10) {
+    return history;
+  }
+  const summaryPrompt = [
+    "Summarize the following Q&A chat history in a concise way for future context.",
+    formatChatHistory(history),
+  ].join("\n\n");
+  const summary = (await runLlmPrompt(summaryPrompt, llm)).trim();
+  return [{ question: "Chat history summary", answer: summary }];
 }
 
 async function resolveRemoteMrContext(
@@ -140,94 +168,106 @@ async function getMergeRequestContextNode(state: {
   };
 }
 
-async function performSummaryNode(
-  state: SummarizeGraphState
-): Promise<{ result: ReviewWorkflowResult }> {
-  const runtime = assertRuntime(state.runtime);
+async function generateChatSummaryNode(state: ChatGraphState): Promise<{ summary: string }> {
   const llm = assertLlm(state.llm);
-
-  if (state.input.local) {
-    const diff = state.input.stdinDiff?.trim() ?? "";
-    if (!diff) {
-      throw new Error("No diff provided for local review. Use: git diff | cr review --local");
-    }
-    const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
-    const template = await loadPrompt("summarize.txt", state.input.repoRoot);
-    const prompt = injectMergeRequestContextIntoTemplate(template, {
-      mrContent: "(Local review)",
-      mrChanges: diff,
-      mrCommits: "(N/A)",
-    });
-    phaseReporter.started("local_summary", "Summarizing local changes...");
-    const output = await runLlmPrompt(prompt, llm);
-    phaseReporter.completed("local_summary", "Local summary generated.");
-    return {
-      result: {
-        output,
-        inlineComments: [],
-        contextLabel: "local diff",
-      },
-    };
-  }
-
   const remoteContext = assertRemoteContext(state.remoteContext);
-  const template = await loadPrompt("summarize.txt", state.input.repoRoot);
-  const prompt = injectMergeRequestContextIntoTemplate(template, {
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
+  phaseReporter.started("chat_context_summary", "Summarizing merge request changes...");
+  const summarizeTemplate = await loadPrompt("summarize.txt", state.input.repoRoot);
+  const summarizePrompt = injectMergeRequestContextIntoTemplate(summarizeTemplate, {
     mrContent: JSON.stringify(remoteContext.mr, null, 2),
     mrChanges: JSON.stringify(remoteContext.changes, null, 2),
     mrCommits: JSON.stringify(remoteContext.commits, null, 2),
   });
-  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
-  phaseReporter.started("generate_summary", "Generating summary...");
-  const output = await runLlmPrompt(prompt, llm);
-  phaseReporter.completed("generate_summary", "Summary generated.");
+  const summary = await runLlmPrompt(summarizePrompt, llm);
+  phaseReporter.completed("chat_context_summary", "Summary generated.");
+  return { summary };
+}
+
+async function finalizeChatContextNode(
+  state: ChatGraphState
+): Promise<{ context: ReviewChatContext }> {
+  const remoteContext = assertRemoteContext(state.remoteContext);
   return {
-    result: {
-      output,
-      inlineComments: [],
+    context: {
       contextLabel: `MR !${remoteContext.mrIid} (${remoteContext.projectPath})`,
-      mrIid: remoteContext.mrIid,
-      projectPath: remoteContext.projectPath,
-      gitlabUrl: runtime.gitlabUrl,
+      mrContent: JSON.stringify(remoteContext.mr, null, 2),
+      mrChanges: JSON.stringify(remoteContext.changes, null, 2),
+      mrCommits: JSON.stringify(remoteContext.commits, null, 2),
+      summary: state.summary,
     },
   };
 }
 
-export async function runReviewSummarizeWorkflow(
-  input: ReviewWorkflowInput
-): Promise<ReviewWorkflowResult> {
-  const finalState = await runWorkflow<SummarizeGraphState>({
-    initialState: {
-      input: { ...input, workflow: "summarize" },
+async function runChatStateGraph(input: ReviewWorkflowInput): Promise<ReviewChatContext> {
+  const finalState = await runSequentialWorkflow<ChatGraphState>(
+    {
+      input,
       runtime: null,
       llm: null,
       gitlab: null,
       remoteContext: null,
-      result: null,
+      summary: "",
+      context: null,
     },
-    steps: {
-      loadRuntime: initializeRuntimeNode,
-      validateLlmConfiguration: validateLlmConfigNode,
-      initializeLlmClient: initializeLlmClientNode,
-      initializeGitLabClient: initializeGitLabClientNode,
-      getMergeRequestContext: getMergeRequestContextNode,
-      performSummary: performSummaryNode,
-    },
-    routes: {
-      loadRuntime: "validateLlmConfiguration",
-      validateLlmConfiguration: "initializeLlmClient",
-      initializeLlmClient: (state) =>
-        state.input.local ? "performSummary" : "initializeGitLabClient",
-      initializeGitLabClient: "getMergeRequestContext",
-      getMergeRequestContext: "performSummary",
-      performSummary: "end",
-    },
-    start: "loadRuntime",
-    end: "end",
+    [
+      initializeRuntimeNode,
+      validateLlmConfigNode,
+      initializeLlmClientNode,
+      initializeGitLabClientNode,
+      getMergeRequestContextNode,
+      generateChatSummaryNode,
+      finalizeChatContextNode,
+    ]
+  );
+
+  if (!finalState.context) {
+    throw new Error("Chat workflow did not produce context.");
+  }
+  return finalState.context;
+}
+
+export async function runReviewChatWorkflow(
+  input: ReviewWorkflowInput
+): Promise<ReviewChatContext> {
+  if (input.local) {
+    throw new Error("The --local option is not supported in chat mode.");
+  }
+  return runChatStateGraph(input);
+}
+
+export async function answerReviewChatQuestion(args: {
+  repoRoot: string;
+  context: ReviewChatContext;
+  question: string;
+  history: ReviewChatHistoryEntry[];
+  events?: WorkflowEventReporter;
+}): Promise<{ answer: string; history: ReviewChatHistoryEntry[] }> {
+  const runtime = await loadWorkflowRuntime();
+
+  if (!runtime.openaiApiKey || !runtime.openaiApiUrl) {
+    throw new Error(
+      "Missing LLM configuration. Run `cr init` or set OPENAI_API_KEY/OPENAI_API_URL."
+    );
+  }
+
+  const llm = createRuntimeLlmClient(runtime);
+  const compressedHistory = await summarizeChatHistory(args.history, llm);
+  const chatTemplate = await loadPrompt("chat.txt", args.repoRoot).catch(() => "");
+  const prompt = buildChatPrompt({
+    question: args.question,
+    history: compressedHistory,
+    context: args.context,
+    chatTemplate,
   });
 
-  if (!finalState.result) {
-    throw new Error("Summary workflow did not produce a result.");
-  }
-  return finalState.result;
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, args.events);
+  phaseReporter.started("answering_question", "Thinking...");
+  const answer = await runLlmPrompt(prompt, llm);
+  phaseReporter.completed("answering_question", "");
+
+  return {
+    answer,
+    history: [...compressedHistory, { question: args.question, answer }],
+  };
 }

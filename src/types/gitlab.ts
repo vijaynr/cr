@@ -8,6 +8,8 @@ export type GitLabBranch = {
 
 export type GitLabCompare = {
   diffs?: Array<{ diff?: string }>;
+  commits?: Array<{ id: string; title: string; message: string }>;
+  compare_timeout?: boolean;
 };
 
 export type GitLabMr = {

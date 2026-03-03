@@ -31,7 +31,6 @@
     "ts:typecheck": "bun run typecheck"
   },
   "dependencies": {
-    "@preact/signals-core": "^1.13.0",
     "marked": "^16.4.1",
     "marked-terminal": "^7.3.0",
     "openai": "^6.6.0",

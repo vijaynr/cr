@@ -1,48 +1,42 @@
 import prompts from "prompts";
-import { createRequire } from "node:module";
-import { printHorizontalLine } from "./console.js";
-import { COLORS, DOT } from "./constants.js";
+import { DOT } from "./constants.js";
+import { printDivider } from "./console.js";
 
 type PromptQuestions = Parameters<typeof prompts>[0];
 type PromptOptions = Parameters<typeof prompts>[1];
 type PromptResult = Awaited<ReturnType<typeof prompts>>;
-const require = createRequire(import.meta.url);
-let didPatchPromptSymbols = false;
 
-function patchPromptSymbols(): void {
-  if (didPatchPromptSymbols) {
-    return;
-  }
-  didPatchPromptSymbols = true;
+// √ = Windows tick (U+221A), ✓ = Unix tick (U+2713), ✔ = heavy check (U+2714)
+// ✖ = heavy cross (U+2716), ✗ = ballot X (U+2717), × = multiplication sign (U+00D7)
+const TICK_RE  = /[√✓✔]/g;
+const CROSS_RE = /[✖✗×]/g;
 
-  const setSymbolOverride = (style: {
-    symbol?: (done: boolean, aborted: boolean, exited?: boolean) => string;
-  }): void => {
-    style.symbol = (done: boolean, aborted: boolean, exited?: boolean): string => {
-      if (aborted) {
-        return `${COLORS.red}${DOT}${COLORS.reset}`;
-      }
-      if (exited) {
-        return `${COLORS.yellow}${DOT}${COLORS.reset}`;
-      }
-      if (done) {
-        return `${COLORS.green}${DOT}${COLORS.reset}`;
-      }
-      return `${COLORS.cyan}${DOT}${COLORS.reset}`;
-    };
+/**
+ * Wraps process.stdout.write for the duration of an async call, replacing
+ * prompts' tick/cross symbols with our dot. Restored in a finally block so
+ * the intercept is always scoped tightly to the prompt interaction.
+ */
+async function withDotSymbols<T>(fn: () => Promise<T>): Promise<T> {
+  const orig = process.stdout.write.bind(process.stdout);
+
+  (process.stdout as NodeJS.WriteStream).write = (
+    chunk: Uint8Array | string,
+    encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
+    cb?: (err?: Error | null) => void
+  ): boolean => {
+    if (typeof chunk === "string") {
+      chunk = chunk.replace(TICK_RE, DOT).replace(CROSS_RE, DOT);
+    }
+    if (typeof encodingOrCb === "function") {
+      return orig(chunk, encodingOrCb);
+    }
+    return orig(chunk, encodingOrCb as BufferEncoding, cb);
   };
 
   try {
-    setSymbolOverride(require("prompts/lib/util/style"));
-    return;
-  } catch {
-    // Fall through to dist path for older runtime resolution.
-  }
-
-  try {
-    setSymbolOverride(require("prompts/dist/util/style"));
-  } catch {
-    // Keep default prompt symbols if internal path changes.
+    return await fn();
+  } finally {
+    process.stdout.write = orig;
   }
 }
 
@@ -50,14 +44,11 @@ export async function promptWithFrame(
   questions: PromptQuestions,
   options?: PromptOptions
 ): Promise<PromptResult> {
-  patchPromptSymbols();
-  printHorizontalLine();
-  console.log();
   try {
-    return await prompts(questions, options);
+    printDivider();
+    return await withDotSymbols(() => prompts(questions, options));
   } finally {
-    console.log();
-    // printHorizontalLine();
+    // intentionally empty
   }
 }
 

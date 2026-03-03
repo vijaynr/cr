@@ -1,6 +1,7 @@
 import {
   addInlineMergeRequestComment,
   addMergeRequestComment,
+  branchExists,
   compareBranches,
   createMergeRequest,
   findExistingMergeRequest,
@@ -9,6 +10,7 @@ import {
   getMergeRequestChanges,
   getMergeRequestCommits,
   getMergeRequestInlineComments,
+  getProjectDefaultBranch,
   listBranches,
   listMergeRequests,
   remoteToProjectPath,
@@ -21,6 +23,8 @@ export type { GitLabInlineComment };
 
 export interface GitLabClient {
   listBranches(projectPath: string): Promise<string[]>;
+  getDefaultBranch(projectPath: string): Promise<string>;
+  branchExists(projectPath: string, branchName: string): Promise<boolean>;
   listMergeRequests(
     projectPath: string,
     state: MergeRequestState
@@ -84,6 +88,8 @@ export interface GitLabClient {
 export function createGitLabClient(baseUrl: string, token: string): GitLabClient {
   return {
     listBranches: (projectPath) => listBranches(baseUrl, token, projectPath),
+    getDefaultBranch: (projectPath) => getProjectDefaultBranch(baseUrl, token, projectPath),
+    branchExists: (projectPath, branchName) => branchExists(baseUrl, token, projectPath, branchName),
     listMergeRequests: (projectPath, state) =>
       listMergeRequests(baseUrl, token, projectPath, state),
     findOpenMergeRequestBySourceBranch: (projectPath, sourceBranch) =>

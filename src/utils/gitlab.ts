@@ -9,6 +9,7 @@ import type {
   GitLabDiscussion,
   GitLabInlineComment,
 } from "../types/gitlab.js";
+import { logger } from "./logger.js";
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
@@ -48,22 +49,33 @@ async function gitlabRequest<T>(
   baseUrl: string,
   token: string,
   endpoint: string,
-  init?: RequestInit
+  init?: RequestInit & { silent?: boolean }
 ): Promise<T> {
-  const response = await fetch(`${normalizeBaseUrl(baseUrl)}${endpoint}`, {
-    ...init,
+  const method = init?.method ?? "GET";
+  const url = `${normalizeBaseUrl(baseUrl)}${endpoint}`;
+  logger.debug("gitlab", `${method} ${endpoint}`);
+
+  const { silent, ...fetchInit } = init ?? {};
+  const response = await fetch(url, {
+    ...fetchInit,
     headers: {
       "PRIVATE-TOKEN": token,
       "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
+      ...(fetchInit?.headers ?? {}),
     },
   });
 
   if (!response.ok) {
     const body = await response.text();
+    if (silent) {
+      logger.trace("gitlab", `${method} ${endpoint} → ${response.status} (silent)`);
+    } else {
+      logger.error("gitlab", `${method} ${endpoint} → ${response.status}`, { body });
+    }
     throw new Error(`GitLab API ${response.status}: ${body}`);
   }
 
+  logger.trace("gitlab", `${method} ${endpoint} → ${response.status}`);
   return (await response.json()) as T;
 }
 
@@ -79,12 +91,60 @@ export async function listBranches(
   projectPath: string
 ): Promise<string[]> {
   const encodedProject = encodeURIComponent(projectPath);
-  const result = await gitlabRequest<GitLabBranch[]>(
+  const allBranches: string[] = [];
+  let page = 1;
+
+  while (true) {
+    const result = await gitlabRequest<GitLabBranch[]>(
+      baseUrl,
+      token,
+      `/api/v4/projects/${encodedProject}/repository/branches?per_page=100&page=${page}`
+    );
+    if (result.length === 0) break;
+    allBranches.push(...result.map((b) => b.name));
+    if (result.length < 100) break;
+    page++;
+  }
+
+  logger.debug("gitlab", `listBranches: ${allBranches.length} branches fetched (${page} page(s))`);
+  return allBranches;
+}
+
+export async function branchExists(
+  baseUrl: string,
+  token: string,
+  projectPath: string,
+  branchName: string
+): Promise<boolean> {
+  const encodedProject = encodeURIComponent(projectPath);
+  const encodedBranch = encodeURIComponent(branchName);
+  try {
+    await gitlabRequest<GitLabBranch>(
+      baseUrl,
+      token,
+      `/api/v4/projects/${encodedProject}/repository/branches/${encodedBranch}`,
+      { silent: true }
+    );
+    logger.debug("gitlab", `branchExists: '${branchName}' → true`);
+    return true;
+  } catch {
+    logger.debug("gitlab", `branchExists: '${branchName}' → false`);
+    return false;
+  }
+}
+
+export async function getProjectDefaultBranch(
+  baseUrl: string,
+  token: string,
+  projectPath: string
+): Promise<string> {
+  const encodedProject = encodeURIComponent(projectPath);
+  const project = await gitlabRequest<{ default_branch: string }>(
     baseUrl,
     token,
-    `/api/v4/projects/${encodedProject}/repository/branches?per_page=100`
+    `/api/v4/projects/${encodedProject}`
   );
-  return result.map((b) => b.name);
+  return project.default_branch;
 }
 
 /**
@@ -289,7 +349,27 @@ export async function compareBranches(
   const endpoint = `/api/v4/projects/${encodedProject}/repository/compare?from=${encodeURIComponent(targetBranch)}&to=${encodeURIComponent(sourceBranch)}`;
   const compare = await gitlabRequest<GitLabCompare>(baseUrl, token, endpoint);
   const diffs = compare.diffs ?? [];
-  return diffs.map((d) => d.diff ?? "").join("\n");
+  const diffText = diffs.map((d) => d.diff ?? "").join("\n").trim();
+
+  if (diffText) {
+    return diffText;
+  }
+
+  // GitLab truncates diffs when the changeset is too large (compare_timeout) or too many files.
+  // Fall back to commit messages so the LLM still has meaningful context.
+  const commits = compare.commits ?? [];
+  if (commits.length > 0) {
+    logger.warn(
+      "gitlab",
+      `compareBranches: diffs empty (compare_timeout=${compare.compare_timeout}), falling back to ${commits.length} commit message(s)`
+    );
+    const commitLines = commits
+      .map((c) => `- ${c.id.slice(0, 8)} ${c.title ?? c.message ?? ""}`.trim())
+      .join("\n");
+    return `## Commits (diff unavailable — changeset too large)\n\n${commitLines}`;
+  }
+
+  return "";
 }
 
 export async function findExistingMergeRequest(

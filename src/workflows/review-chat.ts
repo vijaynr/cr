@@ -1,8 +1,8 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "../utils/git.js";
-import { type LlmClient } from "../clients/llm-client.js";
+import { type LlmClient } from "../clients/llmClient.js";
 import { loadPrompt } from "../utils/prompts.js";
 import { createWorkflowPhaseReporter } from "../utils/workflow-events.js";
-import { type GitLabClient, remoteToProjectPath } from "../clients/gitlab-client.js";
+import { type GitLabClient, remoteToProjectPath } from "../clients/gitlabClient.js";
 import {
   buildChatPrompt,
   injectMergeRequestContextIntoTemplate,
@@ -17,6 +17,7 @@ import type {
   ReviewChatContext,
   ReviewChatHistoryEntry,
   ReviewWorkflowInput,
+  WorkflowEventReporter,
 } from "../types/workflows.js";
 import { runSequentialWorkflow } from "../utils/workflow.js";
 
@@ -37,6 +38,8 @@ type ChatGraphState = {
   summary: string;
   context: ReviewChatContext | null;
 };
+
+const WORKFLOW_NAME = "reviewChat";
 
 function assertRuntime(runtime: WorkflowRuntime | null): WorkflowRuntime {
   if (!runtime) {
@@ -112,7 +115,7 @@ async function resolveRemoteMrContext(
     );
   }
 
-  const phaseReporter = createWorkflowPhaseReporter("review", input.events);
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
   phaseReporter.started("load_mr_context", "Loading merge request context...");
   const [mr, changes, commits] = await Promise.all([
     gitlab.getMergeRequest(projectPath, mrIid),
@@ -168,7 +171,7 @@ async function getMergeRequestContextNode(state: {
 async function generateChatSummaryNode(state: ChatGraphState): Promise<{ summary: string }> {
   const llm = assertLlm(state.llm);
   const remoteContext = assertRemoteContext(state.remoteContext);
-  const phaseReporter = createWorkflowPhaseReporter("review", state.input.events);
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
   phaseReporter.started("chat_context_summary", "Summarizing merge request changes...");
   const summarizeTemplate = await loadPrompt("summarize.txt", state.input.repoRoot);
   const summarizePrompt = injectMergeRequestContextIntoTemplate(summarizeTemplate, {
@@ -238,6 +241,7 @@ export async function answerReviewChatQuestion(args: {
   context: ReviewChatContext;
   question: string;
   history: ReviewChatHistoryEntry[];
+  events?: WorkflowEventReporter;
 }): Promise<{ answer: string; history: ReviewChatHistoryEntry[] }> {
   const runtime = await loadWorkflowRuntime();
 
@@ -256,7 +260,12 @@ export async function answerReviewChatQuestion(args: {
     context: args.context,
     chatTemplate,
   });
+
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, args.events);
+  phaseReporter.started("answering_question", "Thinking...");
   const answer = await runLlmPrompt(prompt, llm);
+  phaseReporter.completed("answering_question", "");
+
   return {
     answer,
     history: [...compressedHistory, { question: args.question, answer }],

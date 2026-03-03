@@ -166,4 +166,9 @@ export const DOT = "●";
  */
 export const BORDERS = {
   horizontal: "─",
+  topLeft: "┌",
+  topRight: "┐",
+  bottomLeft: "└",
+  bottomRight: "┘",
+  vertical: "│",
 } as const;
