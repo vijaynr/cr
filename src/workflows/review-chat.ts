@@ -1,18 +1,18 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "../utils/git.js";
 import { type LlmClient } from "../clients/llmClient.js";
-import { loadPrompt } from "../utils/prompts.js";
-import { createWorkflowPhaseReporter } from "../utils/workflow-events.js";
+import { loadPrompt } from "../utils/promptsManager.js";
+import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import { type GitLabClient, remoteToProjectPath } from "../clients/gitlabClient.js";
 import {
   buildChatPrompt,
   injectMergeRequestContextIntoTemplate,
-} from "../utils/review-workflow-helpers.js";
+} from "../utils/reviewWorkflowHelper.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
   loadWorkflowRuntime,
   type WorkflowRuntime,
-} from "../utils/workflow-runtime.js";
+} from "../utils/workflowRuntime.js";
 import type {
   ReviewChatContext,
   ReviewChatHistoryEntry,

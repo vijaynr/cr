@@ -6,7 +6,7 @@ import {
   remoteToProjectPath,
 } from "../clients/gitlabClient.js";
 import { type LlmClient } from "../clients/llmClient.js";
-import { loadPrompt } from "../utils/prompts.js";
+import { loadPrompt } from "../utils/promptsManager.js";
 import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import {
   injectMergeRequestContextIntoTemplate,
@@ -14,7 +14,7 @@ import {
   extractJsonObject,
   parseDiffHunks,
   resolveInlinePosition,
-} from "../utils/reviewWorkflowHelpers.js";
+} from "../utils/reviewWorkflowHelper.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,

@@ -1,9 +1,9 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "../utils/git.js";
 import { type LlmClient } from "../clients/llmClient.js";
-import { loadPrompt } from "../utils/prompts.js";
+import { loadPrompt } from "../utils/promptsManager.js";
 import { createWorkflowPhaseReporter } from "../utils/workflowEvents.js";
 import { type GitLabClient, remoteToProjectPath } from "../clients/gitlabClient.js";
-import { injectMergeRequestContextIntoTemplate } from "../utils/reviewWorkflowHelpers.js";
+import { injectMergeRequestContextIntoTemplate } from "../utils/reviewWorkflowHelper.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,

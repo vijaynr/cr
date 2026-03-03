@@ -37,7 +37,7 @@ export { generateTextWithLlm } from "./llm.js";
 export { renderMarkdownForTerminal } from "./markdown.js";
 
 // Prompts exports
-export { loadPrompt } from "./prompts.js";
+export { loadPrompt } from "./promptsManager.js";
 
 // Spinner exports
 export { createSpinner } from "./spinner.js";
@@ -74,4 +74,4 @@ export {
   extractJsonObject,
   parseDiffHunks,
   resolveInlinePosition,
-} from "./reviewWorkflowHelpers.js";
+} from "./reviewWorkflowHelper.js";
