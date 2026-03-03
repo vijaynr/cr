@@ -1,0 +1,13 @@
+{
+  "name": "@cr/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "openai": "^6.6.0",
+    "zod": "^4.1.12",
+    "marked": "^16.4.1",
+    "marked-terminal": "^7.3.0"
+  }
+}

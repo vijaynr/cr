@@ -1,46 +1,29 @@
 {
-  "name": "cli",
+  "name": "cr-monorepo",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "CR CLI (TypeScript, Bun runtime).",
+  "description": "CR CLI monorepo (TypeScript, Bun runtime).",
   "workspaces": [
     "packages/*"
   ],
-  "bin": {
-    "cr": "./src/cli.ts"
-  },
   "scripts": {
-    "dev": "bun run src/cli.ts",
-    "help": "bun run src/cli.ts help",
-    "init": "bun run src/cli.ts init",
-    "review": "bun run src/cli.ts review",
+    "dev": "bun run packages/cli/src/cli.ts",
+    "help": "bun run packages/cli/src/cli.ts help",
+    "init": "bun run packages/cli/src/cli.ts init",
+    "review": "bun run packages/cli/src/cli.ts review",
+    "create-mr": "bun run packages/cli/src/cli.ts create-mr",
     "test": "bun test tests",
-    "test:integration": "bun test tests",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
-    "format": "prettier --write src",
-    "format:check": "prettier --check src",
-    "build:bin": "bun build --compile --minify src/cli.ts --outfile dist/cr",
-    "build": "bun run typecheck && bun run build:bin",
-    "ts:dev": "bun run dev",
-    "ts:help": "bun run help",
-    "ts:init": "bun run init",
-    "ts:review": "bun run review",
-    "ts:typecheck": "bun run typecheck"
-  },
-  "dependencies": {
-    "marked": "^16.4.1",
-    "marked-terminal": "^7.3.0",
-    "openai": "^6.6.0",
-    "ora": "^8.2.0",
-    "prompts": "^2.4.2",
-    "zod": "^4.1.12"
+    "lint": "eslint packages --ext .ts",
+    "lint:fix": "eslint packages --ext .ts --fix",
+    "format": "prettier --write packages",
+    "format:check": "prettier --check packages",
+    "build:bin": "bun build --compile --minify packages/cli/src/cli.ts --outfile dist/cr",
+    "build": "bun run typecheck && bun run build:bin"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
-    "@types/prompts": "^2.4.9",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",

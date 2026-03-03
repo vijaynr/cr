@@ -9,7 +9,12 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": ["node"],
-    "outDir": "dist-ts"
+    "outDir": "dist-ts",
+    "paths": {
+      "@cr/core": ["./packages/core/src/index.ts"],
+      "@cr/workflows": ["./packages/workflows/src/index.ts"],
+      "@cr/ui": ["./packages/ui/src/index.ts"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["packages/*/src/**/*"]
 }

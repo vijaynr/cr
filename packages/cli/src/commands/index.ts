@@ -1,0 +1,48 @@
+import { printBanner, printHeaderBox } from "@cr/ui";
+
+export async function runCommand(args: string[]): Promise<void> {
+  const [command = "help", ...rest] = args;
+  const showFullBanner = args.includes("--show-banner");
+  const filteredRest = rest.filter((a) => a !== "--show-banner");
+
+  if (showFullBanner) {
+    await printBanner();
+  }
+  printHeaderBox();
+
+  switch (command) {
+    case "help":
+    case "--help":
+    case "-h":
+      {
+        const { runHelpCommand } = await import("./helpCommand.js");
+        await runHelpCommand();
+      }
+      return;
+    case "init":
+      {
+        const { runInitCommand } = await import("./initCommand.js");
+        await runInitCommand();
+      }
+      return;
+    case "review":
+      {
+        const { runReviewCommand } = await import("./reviewCommand.js");
+        await runReviewCommand(filteredRest);
+      }
+      return;
+    case "create-mr":
+      {
+        const { runCreateMergeRequestCommand } = await import("./createMrCommand.js");
+        await runCreateMergeRequestCommand(filteredRest);
+      }
+      return;
+    default:
+      console.error(`Unknown command: ${command}`);
+      {
+        const { runHelpCommand } = await import("./helpCommand.js");
+        await runHelpCommand();
+      }
+      process.exitCode = 1;
+  }
+}
