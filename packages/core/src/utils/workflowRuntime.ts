@@ -6,6 +6,13 @@ import { logger } from "./logger.js";
 export type WorkflowRuntime = {
   gitlabUrl: string;
   gitlabKey: string;
+  gitlabWebhookSecret?: string;
+  sslCertPath?: string;
+  sslKeyPath?: string;
+  sslCaPath?: string;
+  webhookConcurrency: number;
+  webhookQueueLimit: number;
+  webhookJobTimeoutMs: number;
   openaiApiUrl: string;
   openaiApiKey: string;
   openaiModel: string;
@@ -22,9 +29,16 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
       ? envCustomStreaming.toLowerCase() === "true"
       : (config.useCustomStreaming ?? false);
 
-  const runtime = {
+  const runtime: WorkflowRuntime = {
     gitlabUrl: envOrConfig("GITLAB_URL", config.gitlabUrl, ""),
     gitlabKey: envOrConfig("GITLAB_KEY", config.gitlabKey, ""),
+    gitlabWebhookSecret: envOrConfig("GITLAB_WEBHOOK_SECRET", config.gitlabWebhookSecret, ""),
+    sslCertPath: envOrConfig("SSL_CERT_PATH", config.sslCertPath, ""),
+    sslKeyPath: envOrConfig("SSL_KEY_PATH", config.sslKeyPath, ""),
+    sslCaPath: envOrConfig("SSL_CA_PATH", config.sslCaPath, ""),
+    webhookConcurrency: Number.parseInt(envOrConfig("WEBHOOK_CONCURRENCY", config.webhookConcurrency?.toString(), "3"), 10),
+    webhookQueueLimit: Number.parseInt(envOrConfig("WEBHOOK_QUEUE_LIMIT", config.webhookQueueLimit?.toString(), "50"), 10),
+    webhookJobTimeoutMs: Number.parseInt(envOrConfig("WEBHOOK_JOB_TIMEOUT_MS", config.webhookJobTimeoutMs?.toString(), "600000"), 10), // 10 mins default
     openaiApiUrl: envOrConfig("OPENAI_API_URL", config.openaiApiUrl, ""),
     openaiApiKey: envOrConfig("OPENAI_API_KEY", config.openaiApiKey, ""),
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),

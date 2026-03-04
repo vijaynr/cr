@@ -1,4 +1,4 @@
-import type { WorkflowKind } from "../types/workflows.js";
+import type { WorkflowKind } from "@cr/core";
 
 export type ReviewWorkflowKind = WorkflowKind;
 
@@ -75,29 +75,4 @@ export function getWorkflowResultTitle(workflow: ReviewWorkflowKind, local: bool
     return local ? "Workflow: Local Changes Summary" : "Workflow: Merge Request Summary";
   }
   return "Workflow: Code Review";
-}
-
-export function buildCreateMrResultBody(result: {
-  action: "updated" | "created" | "cancelled";
-  sourceBranch: string;
-  targetBranch: string;
-  title: string;
-  mergeRequestUrl?: string;
-}): string {
-  const status =
-    result.action === "updated"
-      ? "Merge Request Updated"
-      : result.action === "created"
-        ? "Merge Request Created"
-        : "Merge Request Cancelled";
-  const bodyLines = [
-    `Status: ${status}`,
-    `Source: ${result.sourceBranch}`,
-    `Target: ${result.targetBranch}`,
-    `Title: ${result.title}`,
-  ];
-  if (result.mergeRequestUrl) {
-    bodyLines.push(`URL: ${result.mergeRequestUrl}`);
-  }
-  return bodyLines.join("\n");
 }

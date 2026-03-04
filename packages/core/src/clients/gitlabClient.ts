@@ -1,6 +1,4 @@
 import {
-  addInlineMergeRequestComment,
-  addMergeRequestComment,
   branchExists,
   compareBranches,
   createMergeRequest,
@@ -9,13 +7,17 @@ import {
   getMergeRequest,
   getMergeRequestChanges,
   getMergeRequestCommits,
-  getMergeRequestInlineComments,
   getProjectDefaultBranch,
   listBranches,
   listMergeRequests,
   remoteToProjectPath,
   updateMergeRequest,
 } from "../utils/gitlab.js";
+import {
+  addInlineMergeRequestComment,
+  addMergeRequestComment,
+  getMergeRequestInlineComments,
+} from "../utils/gitlabComments.js";
 import type { GitLabInlineComment } from "../types/gitlab.js";
 import type { MergeRequestState } from "../types/workflows.js";
 

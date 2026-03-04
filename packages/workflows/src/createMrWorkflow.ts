@@ -3,7 +3,7 @@ import { type LlmClient } from "@cr/core";
 import { getCurrentBranch, getOriginRemoteUrl } from "@cr/core";
 import { logger } from "@cr/core";
 import { loadPrompt } from "@cr/core";
-import { createWorkflowPhaseReporter } from "@cr/core";
+import { createWorkflowPhaseReporter } from "./workflowEvents.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,

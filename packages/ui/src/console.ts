@@ -1,4 +1,4 @@
-import { renderMarkdownForTerminal } from "@cr/core";
+import { renderMarkdownForTerminal } from "./markdown.js";
 import { COLORS, DOT, BORDERS, BANNER_COLOR } from "./constants.js";
 import { BANNER_TEXT, BANNER_LOGO } from "./banner.js";
 
@@ -68,11 +68,9 @@ async function sleep(ms: number): Promise<void> {
   await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-function renderBinaryLines(lines: string[], terminalWidth: number): void {
+function renderBinaryLines(lines: string[]): void {
   for (const line of lines) {
-    process.stdout.write(
-      COLORS.cyan + COLORS.dim + centerLine(line, terminalWidth) + COLORS.reset + "\n"
-    );
+    process.stdout.write(COLORS.cyan + COLORS.dim + line + COLORS.reset + "\n");
   }
 }
 
@@ -82,7 +80,7 @@ function renderBannerLines(lines: string[]): void {
   }
 }
 
-async function renderAnimatedBinary(binaryLines: string[], terminalWidth: number): Promise<void> {
+async function renderAnimatedBinary(binaryLines: string[]): Promise<void> {
   const frameCount = 16;
   const frameDelayMs = 70;
   for (let frame = 0; frame < frameCount; frame += 1) {
@@ -91,15 +89,14 @@ async function renderAnimatedBinary(binaryLines: string[], terminalWidth: number
     }
     const jitter = (frameCount - 1 - frame) / (frameCount - 1);
     const frameLines = binaryLines.map((line) => scrambleBinaryText(line, jitter));
-    renderBinaryLines(frameLines, terminalWidth);
+    renderBinaryLines(frameLines);
     await sleep(frameDelayMs);
   }
 }
 
 async function renderAnimatedBannerText(
   bannerLines: string[],
-  binaryLines: string[],
-  terminalWidth: number
+  binaryLines: string[]
 ): Promise<void> {
   const frameCount = 12;
   const frameDelayMs = 60;
@@ -110,7 +107,7 @@ async function renderAnimatedBannerText(
     const jitter = (frameCount - 1 - frame) / (frameCount - 1);
     const frameBanner = bannerLines.map((line) => scrambleBannerLine(line, jitter));
     renderBannerLines(frameBanner);
-    renderBinaryLines(binaryLines, terminalWidth);
+    renderBinaryLines(binaryLines);
     await sleep(frameDelayMs);
   }
 }
@@ -258,23 +255,26 @@ export function printHeaderBox(): void {
 
 export async function printBanner(): Promise<void> {
   const banner = loadBannerText();
-  const terminalWidth = getTerminalWidth();
-  const centeredBannerLines = banner.split("\n").map((line) => centerLine(line, terminalWidth));
+  const bannerLines = banner.split("\n");
   const binary = toBinaryText(BINARY_BANNER_LABEL);
   const wrappedBinary = wrapTextByWidth(binary, 80);
   console.log();
-  renderBannerLines(centeredBannerLines);
+  renderBannerLines(bannerLines);
   if (shouldAnimateBanner()) {
-    await renderAnimatedBinary(wrappedBinary, terminalWidth);
-    await renderAnimatedBannerText(centeredBannerLines, wrappedBinary, terminalWidth);
+    await renderAnimatedBinary(wrappedBinary);
+    await renderAnimatedBannerText(bannerLines, wrappedBinary);
   } else {
-    renderBinaryLines(wrappedBinary, terminalWidth);
+    renderBinaryLines(wrappedBinary);
   }
   console.log();
 }
 
 export function printSuccess(message: string): void {
   console.log(COLORS.green + `${DOT} ` + message + COLORS.reset);
+}
+
+export function printInfo(message: string): void {
+  console.log(COLORS.cyan + `${DOT} ` + message + COLORS.reset);
 }
 
 export function printWarning(message: string): void {
@@ -316,9 +316,11 @@ export function printCommandHelp(sections: { title: string; lines: string[] }[])
 
 export function printHelpView(): void {
   const commandRows = formatHelpRows([
-    { cmd: "cr init", desc: "Configure API and GitLab settings." },
+    { cmd: "cr init", desc: "Initialize configuration. Use --sdd or --webhook for specific setups." },
+    { cmd: "cr config", desc: "View or edit complete configuration." },
     { cmd: "cr review", desc: "Run review, summarize, or chat workflows." },
     { cmd: "cr create-mr", desc: "Generate or update a merge request draft." },
+    { cmd: "cr serve", desc: "Start a webhook server for GitLab events." },
     { cmd: "cr help", desc: "Show this help screen." },
   ]);
 

@@ -2,7 +2,7 @@ import path from "node:path";
 import { printCommandHelp } from "@cr/ui";
 import { createWorkflowStatusController, runLiveTask, runLiveCreateMrTask } from "@cr/ui";
 import { repoRootFromModule } from "@cr/core";
-import { getFlag } from "@cr/core";
+import { getFlag } from "../cliHelpers.js";
 import { runCreateMrWorkflow } from "@cr/workflows";
 import type { WorkflowMode } from "@cr/core";
 

@@ -13,8 +13,30 @@ import type {
 import { COLORS, DOT } from "./constants.js";
 import { printChatAnswer, printDivider, printReviewSummary, printWarning } from "./console.js";
 import { askForOptionalFeedback, promptWithFrame } from "./prompt.js";
-import { buildCreateMrResultBody } from "@cr/core";
-import { createSpinner, type OraSpinner } from "./spinner.js";
+function buildCreateMrResultBody(result: {
+  action: "updated" | "created" | "cancelled";
+  sourceBranch: string;
+  targetBranch: string;
+  title: string;
+  mergeRequestUrl?: string;
+}): string {
+  const status =
+    result.action === "updated"
+      ? "Merge Request Updated"
+      : result.action === "created"
+        ? "Merge Request Created"
+        : "Merge Request Cancelled";
+  const lines = [
+    `Status: ${status}`,
+    `Source: ${result.sourceBranch}`,
+    `Target: ${result.targetBranch}`,
+    `Title: ${result.title}`,
+  ];
+  if (result.mergeRequestUrl) {
+    lines.push(`URL: ${result.mergeRequestUrl}`);
+  }
+  return lines.join("\n");
+}import { createSpinner, type OraSpinner } from "./spinner.js";
 
 type LiveLevel = "info" | "success" | "warning" | "error";
 

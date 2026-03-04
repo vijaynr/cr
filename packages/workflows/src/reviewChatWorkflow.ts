@@ -1,12 +1,12 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "@cr/core";
 import { type LlmClient } from "@cr/core";
 import { loadPrompt } from "@cr/core";
-import { createWorkflowPhaseReporter } from "@cr/core";
+import { createWorkflowPhaseReporter } from "./workflowEvents.js";
 import { type GitLabClient, remoteToProjectPath } from "@cr/core";
 import {
   buildChatPrompt,
   injectMergeRequestContextIntoTemplate,
-} from "@cr/core";
+} from "./reviewWorkflowHelper.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,

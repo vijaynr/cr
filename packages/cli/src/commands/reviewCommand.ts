@@ -24,7 +24,7 @@ import {
   hasFlag,
   readStdinDiff,
   type ReviewWorkflowKind,
-} from "@cr/core";
+} from "../cliHelpers.js";
 import {
   maybePostReviewComment,
   runReviewWorkflow,
@@ -198,16 +198,7 @@ async function maybePostReviewNotes(args: {
 
   const postedSummaryNoteId = posted.summaryNoteId;
   const postedInlineCount = posted.inlineNoteIds.length;
-  if (postedInlineCount > 0) {
-    args.ui.success(
-      `Posted ${postedInlineCount} inline review comment(s)${
-        postedSummaryNoteId ? ` + summary note ${postedSummaryNoteId}` : ""
-      }.`
-    );
-  } else if (postedSummaryNoteId) {
-    args.ui.success(`Posted review note: ${postedSummaryNoteId}`);
-  }
-
+  
   return { postedSummaryNoteId, postedInlineCount };
 }
 

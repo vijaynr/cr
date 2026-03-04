@@ -2,3 +2,8 @@ export * from "./reviewWorkflow.js";
 export * from "./reviewChatWorkflow.js";
 export * from "./reviewSummarizeWorkflow.js";
 export * from "./createMrWorkflow.js";
+export * from "./workflowEvents.js";
+export * from "./reviewWorkflowHelper.js";
+export * from "./reviewWorkflowComments.js";
+export * from "./reviewWorkflowInlineHelper.js";
+export * from "./diffUtils.js";

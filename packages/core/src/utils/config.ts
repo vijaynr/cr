@@ -11,6 +11,13 @@ const configSchema = z.object({
   useCustomStreaming: z.boolean(),
   gitlabUrl: z.string(),
   gitlabKey: z.string(),
+  gitlabWebhookSecret: z.string().optional(),
+  sslCertPath: z.string().optional(),
+  sslKeyPath: z.string().optional(),
+  sslCaPath: z.string().optional(),
+  webhookConcurrency: z.number().int().min(1).optional(),
+  webhookQueueLimit: z.number().int().min(1).optional(),
+  webhookJobTimeoutMs: z.number().int().min(1000).optional(),
   terminalTheme: z.enum(["auto", "dark", "light"]).optional(),
 });
 
@@ -81,6 +88,13 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
     useCustomStreaming: (section.use_custom_streaming ?? "false").toLowerCase() === "true",
     gitlabUrl: section.gitlab_url ?? "",
     gitlabKey: section.gitlab_key ?? "",
+    gitlabWebhookSecret: section.gitlab_webhook_secret ?? undefined,
+    sslCertPath: section.ssl_cert_path ?? undefined,
+    sslKeyPath: section.ssl_key_path ?? undefined,
+    sslCaPath: section.ssl_ca_path ?? undefined,
+    webhookConcurrency: section.webhook_concurrency ? Number.parseInt(section.webhook_concurrency, 10) : undefined,
+    webhookQueueLimit: section.webhook_queue_limit ? Number.parseInt(section.webhook_queue_limit, 10) : undefined,
+    webhookJobTimeoutMs: section.webhook_job_timeout_ms ? Number.parseInt(section.webhook_job_timeout_ms, 10) : undefined,
     terminalTheme: section.terminal_theme as "auto" | "dark" | "light" | undefined,
   };
 
@@ -101,6 +115,13 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       use_custom_streaming: parsed.useCustomStreaming ? "true" : "false",
       gitlab_url: parsed.gitlabUrl,
       gitlab_key: parsed.gitlabKey,
+      ...(parsed.gitlabWebhookSecret && { gitlab_webhook_secret: parsed.gitlabWebhookSecret }),
+      ...(parsed.sslCertPath && { ssl_cert_path: parsed.sslCertPath }),
+      ...(parsed.sslKeyPath && { ssl_key_path: parsed.sslKeyPath }),
+      ...(parsed.sslCaPath && { ssl_ca_path: parsed.sslCaPath }),
+      ...(parsed.webhookConcurrency && { webhook_concurrency: String(parsed.webhookConcurrency) }),
+      ...(parsed.webhookQueueLimit && { webhook_queue_limit: String(parsed.webhookQueueLimit) }),
+      ...(parsed.webhookJobTimeoutMs && { webhook_job_timeout_ms: String(parsed.webhookJobTimeoutMs) }),
       ...(parsed.terminalTheme && { terminal_theme: parsed.terminalTheme }),
     },
   });

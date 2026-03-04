@@ -5,6 +5,13 @@ export type CRConfig = {
   useCustomStreaming: boolean; // Use custom SSE streaming instead of standard OpenAI SDK
   gitlabUrl: string;
   gitlabKey: string;
+  gitlabWebhookSecret?: string;
+  sslCertPath?: string;
+  sslKeyPath?: string;
+  sslCaPath?: string;
+  webhookConcurrency?: number;
+  webhookQueueLimit?: number;
+  webhookJobTimeoutMs?: number;
   terminalTheme?: "auto" | "dark" | "light"; // Optional theme override
 };
 

@@ -22,7 +22,13 @@ export async function runCommand(args: string[]): Promise<void> {
     case "init":
       {
         const { runInitCommand } = await import("./initCommand.js");
-        await runInitCommand();
+        await runInitCommand(filteredRest);
+      }
+      return;
+    case "config":
+      {
+        const { runConfigCommand } = await import("./configCommand.js");
+        await runConfigCommand();
       }
       return;
     case "review":
@@ -35,6 +41,12 @@ export async function runCommand(args: string[]): Promise<void> {
       {
         const { runCreateMergeRequestCommand } = await import("./createMrCommand.js");
         await runCreateMergeRequestCommand(filteredRest);
+      }
+      return;
+    case "serve":
+      {
+        const { runServeCommand } = await import("./serveCommand.js");
+        await runServeCommand(filteredRest);
       }
       return;
     default:

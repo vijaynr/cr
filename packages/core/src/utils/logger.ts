@@ -57,6 +57,10 @@ class Logger {
     this.enqueue(formatEntry("INFO", context, message, data));
   }
 
+  success(context: string, message: string, data?: unknown): void {
+    this.enqueue(formatEntry("INFO", context, `SUCCESS: ${message}`, data));
+  }
+
   warn(context: string, message: string, data?: unknown): void {
     this.enqueue(formatEntry("WARN", context, message, data));
   }

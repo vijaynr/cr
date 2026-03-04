@@ -7,14 +7,16 @@ import {
 } from "@cr/core";
 import { type LlmClient } from "@cr/core";
 import { loadPrompt } from "@cr/core";
-import { createWorkflowPhaseReporter } from "@cr/core";
+import { createWorkflowPhaseReporter } from "./workflowEvents.js";
 import {
   injectMergeRequestContextIntoTemplate,
   buildChatPrompt,
   extractJsonObject,
   parseDiffHunks,
   resolveInlinePosition,
-} from "@cr/core";
+  buildInlineReviewPrompt,
+} from "./reviewWorkflowHelper.js";
+import { maybePostReviewComment } from "./reviewWorkflowComments.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
@@ -35,11 +37,6 @@ export type {
   ReviewWorkflowResult,
 } from "@cr/core";
 
-type PostReviewCommentResult = {
-  summaryNoteId?: string;
-  inlineNoteIds: string[];
-};
-
 type RemoteMrContext = {
   projectPath: string;
   mrIid: number;
@@ -57,15 +54,6 @@ type ReviewGraphState = {
   result: ReviewWorkflowResult | null;
   pendingFeedback: string;
   feedbackUsed: boolean;
-};
-
-type PostReviewGraphState = {
-  result: ReviewWorkflowResult;
-  mode: WorkflowMode;
-  enabled: boolean;
-  gitlabKey: string;
-  shouldPost: boolean;
-  posted: PostReviewCommentResult | null;
 };
 
 const WORKFLOW_NAME = "review";
@@ -123,54 +111,6 @@ async function resolveRemoteMrContext(
   phaseReporter.completed("load_mr_context", "Loaded merge request context.");
 
   return { projectPath, mrIid, mr, changes, commits };
-}
-
-function buildInlineReviewPrompt(args: {
-  filePath: string;
-  diffText: string;
-  mrContent: string;
-  mrCommits: string;
-  existingInlineComments: GitLabInlineComment[];
-  userFeedback?: string;
-}): string {
-  const existing = args.existingInlineComments.map((c) => ({
-    line: c.line,
-    position_type: c.positionType,
-    body: c.body,
-  }));
-  const body = [
-    "You are reviewing one file from a merge request.",
-    "Return ONLY valid JSON in this format:",
-    '{"findings":[{"should_comment": true|false, "severity":"Critical|High|Medium|Low", "summary": "string", "suggested_fix": "string|null", "line": number|null, "position_type":"new|old|null", "evidence_snippet":"string|null"}]}',
-    "",
-    "Rules:",
-    "- Return one finding object per distinct issue in this file.",
-    "- If no issues, return an empty list for findings.",
-    "- should_comment=true only for actionable issues.",
-    "- summary must be concise and specific.",
-    "- suggested_fix must provide a concrete code-level fix when should_comment=true.",
-    "- suggested_fix should be null when should_comment=false.",
-    "- line should be the most relevant changed line number from this diff if possible.",
-    "- position_type should be 'old' for deleted-code issues; otherwise use 'new' when possible.",
-    "- evidence_snippet should be a short exact code phrase from the relevant changed line.",
-    "- Do not repeat feedback that already exists in inline discussions.",
-    "",
-    "MR details:",
-    args.mrContent,
-    "",
-    "Commits:",
-    args.mrCommits,
-    "",
-    `File path: ${args.filePath}`,
-    `Existing inline comments for this file:\n${JSON.stringify(existing)}`,
-    "",
-    `Diff:\n${args.diffText}`,
-  ].join("\n");
-
-  if (args.userFeedback?.trim()) {
-    return `Human feedback for this re-run:\n${args.userFeedback.trim()}\n\n${body}`;
-  }
-  return body;
 }
 
 async function buildInlineRemoteReview(
@@ -525,91 +465,6 @@ export async function runReviewWorkflow(input: ReviewWorkflowInput): Promise<Rev
     throw new Error("Use reviewChatWorkflow.ts or reviewSummarizeWorkflow.ts for non-review workflows.");
   }
   return runReviewStateGraph(input);
-}
-
-export async function maybePostReviewComment(
-  result: ReviewWorkflowResult,
-  mode: WorkflowMode,
-  enabled: boolean,
-  gitlabKey: string
-): Promise<PostReviewCommentResult | null> {
-  const finalState = await runWorkflow<PostReviewGraphState>({
-    initialState: {
-      result,
-      mode,
-      enabled,
-      gitlabKey,
-      shouldPost: false,
-      posted: null,
-    },
-    steps: {
-      decidePostReview: async (state) => {
-        if (
-          !state.enabled ||
-          !state.result.gitlabUrl ||
-          !state.result.projectPath ||
-          !state.result.mrIid
-        ) {
-          return { shouldPost: false, posted: null };
-        }
-        return { shouldPost: state.enabled };
-      },
-      submitReviewToGitlab: async (state) => {
-        if (
-          !state.shouldPost ||
-          !state.result.gitlabUrl ||
-          !state.result.projectPath ||
-          !state.result.mrIid
-        ) {
-          return { posted: null };
-        }
-
-        const gitlab = createGitLabClient(state.result.gitlabUrl, state.gitlabKey);
-        const inlineNoteIds: string[] = [];
-
-        if (state.result.inlineComments.length > 0) {
-          for (const inline of state.result.inlineComments) {
-            const noteId = await gitlab.addInlineMergeRequestComment(
-              state.result.projectPath,
-              state.result.mrIid,
-              inline.comment,
-              inline.filePath,
-              inline.line,
-              inline.positionType
-            );
-            inlineNoteIds.push(noteId);
-          }
-        }
-
-        const summaryBody =
-          state.result.inlineComments.length > 0
-            ? [
-                "## Overall Review Summary",
-                "",
-                state.result.overallSummary?.trim() || state.result.output,
-                "",
-                "> **AI-Assisted Review:** Treat this as a first-pass analysis and confirm all findings manually.",
-              ].join("\n")
-            : state.result.output;
-
-        const summaryNoteId = await gitlab.addMergeRequestComment(
-          state.result.projectPath,
-          state.result.mrIid,
-          summaryBody
-        );
-
-        return { posted: { summaryNoteId, inlineNoteIds } };
-      },
-    },
-    routes: {
-      decidePostReview: (state) => (state.shouldPost ? "submitReviewToGitlab" : "end"),
-      submitReviewToGitlab: "end",
-    },
-    start: "decidePostReview",
-    end: "end",
-  });
-
-  return finalState.posted;
 }
 
 export const __test__ = {

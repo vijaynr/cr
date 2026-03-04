@@ -8,6 +8,8 @@ export type {
   WorkflowEventReporter,
   WorkflowName,
   WorkflowUiEvent,
+  WorkflowKind,
+  WorkflowPhaseMap,
   CreateMrWorkflowInput,
   CreateMrWorkflowResult,
   CreateMrDraft,

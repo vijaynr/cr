@@ -20,28 +20,29 @@ export {
   getMergeRequest,
   getMergeRequestChanges,
   getMergeRequestCommits,
-  addMergeRequestComment,
-  getMergeRequestInlineComments,
-  addInlineMergeRequestComment,
   compareBranches,
   findExistingMergeRequest,
   createMergeRequest,
   updateMergeRequest,
   type GitLabInlineComment,
 } from "./gitlab.js";
+export {
+  addMergeRequestComment,
+  getMergeRequestInlineComments,
+  addInlineMergeRequestComment,
+} from "./gitlabComments.js";
 
 // LLM exports
 export { generateTextWithLlm } from "./llm.js";
 
-// Markdown exports
-export { renderMarkdownForTerminal } from "./markdown.js";
-
 // Prompts exports
 export { loadPrompt } from "./promptsManager.js";
 
-
 // Bootstrap exports
 export { initializeCRHome } from "./bootstrap.js";
+
+// Specs exports
+export { setupSpecs, type SpecTarget } from "./specs.js";
 
 // Workflow runtime exports
 export {
@@ -50,26 +51,3 @@ export {
   createRuntimeGitLabClient,
   type WorkflowRuntime,
 } from "./workflowRuntime.js";
-
-// Workflow events exports
-export { createWorkflowPhaseReporter } from "./workflowEvents.js";
-
-// Review command utilities
-export {
-  getWorkflowHeadingAndDescription,
-  getWorkflowResultTitle,
-  buildCreateMrResultBody,
-  hasFlag,
-  getFlag,
-  readStdinDiff,
-  type ReviewWorkflowKind,
-} from "./reviewCommandHelper.js";
-
-// Review workflow helpers
-export {
-  injectMergeRequestContextIntoTemplate,
-  buildChatPrompt,
-  extractJsonObject,
-  parseDiffHunks,
-  resolveInlinePosition,
-} from "./reviewWorkflowHelper.js";
