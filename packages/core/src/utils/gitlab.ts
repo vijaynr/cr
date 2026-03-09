@@ -6,7 +6,6 @@ import type {
   GitLabMrWithBasics,
   GitLabCommit,
   GitLabMrChangesResponse,
-  GitLabDiscussion,
   GitLabInlineComment,
 } from "../types/gitlab.js";
 import { logger } from "./logger.js";
@@ -262,7 +261,10 @@ export async function compareBranches(
   const endpoint = `/api/v4/projects/${encodedProject}/repository/compare?from=${encodeURIComponent(targetBranch)}&to=${encodeURIComponent(sourceBranch)}`;
   const compare = await gitlabRequest<GitLabCompare>(baseUrl, token, endpoint);
   const diffs = compare.diffs ?? [];
-  const diffText = diffs.map((d) => d.diff ?? "").join("\n").trim();
+  const diffText = diffs
+    .map((d) => d.diff ?? "")
+    .join("\n")
+    .trim();
 
   if (diffText) {
     return diffText;

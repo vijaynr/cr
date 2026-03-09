@@ -8,7 +8,7 @@ type PromptResult = Awaited<ReturnType<typeof prompts>>;
 
 // √ = Windows tick (U+221A), ✓ = Unix tick (U+2713), ✔ = heavy check (U+2714)
 // ✖ = heavy cross (U+2716), ✗ = ballot X (U+2717), × = multiplication sign (U+00D7)
-const TICK_RE  = /[√✓✔]/g;
+const TICK_RE = /[√✓✔]/g;
 const CROSS_RE = /[✖✗×]/g;
 
 /**

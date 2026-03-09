@@ -11,4 +11,4 @@ export const BANNER_LOGO: string = `
   ▄   ▄
  ▐██▄██▌
   ▀ ▀ ▀
-`
+`;

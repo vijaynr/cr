@@ -71,7 +71,11 @@ export function getWorkflowHeadingAndDescription(
   };
 }
 
-export function getWorkflowResultTitle(workflow: ReviewWorkflowKind, local: boolean, provider?: string): string {
+export function getWorkflowResultTitle(
+  workflow: ReviewWorkflowKind,
+  local: boolean,
+  provider?: string
+): string {
   const isRB = provider === "reviewboard";
   const itemType = isRB ? "Review Request (Reviewboard)" : "Merge Request";
 

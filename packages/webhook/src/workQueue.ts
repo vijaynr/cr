@@ -1,4 +1,9 @@
-import { runReviewWorkflow, maybePostReviewComment, runReviewBoardWorkflow, maybePostReviewBoardComment } from "@cr/workflows";
+import {
+  runReviewWorkflow,
+  maybePostReviewComment,
+  runReviewBoardWorkflow,
+  maybePostReviewBoardComment,
+} from "@cr/workflows";
 import { logger, repoRootFromModule, type WorkflowRuntime } from "@cr/core";
 import type { ReviewJob } from "./index.js";
 
@@ -36,7 +41,7 @@ export class WorkQueue {
 
     this.queue.push(job);
     console.log(`[QUEUE] Job ${jobId} queued (Position: ${this.queue.length})`);
-    
+
     // Start processing if workers available
     this.processNext();
 
@@ -58,7 +63,9 @@ export class WorkQueue {
     job.status = "processing";
     job.startedAt = new Date();
 
-    console.log(`[WORKER] Starting job ${job.id} (Active: ${this.activeWorkers}/${this.runtime.webhookConcurrency}, Mode: ${this.mode})`);
+    console.log(
+      `[WORKER] Starting job ${job.id} (Active: ${this.activeWorkers}/${this.runtime.webhookConcurrency}, Mode: ${this.mode})`
+    );
 
     try {
       // Create a promise that rejects after timeout
@@ -122,7 +129,7 @@ export class WorkQueue {
       this.processing.delete(job.id);
       this.completed.set(job.id, job);
       this.activeWorkers--;
-      
+
       // Cleanup old completed jobs (keep last 100)
       if (this.completed.size > 100) {
         const oldestId = this.completed.keys().next().value;

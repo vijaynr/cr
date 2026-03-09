@@ -5,6 +5,7 @@ Inputs:
 {{INPUT_DESIGN}}
 
 Rules:
+
 1. Resolve target feature folder under `.features/`:
    - Exact folder match first.
    - Else match `<feature-name>-<random-number>`.
@@ -12,13 +13,15 @@ Rules:
 2. Fail fast if `.features/<feature-folder>/requirements.md` is missing.
 3. Ask up to 5 clarifying questions for ambiguous boundaries/flows. If unanswered, proceed with explicit assumptions.
 4. Do not design unrelated parts of the system.
-{{BUILD_RULE}}
+   {{BUILD_RULE}}
 
 Read:
+
 - `.features/<feature-folder>/requirements.md`
 - Relevant codebase modules
 
 Write `.features/<feature-folder>/design.md` using this exact section order:
+
 1. `Feature references`
 2. `Scope and constraints`
 3. `Architecture overview (HLD)`
@@ -35,11 +38,13 @@ Write `.features/<feature-folder>/design.md` using this exact section order:
 14. `Quality checklist`
 
 Diagram rules:
+
 - For HLD, use Mermaid `flowchart`, `sequenceDiagram`, or block-like representation only when it improves clarity.
 - For LLD, use Mermaid `classDiagram` only for proposed impacted modules/classes.
 - Do not create diagrams for every section.
 
 Traceability rules:
+
 - Assign design IDs as `DES-001`, `DES-002`, ...
 - Include a traceability table mapping each `DES-*` to one or more `REQ-*`.
 - `Feature references` must include:
@@ -50,6 +55,7 @@ Traceability rules:
   - `done.md`
 
 Output:
+
 - Return feature folder path.
 - Return concise summary.
 - End with: `Next command to run: /spec.threat-model`.

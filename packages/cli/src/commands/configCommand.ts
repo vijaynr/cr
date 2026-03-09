@@ -4,10 +4,12 @@ import { defaultConfig } from "@cr/core";
 import { COLORS, DOT } from "@cr/ui";
 
 export async function runConfigCommand(): Promise<void> {
-  createSpinner("Loading settings...").start().stopAndPersist({
-    symbol: COLORS.cyan + DOT + COLORS.reset,
-    text: "View and edit the configuration",
-  });
+  createSpinner("Loading settings...")
+    .start()
+    .stopAndPersist({
+      symbol: COLORS.cyan + DOT + COLORS.reset,
+      text: "View and edit the configuration",
+    });
 
   const existing = await loadCRConfig();
 

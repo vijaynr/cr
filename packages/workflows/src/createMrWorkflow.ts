@@ -10,11 +10,7 @@ import {
   loadWorkflowRuntime,
   type WorkflowRuntime,
 } from "@cr/core";
-import type {
-  CreateMrWorkflowInput,
-  CreateMrWorkflowResult,
-  StatusLevel,
-} from "@cr/core";
+import type { CreateMrWorkflowInput, CreateMrWorkflowResult, StatusLevel } from "@cr/core";
 import { runWorkflow } from "@cr/core";
 
 type CreateMrGraphState = {
@@ -165,12 +161,16 @@ async function validateBranchesNode(state: CreateMrGraphState): Promise<Record<s
     );
   }
   if (state.input.targetBranch && !targetExists) {
-    throw new Error(`Target branch '${state.input.targetBranch}' does not exist in remote repository.`);
+    throw new Error(
+      `Target branch '${state.input.targetBranch}' does not exist in remote repository.`
+    );
   }
   return {};
 }
 
-async function loadRemoteBranchesNode(state: CreateMrGraphState): Promise<{ branches: string[]; defaultBranch: string }> {
+async function loadRemoteBranchesNode(
+  state: CreateMrGraphState
+): Promise<{ branches: string[]; defaultBranch: string }> {
   const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
   phaseReporter.started("load_remote_branches", "Loading remote branches...");
   const gitlab = assertGitLab(state.gitlab);
@@ -178,7 +178,9 @@ async function loadRemoteBranchesNode(state: CreateMrGraphState): Promise<{ bran
     gitlab.listBranches(state.projectPath),
     gitlab.getDefaultBranch(state.projectPath),
   ]);
-  const defaultBranch = branches.includes(rawDefaultBranch) ? rawDefaultBranch : (branches[0] ?? "");
+  const defaultBranch = branches.includes(rawDefaultBranch)
+    ? rawDefaultBranch
+    : (branches[0] ?? "");
   logger.debug("create-mr", `branches loaded`, {
     count: branches.length,
     rawDefaultBranch,

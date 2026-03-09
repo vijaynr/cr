@@ -21,7 +21,7 @@ const payload = {
   },
   object_attributes: {
     action: "update", // Can be 'open', 'update', 'reopen'
-    iid: 7,           // MR IID
+    iid: 7, // MR IID
     title: "Test Merge Request",
     state: "opened",
     url: "https://gitlab.otxlab.net/org/project-118153/-/merge_requests/7",

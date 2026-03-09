@@ -5,16 +5,19 @@ Inputs:
 {{INPUT_DESIGN}}
 
 Rules:
+
 1. Resolve target feature folder under `.features/`.
 2. Fail fast if `.features/<feature-folder>/design.md` is missing.
 3. Use STRIDE methodology (Spoofing, Tampering, Repudiation, Information Disclosure, Denial of Service, Elevation of Privilege).
-{{BUILD_RULE}}
+   {{BUILD_RULE}}
 
 Read:
+
 - `.features/<feature-folder>/requirements.md`
 - `.features/<feature-folder>/design.md`
 
 Write `.features/<feature-folder>/threat-model.md` using this exact section order:
+
 1. `Feature references`
 2. `Trust boundaries`
 3. `STRIDE threats` (Table with: Threat ID, Category, Description, Mitigation)
@@ -22,6 +25,7 @@ Write `.features/<feature-folder>/threat-model.md` using this exact section orde
 5. `Security checklist`
 
 Traceability rules:
+
 - Assign threat IDs as `THR-001`, `THR-002`, ...
 - `Feature references` must include:
   - `requirements.md`
@@ -31,6 +35,7 @@ Traceability rules:
   - `done.md`
 
 Output:
+
 - Return feature folder path.
 - Return concise summary.
 - End with: `Next command to run: /spec.refine`.

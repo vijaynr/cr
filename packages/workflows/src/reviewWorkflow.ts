@@ -1,10 +1,5 @@
 import { getCurrentBranch, getOriginRemoteUrl } from "@cr/core";
-import {
-  createGitLabClient,
-  type GitLabInlineComment,
-  type GitLabClient,
-  remoteToProjectPath,
-} from "@cr/core";
+import { type GitLabInlineComment, type GitLabClient, remoteToProjectPath } from "@cr/core";
 import { type LlmClient } from "@cr/core";
 import { loadPrompt } from "@cr/core";
 import { createWorkflowPhaseReporter } from "./workflowEvents.js";
@@ -16,7 +11,6 @@ import {
   resolveInlinePosition,
   buildInlineReviewPrompt,
 } from "./reviewWorkflowHelper.js";
-import { maybePostReviewComment } from "./reviewWorkflowComments.js";
 import {
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
@@ -24,11 +18,7 @@ import {
   type WorkflowRuntime,
 } from "@cr/core";
 import { assert } from "@cr/core";
-import type {
-  ReviewWorkflowInput,
-  ReviewWorkflowResult,
-  WorkflowMode,
-} from "@cr/core";
+import type { ReviewWorkflowInput, ReviewWorkflowResult } from "@cr/core";
 import { runWorkflow } from "@cr/core";
 export type {
   ReviewChatContext,
@@ -504,7 +494,9 @@ async function runReviewStateGraph(input: ReviewWorkflowInput): Promise<ReviewWo
 
 export async function runReviewWorkflow(input: ReviewWorkflowInput): Promise<ReviewWorkflowResult> {
   if (input.workflow !== WORKFLOW_NAME) {
-    throw new Error("Use reviewChatWorkflow.ts or reviewSummarizeWorkflow.ts for non-review workflows.");
+    throw new Error(
+      "Use reviewChatWorkflow.ts or reviewSummarizeWorkflow.ts for non-review workflows."
+    );
   }
   return runReviewStateGraph(input);
 }

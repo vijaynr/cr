@@ -17,9 +17,10 @@ export type CRConfig = {
   terminalTheme?: "auto" | "dark" | "light"; // Optional theme override
 };
 
-export const defaultConfig: Pick<CRConfig, "openaiApiUrl" | "openaiModel" | "gitlabUrl" | "rbUrl"> = {
-  openaiApiUrl: "https://model-broker.aviator-model.bp.anthos.otxlab.net/v1",
-  openaiModel: "llama-3.3-70b",
-  gitlabUrl: "https://gitlab.otxlab.net",
-  rbUrl: "https://reviews.otxlab.net",
-};
+export const defaultConfig: Pick<CRConfig, "openaiApiUrl" | "openaiModel" | "gitlabUrl" | "rbUrl"> =
+  {
+    openaiApiUrl: "https://model-broker.aviator-model.bp.anthos.otxlab.net/v1",
+    openaiModel: "llama-3.3-70b",
+    gitlabUrl: "https://gitlab.otxlab.net",
+    rbUrl: "https://reviews.otxlab.net",
+  };

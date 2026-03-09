@@ -12,10 +12,40 @@ import {
   printWorkflowOutput,
   printEmptyLine,
 } from "@cr/ui";
-import { defaultConfig } from "@cr/core";
+import { defaultConfig, type CRConfig } from "@cr/core";
 import { COLORS, DOT } from "@cr/ui";
 import { hasFlag, getFlag } from "../cliHelpers.js";
 import path from "node:path";
+
+type WebhookSetupAnswers = {
+  rbUrl?: string;
+  rbToken?: string;
+  gitlabUrl?: string;
+  gitlabKey?: string;
+  gitlabWebhookSecret?: string;
+  sslCertPath?: string;
+  sslKeyPath?: string;
+  sslCaPath?: string;
+  webhookConcurrency?: number;
+  webhookQueueLimit?: number;
+  webhookJobTimeoutMs?: number;
+};
+
+type GitLabSetupAnswers = {
+  openaiApiUrl?: string;
+  openaiApiKey?: string;
+  openaiModel?: string;
+  useCustomStreaming?: boolean;
+  gitlabUrl?: string;
+  gitlabKey?: string;
+};
+
+type ReviewBoardSetupAnswers = {
+  openaiApiUrl?: string;
+  openaiApiKey?: string;
+  rbUrl?: string;
+  rbToken?: string;
+};
 
 export async function runInitCommand(args: string[] = []): Promise<void> {
   const isSdd = hasFlag(args, "sdd");
@@ -46,7 +76,7 @@ export async function runInitCommand(args: string[] = []): Promise<void> {
   await bootstrap(args);
 }
 
-async function bootstrap(args: string[] = []): Promise<void> {
+async function bootstrap(_args: string[] = []): Promise<void> {
   const spinner = createSpinner("Bootstrapping application...").start();
   try {
     const repoRoot = repoRootFromModule(import.meta.url);
@@ -193,7 +223,6 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
       }
     );
   } else {
-    
     prompts.push(
       {
         type: "text",
@@ -212,7 +241,8 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
         name: "gitlabWebhookSecret",
         message: "GitLab Webhook Secret (X-Gitlab-Token)",
         initial: existing.gitlabWebhookSecret ?? "",
-      });
+      }
+    );
   }
 
   prompts.push(
@@ -254,24 +284,32 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
     }
   );
 
-  const answers = await promptWithFrame(prompts as any, { onCancel: () => true });
+  const answers = (await promptWithFrame(prompts as Parameters<typeof promptWithFrame>[0], {
+    onCancel: () => true,
+  })) as WebhookSetupAnswers;
 
   if (answers.webhookConcurrency === undefined) {
     printWarning("Webhook initialization cancelled.");
     return;
   }
 
-  await saveCRConfig({
+  const nextConfig: CRConfig = {
+    openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+    openaiApiKey: existing.openaiApiKey ?? "",
+    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+    useCustomStreaming: existing.useCustomStreaming ?? false,
+    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+    gitlabKey: existing.gitlabKey ?? "",
     ...existing,
     ...(isRb
-      ? { 
-          rbUrl: answers.rbUrl || undefined, 
-          rbToken: answers.rbToken || undefined 
+      ? {
+          rbUrl: answers.rbUrl || undefined,
+          rbToken: answers.rbToken || undefined,
         }
-      : { 
+      : {
           gitlabUrl: answers.gitlabUrl || existing.gitlabUrl || defaultConfig.gitlabUrl,
           gitlabKey: answers.gitlabKey || existing.gitlabKey || "",
-          gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined 
+          gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
         }),
     sslCertPath: answers.sslCertPath || undefined,
     sslKeyPath: answers.sslKeyPath || undefined,
@@ -279,17 +317,19 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
     webhookConcurrency: answers.webhookConcurrency,
     webhookQueueLimit: answers.webhookQueueLimit,
     webhookJobTimeoutMs: answers.webhookJobTimeoutMs,
-  } as any);
+  };
+
+  await saveCRConfig(nextConfig);
 
   printDivider();
   printSuccess(`Webhook configuration updated in ${CR_CONF_PATH}`);
   printDivider();
 }
 
-async function runGitLabSetup(args: string[] = []): Promise<void> {
+async function runGitLabSetup(_args: string[] = []): Promise<void> {
   const existing = await loadCRConfig();
 
-  const answers = await promptWithFrame(
+  const answers = (await promptWithFrame(
     [
       {
         type: "text",
@@ -331,14 +371,14 @@ async function runGitLabSetup(args: string[] = []): Promise<void> {
       },
     ],
     { onCancel: () => true }
-  );
+  )) as GitLabSetupAnswers;
 
   if (!answers.openaiApiUrl || !answers.openaiModel || !answers.gitlabUrl) {
     printWarning("Initialization cancelled.");
     return;
   }
 
-  await saveCRConfig({
+  const nextConfig: CRConfig = {
     ...existing,
     openaiApiUrl: answers.openaiApiUrl,
     openaiApiKey: answers.openaiApiKey ?? "",
@@ -346,13 +386,15 @@ async function runGitLabSetup(args: string[] = []): Promise<void> {
     useCustomStreaming: answers.useCustomStreaming ?? false,
     gitlabUrl: answers.gitlabUrl,
     gitlabKey: answers.gitlabKey ?? "",
-  } as any);
+  };
+
+  await saveCRConfig(nextConfig);
 
   printDivider();
   printSuccess(`Configuration saved to ${CR_CONF_PATH}`);
 }
 
-async function runRbSetup(args: string[] = []): Promise<void> {
+async function runRbSetup(_args: string[] = []): Promise<void> {
   const existing = await loadCRConfig();
 
   createSpinner("Loading settings...")
@@ -362,7 +404,7 @@ async function runRbSetup(args: string[] = []): Promise<void> {
       text: "Initialize Review Board configuration",
     });
 
-  const answers = await promptWithFrame(
+  const answers = (await promptWithFrame(
     [
       {
         type: "text",
@@ -390,20 +432,26 @@ async function runRbSetup(args: string[] = []): Promise<void> {
       },
     ],
     { onCancel: () => true }
-  );
+  )) as ReviewBoardSetupAnswers;
 
   if (!answers.rbUrl || !answers.openaiApiUrl) {
     printWarning("Review Board initialization cancelled.");
     return;
   }
 
-  await saveCRConfig({
+  const nextConfig: CRConfig = {
     ...existing,
+    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+    useCustomStreaming: existing.useCustomStreaming ?? false,
+    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+    gitlabKey: existing.gitlabKey ?? "",
     rbUrl: answers.rbUrl,
     rbToken: answers.rbToken ?? "",
     openaiApiUrl: answers.openaiApiUrl,
     openaiApiKey: answers.openaiApiKey ?? "",
-  } as any);
+  };
+
+  await saveCRConfig(nextConfig);
 
   printDivider();
   printSuccess(`Review Board configuration updated in ${CR_CONF_PATH}`);

@@ -22,19 +22,22 @@ const TEMPLATES: TemplateConfig[] = [
     filename: "design.md",
     copilotDest: ".github/prompts/spec.design.prompt.md",
     opencodeDest: ".opencode/commands/spec.design.md",
-    description: "Create design in .features/<feature-name>-<random-number>/design.md using requirements and codebase",
+    description:
+      "Create design in .features/<feature-name>-<random-number>/design.md using requirements and codebase",
   },
   {
     filename: "threat-model.md",
     copilotDest: ".github/prompts/spec.threat-model.prompt.md",
     opencodeDest: ".opencode/commands/spec.threat-model.md",
-    description: "Create STRIDE threat model in .features/<feature-name>-<random-number>/threat-model.md",
+    description:
+      "Create STRIDE threat model in .features/<feature-name>-<random-number>/threat-model.md",
   },
   {
     filename: "refine.md",
     copilotDest: ".github/prompts/spec.refine.prompt.md",
     opencodeDest: ".opencode/commands/spec.refine.md",
-    description: "Refine existing design or requirements in .features/<feature-name>-<random-number>/",
+    description:
+      "Refine existing design or requirements in .features/<feature-name>-<random-number>/",
   },
   {
     filename: "plan.md",
@@ -71,8 +74,14 @@ const LEGACY_OPENCODE_FILES = [
 function transformForCopilot(content: string): string {
   return content
     .replace("{{PLATFORM_HEADER}}", "")
-    .replace("{{INPUT_PRD}}", "- Feature name: ${input:feature_name:Short kebab-case name like user-auth}\n- Context: ${input:context:Problem statement, users, constraints, goals}")
-    .replace("{{INPUT_DESIGN}}", "- Feature selector: ${input:feature_name:Feature name or exact folder name}\n- Extra context: ${input:context:Any additional direction}")
+    .replace(
+      "{{INPUT_PRD}}",
+      "- Feature name: ${input:feature_name:Short kebab-case name like user-auth}\n- Context: ${input:context:Problem statement, users, constraints, goals}"
+    )
+    .replace(
+      "{{INPUT_DESIGN}}",
+      "- Feature selector: ${input:feature_name:Feature name or exact folder name}\n- Extra context: ${input:context:Any additional direction}"
+    )
     .replace("{{BUILD_RULE}}", "")
     .trim();
 }
@@ -87,11 +96,17 @@ agent: build
     .replace("{{PLATFORM_HEADER}}", header)
     .replace("{{INPUT_PRD}}", "Feature and context: $ARGUMENTS")
     .replace("{{INPUT_DESIGN}}", "Feature and context: $ARGUMENTS")
-    .replace("{{BUILD_RULE}}", "6. Do not modify application source code or tests for this command. Only create/update spec documentation files under `.features/`.")
+    .replace(
+      "{{BUILD_RULE}}",
+      "6. Do not modify application source code or tests for this command. Only create/update spec documentation files under `.features/`."
+    )
     .trim();
 }
 
-export async function setupSpecs(targetPath: string, targetType: SpecTarget = "all"): Promise<string[]> {
+export async function setupSpecs(
+  targetPath: string,
+  targetType: SpecTarget = "all"
+): Promise<string[]> {
   const absoluteTargetPath = path.resolve(targetPath);
   const copiedFiles: string[] = [];
   const cleanupPaths: string[] = [];
@@ -110,7 +125,7 @@ export async function setupSpecs(targetPath: string, targetType: SpecTarget = "a
 
   for (const template of TEMPLATES) {
     const rawContent = bundledSpecTemplates[template.filename];
-    
+
     // Setup Copilot
     if (targetType === "all" || targetType === "copilot") {
       const content = transformForCopilot(rawContent);

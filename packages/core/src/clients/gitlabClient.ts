@@ -93,7 +93,8 @@ export function createGitLabClient(baseUrl: string, token: string): GitLabClient
   return {
     listBranches: (projectPath) => listBranches(baseUrl, token, projectPath),
     getDefaultBranch: (projectPath) => getProjectDefaultBranch(baseUrl, token, projectPath),
-    branchExists: (projectPath, branchName) => branchExists(baseUrl, token, projectPath, branchName),
+    branchExists: (projectPath, branchName) =>
+      branchExists(baseUrl, token, projectPath, branchName),
     listMergeRequests: (projectPath, state) =>
       listMergeRequests(baseUrl, token, projectPath, state),
     findOpenMergeRequestBySourceBranch: (projectPath, sourceBranch) =>
@@ -103,7 +104,8 @@ export function createGitLabClient(baseUrl: string, token: string): GitLabClient
       getMergeRequestChanges(baseUrl, token, projectPath, mrIid),
     getMergeRequestCommits: (projectPath, mrIid) =>
       getMergeRequestCommits(baseUrl, token, projectPath, mrIid),
-    getFileRaw: (projectPath, filePath, ref) => getFileRaw(baseUrl, token, projectPath, filePath, ref),
+    getFileRaw: (projectPath, filePath, ref) =>
+      getFileRaw(baseUrl, token, projectPath, filePath, ref),
     getMergeRequestInlineComments: (projectPath, mrIid) =>
       getMergeRequestInlineComments(baseUrl, token, projectPath, mrIid),
     addInlineMergeRequestComment: (projectPath, mrIid, body, filePath, line, positionType) =>

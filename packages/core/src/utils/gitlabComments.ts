@@ -1,7 +1,4 @@
-import type {
-  GitLabDiscussion,
-  GitLabInlineComment,
-} from "../types/gitlab.js";
+import type { GitLabDiscussion, GitLabInlineComment } from "../types/gitlab.js";
 import { gitlabRequest, getMergeRequest } from "./gitlab.js";
 
 export async function addMergeRequestComment(

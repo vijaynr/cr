@@ -48,7 +48,11 @@ export async function runWorkflow<S>(config: {
       state = { ...state, ...updates };
       logger.debug("workflow", `✓ ${currentNode}`);
     } catch (err) {
-      logger.error("workflow", `✗ ${currentNode}`, err instanceof Error ? err : new Error(String(err)));
+      logger.error(
+        "workflow",
+        `✗ ${currentNode}`,
+        err instanceof Error ? err : new Error(String(err))
+      );
       throw err;
     }
 

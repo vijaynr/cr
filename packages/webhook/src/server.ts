@@ -1,18 +1,38 @@
-import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer as createHttpServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { readFileSync } from "node:fs";
-import { 
-  loadWorkflowRuntime, 
-  envOrConfig, 
-  logger,
-} from "@cr/core";
+import { loadWorkflowRuntime, envOrConfig, logger } from "@cr/core";
 import { WorkQueue } from "./workQueue.js";
+
+type GitLabWebhookEvent = {
+  object_kind?: string;
+  object_attributes?: {
+    action?: string;
+    iid?: number;
+  };
+  project?: {
+    id?: string | number;
+  };
+};
+
+type ReviewBoardWebhookEvent = {
+  review_request?: {
+    id?: number;
+    repository?: {
+      name?: string;
+    };
+  };
+};
 
 export async function startWebhookServer(
   port = 3000,
-  options?: { 
-    sslCertPath?: string; 
-    sslKeyPath?: string; 
+  options?: {
+    sslCertPath?: string;
+    sslKeyPath?: string;
     sslCaPath?: string;
     webhookConcurrency?: number;
     webhookQueueLimit?: number;
@@ -22,7 +42,7 @@ export async function startWebhookServer(
 ) {
   const runtime = await loadWorkflowRuntime();
   const mode = options?.mode || "gitlab";
-  
+
   // Override runtime config with CLI options if provided
   if (options?.webhookConcurrency) runtime.webhookConcurrency = options.webhookConcurrency;
   if (options?.webhookQueueLimit) runtime.webhookQueueLimit = options.webhookQueueLimit;
@@ -31,7 +51,7 @@ export async function startWebhookServer(
   const gitlabKey = envOrConfig("GITLAB_KEY", runtime.gitlabKey, "");
   const rbToken = envOrConfig("RB_TOKEN", runtime.rbToken, "");
   const webhookSecret = envOrConfig("GITLAB_WEBHOOK_SECRET", runtime.gitlabWebhookSecret, "");
-  
+
   const sslCertPath = options?.sslCertPath || envOrConfig("SSL_CERT_PATH", runtime.sslCertPath, "");
   const sslKeyPath = options?.sslKeyPath || envOrConfig("SSL_KEY_PATH", runtime.sslKeyPath, "");
   const sslCaPath = options?.sslCaPath || envOrConfig("SSL_CA_PATH", runtime.sslCaPath, "");
@@ -40,7 +60,9 @@ export async function startWebhookServer(
     throw new Error("Missing GitLab configuration. Run `cr init` or set GITLAB_URL/GITLAB_KEY.");
   }
   if (mode === "reviewboard" && (!runtime.rbUrl || !rbToken)) {
-    throw new Error("Missing Review Board configuration. Run `cr init --rb` or set RB_URL/RB_TOKEN.");
+    throw new Error(
+      "Missing Review Board configuration. Run `cr init --rb` or set RB_URL/RB_TOKEN."
+    );
   }
 
   const workQueue = new WorkQueue(runtime, mode === "reviewboard" ? rbToken : gitlabKey, mode);
@@ -88,27 +110,30 @@ export async function startWebhookServer(
           return;
         }
 
-        let event: any;
+        let event: GitLabWebhookEvent | ReviewBoardWebhookEvent;
         const contentType = req.headers["content-type"] || "";
         if (contentType.includes("application/x-www-form-urlencoded")) {
           const params = new URLSearchParams(body);
           const payload = params.get("payload");
-          event = payload ? JSON.parse(payload) : {};
+          event = payload
+            ? ((JSON.parse(payload) as GitLabWebhookEvent | ReviewBoardWebhookEvent) ?? {})
+            : {};
         } else {
-          event = JSON.parse(body);
+          event = (JSON.parse(body) as GitLabWebhookEvent | ReviewBoardWebhookEvent) ?? {};
         }
 
         let requestId: number | undefined;
         let projectId: string | number | undefined;
 
         if (mode === "gitlab") {
-          const objectKind = event.object_kind;
+          const gitlabEvent = event as GitLabWebhookEvent;
+          const objectKind = gitlabEvent.object_kind;
           if (objectKind !== "merge_request") {
             res.statusCode = 200;
             res.end("Ignored non-merge-request event");
             return;
           }
-          const mrAttributes = event.object_attributes;
+          const mrAttributes = gitlabEvent.object_attributes;
           const action = mrAttributes?.action;
           if (action !== "open" && action !== "update" && action !== "reopen") {
             res.statusCode = 200;
@@ -116,11 +141,12 @@ export async function startWebhookServer(
             return;
           }
           requestId = mrAttributes?.iid;
-          projectId = event.project?.id;
+          projectId = gitlabEvent.project?.id;
         } else if (mode === "reviewboard") {
           // Review Board webhook payload structure
           // Event: review_request_published
-          const rr = event.review_request;
+          const reviewBoardEvent = event as ReviewBoardWebhookEvent;
+          const rr = reviewBoardEvent.review_request;
           if (!rr) {
             res.statusCode = 200;
             res.end("Ignored non-review-request event");
@@ -146,17 +172,21 @@ export async function startWebhookServer(
           return;
         }
 
-        console.log(`[WEBHOOK] Accepted ${mode === "gitlab" ? "MR !" : "RR #"} ${requestId} from project ${projectId}. Job ID: ${jobId}`);
-        
+        console.log(
+          `[WEBHOOK] Accepted ${mode === "gitlab" ? "MR !" : "RR #"} ${requestId} from project ${projectId}. Job ID: ${jobId}`
+        );
+
         // Respond early with 202 Accepted
         res.statusCode = 202;
         res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ 
-          status: "accepted", 
-          jobId,
-          message: "Review queued for processing",
-          ...workQueue.getStatus()
-        }));
+        res.end(
+          JSON.stringify({
+            status: "accepted",
+            jobId,
+            message: "Review queued for processing",
+            ...workQueue.getStatus(),
+          })
+        );
       } catch (err) {
         console.error("[WEBHOOK] Error parsing request body:", err);
         logger.error("webhook", "Error parsing webhook body", err);
@@ -171,14 +201,14 @@ export async function startWebhookServer(
 
   if (sslCertPath && sslKeyPath) {
     try {
-      const options: any = {
+      const httpsOptions: Parameters<typeof createHttpsServer>[0] = {
         cert: readFileSync(sslCertPath),
         key: readFileSync(sslKeyPath),
       };
       if (sslCaPath) {
-        options.ca = readFileSync(sslCaPath);
+        httpsOptions.ca = readFileSync(sslCaPath);
       }
-      server = createHttpsServer(options, requestListener);
+      server = createHttpsServer(httpsOptions, requestListener);
       protocol = "https";
     } catch (err) {
       logger.error("webhook", "Failed to load SSL certificates, falling back to HTTP", err);

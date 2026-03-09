@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "cr": "./src/cli.ts" },
+  "bin": {
+    "cr": "./src/cli.ts"
+  },
   "dependencies": {
     "@cr/core": "workspace:*",
     "@cr/workflows": "workspace:*",

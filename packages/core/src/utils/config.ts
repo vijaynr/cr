@@ -96,9 +96,15 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
     sslCertPath: section.ssl_cert_path ?? undefined,
     sslKeyPath: section.ssl_key_path ?? undefined,
     sslCaPath: section.ssl_ca_path ?? undefined,
-    webhookConcurrency: section.webhook_concurrency ? Number.parseInt(section.webhook_concurrency, 10) : undefined,
-    webhookQueueLimit: section.webhook_queue_limit ? Number.parseInt(section.webhook_queue_limit, 10) : undefined,
-    webhookJobTimeoutMs: section.webhook_job_timeout_ms ? Number.parseInt(section.webhook_job_timeout_ms, 10) : undefined,
+    webhookConcurrency: section.webhook_concurrency
+      ? Number.parseInt(section.webhook_concurrency, 10)
+      : undefined,
+    webhookQueueLimit: section.webhook_queue_limit
+      ? Number.parseInt(section.webhook_queue_limit, 10)
+      : undefined,
+    webhookJobTimeoutMs: section.webhook_job_timeout_ms
+      ? Number.parseInt(section.webhook_job_timeout_ms, 10)
+      : undefined,
     terminalTheme: section.terminal_theme as "auto" | "dark" | "light" | undefined,
   };
 
@@ -127,7 +133,9 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       ...(parsed.sslCaPath && { ssl_ca_path: parsed.sslCaPath }),
       ...(parsed.webhookConcurrency && { webhook_concurrency: String(parsed.webhookConcurrency) }),
       ...(parsed.webhookQueueLimit && { webhook_queue_limit: String(parsed.webhookQueueLimit) }),
-      ...(parsed.webhookJobTimeoutMs && { webhook_job_timeout_ms: String(parsed.webhookJobTimeoutMs) }),
+      ...(parsed.webhookJobTimeoutMs && {
+        webhook_job_timeout_ms: String(parsed.webhookJobTimeoutMs),
+      }),
       ...(parsed.terminalTheme && { terminal_theme: parsed.terminalTheme }),
     },
   });

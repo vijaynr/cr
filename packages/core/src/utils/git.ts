@@ -14,7 +14,11 @@ async function git(args: string[], repoPath: string): Promise<string> {
     logger.trace("git", `result: ${result.slice(0, 200)}`);
     return result;
   } catch (err) {
-    logger.error("git", `failed: git ${args.join(" ")}`, err instanceof Error ? err : new Error(String(err)));
+    logger.error(
+      "git",
+      `failed: git ${args.join(" ")}`,
+      err instanceof Error ? err : new Error(String(err))
+    );
     throw err;
   }
 }

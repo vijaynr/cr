@@ -1,5 +1,6 @@
 import {
   createRuntimeLlmClient,
+  createReviewBoardClient,
   createRuntimeReviewBoardClient,
   loadWorkflowRuntime,
   runWorkflow,
@@ -9,16 +10,9 @@ import {
   type ReviewWorkflowInput,
   type ReviewWorkflowResult,
   type WorkflowRuntime,
-  type ReviewBoardDiffData,
 } from "@cr/core";
 import { createWorkflowPhaseReporter } from "./workflowEvents.js";
-import {
-  extractJsonObject,
-  injectMergeRequestContextIntoTemplate,
-  resolveInlinePosition,
-  buildInlineReviewPrompt,
-  parseDiffHunks,
-} from "./reviewWorkflowHelper.js";
+import { injectMergeRequestContextIntoTemplate } from "./reviewWorkflowHelper.js";
 
 const WORKFLOW_NAME = "review";
 
@@ -41,11 +35,7 @@ type ReviewBoardGraphState = {
 };
 
 export async function runReviewBoardWorkflow(
-  input: ReviewWorkflowInput & {
-    userFeedback?: string;
-    status?: any;
-    events?: any;
-  }
+  input: ReviewWorkflowInput & { userFeedback?: string }
 ): Promise<ReviewWorkflowResult> {
   const initialState: ReviewBoardGraphState = {
     input,
@@ -90,14 +80,14 @@ export async function runReviewBoardWorkflow(
         const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
         phaseReporter.started("generate_review", "Analyzing Review Board changes...");
 
-        // RB doesn't easily expose individual commits like GitLab MRs in one call, 
+        // RB doesn't easily expose individual commits like GitLab MRs in one call,
         // and we are disabling inline comments for now.
         const rawDiff = await rb.getRawDiff(context.requestId, context.diffSet.revision);
-        
+
         const template = await loadPrompt("review.txt", state.input.repoRoot);
         let prompt = injectMergeRequestContextIntoTemplate(template, {
           mrContent: `${context.request.summary}\n\n${context.request.description}`,
-          mrChanges: rawDiff || context.files.map(f => f.dest_file).join("\n"),
+          mrChanges: rawDiff || context.files.map((f) => f.dest_file).join("\n"),
           mrCommits: "N/A", // Not easily available for RB
         });
 
@@ -133,30 +123,6 @@ export async function runReviewBoardWorkflow(
   return finalState.result!;
 }
 
-function reconstructDiffText(oldPath: string, newPath: string, diffData: ReviewBoardDiffData): string {
-  let diff = `--- ${oldPath}\n+++ ${newPath}\n`;
-  for (const chunk of diffData.chunks) {
-    if (chunk.change === "equal") continue;
-    
-    // Simplistic hunk header
-    diff += `@@ -0,0 +0,0 @@\n`;
-    for (const line of chunk.lines) {
-      const [, , oldLineText, , , newLineText] = line;
-      if (chunk.change === "delete" || chunk.change === "replace") {
-        if (oldLineText !== undefined && oldLineText !== null) {
-          diff += `-${oldLineText}\n`;
-        }
-      }
-      if (chunk.change === "insert" || chunk.change === "replace") {
-        if (newLineText !== undefined && newLineText !== null) {
-          diff += `+${newLineText}\n`;
-        }
-      }
-    }
-  }
-  return diff;
-}
-
 export async function maybePostReviewBoardComment(
   result: ReviewWorkflowResult,
   _mode: string,
@@ -165,7 +131,7 @@ export async function maybePostReviewBoardComment(
 ): Promise<{ summaryNoteId?: string; inlineNoteIds: string[] } | null> {
   if (!enabled || !result.rbUrl || !result.mrIid) return null;
 
-  const rb = createRuntimeReviewBoardClient({ rbUrl: result.rbUrl, rbToken } as any);
+  const rb = createReviewBoardClient(result.rbUrl, rbToken);
   const requestId = result.mrIid;
 
   // 1. Create a review
@@ -176,7 +142,7 @@ export async function maybePostReviewBoardComment(
   // 2. Add diff comments
   for (const inline of result.inlineComments) {
     // We need the fileDiffId which we should have stashed in the inline comment object
-    const fileDiffId = (inline as any).id;
+    const fileDiffId = "id" in inline && typeof inline.id === "number" ? inline.id : undefined;
     if (fileDiffId) {
       await rb.addDiffComment(
         requestId,

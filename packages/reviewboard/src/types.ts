@@ -42,7 +42,16 @@ export type ReviewBoardFileDiff = {
 
 export type ReviewBoardDiffData = {
   chunks: Array<{
-    lines: Array<any[]>;
+    lines: Array<
+      [
+        number | null | undefined,
+        number | null | undefined,
+        string | null | undefined,
+        number | null | undefined,
+        number | null | undefined,
+        string | null | undefined,
+      ]
+    >;
     change: "equal" | "insert" | "delete" | "replace";
   }>;
 };

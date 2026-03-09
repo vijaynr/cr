@@ -22,6 +22,8 @@ import {
   loadCRConfig,
   listReviewRequests as rbListRequests,
   getCurrentUser as rbGetCurrentUser,
+  rbRequest,
+  type ReviewBoardRequest,
 } from "@cr/core";
 import { getOriginRemoteUrl } from "@cr/core";
 import { listMergeRequests, remoteToProjectPath } from "@cr/core";
@@ -73,7 +75,7 @@ async function resolveInteractiveRemoteSelection(input: ReviewWorkflowInput): Pr
     const fromUser = getFlag(process.argv, "from", "", "-f") || undefined;
     printDivider();
     const spinner = createSpinner("Loading review requests...").start();
-    let rrs: any[] = [];
+    let rrs: ReviewBoardRequest[] = [];
 
     try {
       rrs = await rbListRequests(rbUrl, rbToken, rbStatusMap[input.state] || "pending", fromUser);
@@ -87,16 +89,20 @@ async function resolveInteractiveRemoteSelection(input: ReviewWorkflowInput): Pr
 
         // 2. Incoming (directly to the user)
         const incomingDirectUrl = `/api/review-requests/?status=pending&to-users-directly=${encodeURIComponent(user.username)}&expand=submitter`;
-        const incomingDirectResp = await (
-          await import("@cr/core")
-        ).rbRequest<{ review_requests: any[] }>(rbUrl, rbToken, incomingDirectUrl);
+        const incomingDirectResp = await rbRequest<{ review_requests: ReviewBoardRequest[] }>(
+          rbUrl,
+          rbToken,
+          incomingDirectUrl
+        );
         const incomingDirect = incomingDirectResp.review_requests ?? [];
 
         // 3. Incoming (via groups)
         const incomingGroupsUrl = `/api/review-requests/?status=pending&to-users=${encodeURIComponent(user.username)}&expand=submitter`;
-        const incomingGroupsResp = await (
-          await import("@cr/core")
-        ).rbRequest<{ review_requests: any[] }>(rbUrl, rbToken, incomingGroupsUrl);
+        const incomingGroupsResp = await rbRequest<{ review_requests: ReviewBoardRequest[] }>(
+          rbUrl,
+          rbToken,
+          incomingGroupsUrl
+        );
         const incomingGroups = incomingGroupsResp.review_requests ?? [];
 
         // Combine and deduplicate by ID

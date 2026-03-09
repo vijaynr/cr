@@ -36,7 +36,8 @@ function buildCreateMrResultBody(result: {
     lines.push(`URL: ${result.mergeRequestUrl}`);
   }
   return lines.join("\n");
-}import { createSpinner, type OraSpinner } from "./spinner.js";
+}
+import { createSpinner, type OraSpinner } from "./spinner.js";
 
 type LiveLevel = "info" | "success" | "warning" | "error";
 
@@ -436,4 +437,3 @@ export async function runLiveCreateMrTask(args: {
     ui.success(statusText);
   }
 }
-

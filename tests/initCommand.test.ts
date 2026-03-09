@@ -22,9 +22,15 @@ mock.module("@cr/ui", () => ({
     return answers;
   }),
   createSpinner: () => ({
-    start: function() { return this; },
-    stopAndPersist: function() { return this; },
-    fail: function() { return this; },
+    start: function () {
+      return this;
+    },
+    stopAndPersist: function () {
+      return this;
+    },
+    fail: function () {
+      return this;
+    },
   }),
   printError: mock(() => {}),
   printSuccess: mock(() => {}),
@@ -62,8 +68,8 @@ describe("initCommand - runWebhookSetup", () => {
 
     await runInitCommand(["--webhook", "--mode", "gitlab"]);
 
-    expect(lastQuestions.some(q => q.name === "gitlabWebhookSecret")).toBe(true);
-    expect(lastQuestions.some(q => q.name === "rbUrl")).toBe(false);
+    expect(lastQuestions.some((q) => q.name === "gitlabWebhookSecret")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "rbUrl")).toBe(false);
     expect(lastSavedConfig.gitlabWebhookSecret).toBe("new-secret");
   });
 
@@ -74,9 +80,9 @@ describe("initCommand - runWebhookSetup", () => {
 
     await runInitCommand(["--webhook", "--mode", "reviewboard"]);
 
-    expect(lastQuestions.some(q => q.name === "gitlabWebhookSecret")).toBe(false);
-    expect(lastQuestions.some(q => q.name === "rbUrl")).toBe(true);
-    expect(lastQuestions.some(q => q.name === "rbToken")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "gitlabWebhookSecret")).toBe(false);
+    expect(lastQuestions.some((q) => q.name === "rbUrl")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "rbToken")).toBe(true);
     expect(lastSavedConfig.rbUrl).toBe("https://new-rb.com");
     expect(lastSavedConfig.rbToken).toBe("new-token");
   });
@@ -84,10 +90,10 @@ describe("initCommand - runWebhookSetup", () => {
   it("should preserve existing config fields", async () => {
     mockConfig = {
       openaiApiKey: "existing-key",
-      gitlabKey: "existing-gitlab-key"
+      gitlabKey: "existing-gitlab-key",
     };
     lastSavedConfig = null;
-    
+
     await runInitCommand(["--webhook", "--mode", "gitlab"]);
 
     expect(lastSavedConfig.openaiApiKey).toBe("existing-key");

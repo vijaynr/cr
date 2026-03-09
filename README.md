@@ -22,6 +22,7 @@ CR CLI is a Bun + TypeScript command-line tool for GitLab merge request review w
 ### Option 1: Manual Installation (Recommended)
 
 **Windows:**
+
 ```powershell
 # 1. Create install directory
 New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\cr\bin"
@@ -40,6 +41,7 @@ cr help
 ```
 
 **Linux/macOS:**
+
 ```bash
 # 1. Create install directory
 mkdir -p ~/.local/bin
@@ -61,11 +63,13 @@ cr help
 **⚠️ CAUTION:** Review the script before running. The automated scripts modify your PATH.
 
 **Windows:**
+
 ```cmd
 install.cmd
 ```
 
 **Linux/macOS:**
+
 ```bash
 bash install.sh
 ```
@@ -73,6 +77,7 @@ bash install.sh
 ### Uninstall
 
 **Windows:**
+
 ```powershell
 # Remove binary
 Remove-Item "$env:LOCALAPPDATA\cr\bin\cr.exe"
@@ -85,6 +90,7 @@ Remove-Item "$env:LOCALAPPDATA\cr\bin\cr.exe"
 ```
 
 **Linux/macOS:**
+
 ```bash
 # Remove binary
 rm ~/.local/bin/cr
@@ -131,6 +137,7 @@ bun run build
 ```
 
 Output:
+
 - `dist/cr` (Linux/macOS)
 - `dist/cr.exe` (Windows, when built on Windows)
 

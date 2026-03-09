@@ -223,7 +223,15 @@ export function printHeaderBox(): void {
 
   const renderRow = (colored: string, visibleLen: number): string => {
     const rightPad = " ".repeat(innerWidth - visibleLen);
-    return COLORS.cyan + BORDERS.vertical + colored + rightPad + COLORS.cyan + BORDERS.vertical + COLORS.reset;
+    return (
+      COLORS.cyan +
+      BORDERS.vertical +
+      colored +
+      rightPad +
+      COLORS.cyan +
+      BORDERS.vertical +
+      COLORS.reset
+    );
   };
 
   console.log();
@@ -238,7 +246,11 @@ export function printHeaderBox(): void {
     const visibleLen = 1 + logoWidth + textSuffix.length;
     const colored =
       " " +
-      BANNER_COLOR + COLORS.bold + logoStr + COLORS.reset + " ".repeat(logoWidth - logoStr.length) +
+      BANNER_COLOR +
+      COLORS.bold +
+      logoStr +
+      COLORS.reset +
+      " ".repeat(logoWidth - logoStr.length) +
       (isFirst ? COLORS.cyan + COLORS.bold + GAP + title + COLORS.reset : "") +
       (isThird ? COLORS.dim + GAP + desc + COLORS.reset : "");
     console.log(renderRow(colored, visibleLen));
@@ -320,7 +332,10 @@ export function printCommandHelp(sections: { title: string; lines: string[] }[])
 
 export function printHelpView(): void {
   const commandRows = formatHelpRows([
-    { cmd: "cr init", desc: "Initialize configuration. Use --sdd or --webhook for specific setups." },
+    {
+      cmd: "cr init",
+      desc: "Initialize configuration. Use --sdd or --webhook for specific setups.",
+    },
     { cmd: "cr config", desc: "View or edit complete configuration." },
     { cmd: "cr review", desc: "Run review, summarize, or chat workflows." },
     { cmd: "cr create-mr", desc: "Generate or update a merge request draft." },

@@ -22,7 +22,10 @@ async function generateTextWithOpenAiLike(config: LlmConfig, prompt: string): Pr
 }
 
 async function generateTextWithCustomStreaming(config: LlmConfig, prompt: string): Promise<string> {
-  logger.debug("llm", `generate (custom-streaming), model=${config.model}, prompt_len=${prompt.length}`);
+  logger.debug(
+    "llm",
+    `generate (custom-streaming), model=${config.model}, prompt_len=${prompt.length}`
+  );
   const response = await fetch(`${config.apiUrl}/chat/completions`, {
     method: "POST",
     headers: {

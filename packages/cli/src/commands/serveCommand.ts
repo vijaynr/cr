@@ -41,7 +41,7 @@ export async function runServeCommand(args: string[]): Promise<void> {
   const sslCertPath = getFlag(args, "ssl-cert", "");
   const sslKeyPath = getFlag(args, "ssl-key", "");
   const sslCaPath = getFlag(args, "ssl-ca", "");
-  
+
   const concurrency = getFlag(args, "concurrency", "");
   const queueLimit = getFlag(args, "queue-limit", "");
   const timeoutMs = getFlag(args, "timeout", "");
@@ -59,11 +59,11 @@ export async function runServeCommand(args: string[]): Promise<void> {
   }
 
   printInfo(`Starting ${mode} webhook server on port ${port}...`);
-  
+
   try {
-    await startWebhookServer(port, { 
-      sslCertPath, 
-      sslKeyPath, 
+    await startWebhookServer(port, {
+      sslCertPath,
+      sslKeyPath,
       sslCaPath,
       webhookConcurrency: concurrency ? Number.parseInt(concurrency, 10) : undefined,
       webhookQueueLimit: queueLimit ? Number.parseInt(queueLimit, 10) : undefined,
@@ -71,7 +71,9 @@ export async function runServeCommand(args: string[]): Promise<void> {
       mode,
     });
   } catch (err) {
-    printError(`Failed to start webhook server: ${err instanceof Error ? err.message : String(err)}`);
+    printError(
+      `Failed to start webhook server: ${err instanceof Error ? err.message : String(err)}`
+    );
     process.exitCode = 1;
   }
 }

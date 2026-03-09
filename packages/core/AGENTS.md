@@ -1,9 +1,11 @@
 # @cr/core — Agent Guidelines
 
 ## Package Role
+
 Pure business logic, shared types, and infrastructure utilities. Has no UI dependencies — never import from `@cr/ui`.
 
 ## Structure
+
 - `src/index.ts` — public barrel export.
 - `src/types/` — shared TypeScript types (`config`, `gitlab`, `llm`, `workflows`).
 - `src/clients/` — factory functions for `GitLabClient` and `LlmClient`.
@@ -28,6 +30,7 @@ Pure business logic, shared types, and infrastructure utilities. Has no UI depen
   - `assertions.ts` — `assert` utility.
 
 ## Key Rules
+
 - No `ora`, no ANSI codes, no `process.stdout` — this package must be UI-free.
 - Spinner logic was intentionally removed from this package; it lives in `@cr/ui`.
 - All public exports must go through `src/index.ts`.

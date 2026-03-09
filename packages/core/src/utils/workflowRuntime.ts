@@ -41,9 +41,18 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     sslCertPath: envOrConfig("SSL_CERT_PATH", config.sslCertPath, ""),
     sslKeyPath: envOrConfig("SSL_KEY_PATH", config.sslKeyPath, ""),
     sslCaPath: envOrConfig("SSL_CA_PATH", config.sslCaPath, ""),
-    webhookConcurrency: Number.parseInt(envOrConfig("WEBHOOK_CONCURRENCY", config.webhookConcurrency?.toString(), "3"), 10),
-    webhookQueueLimit: Number.parseInt(envOrConfig("WEBHOOK_QUEUE_LIMIT", config.webhookQueueLimit?.toString(), "50"), 10),
-    webhookJobTimeoutMs: Number.parseInt(envOrConfig("WEBHOOK_JOB_TIMEOUT_MS", config.webhookJobTimeoutMs?.toString(), "600000"), 10), // 10 mins default
+    webhookConcurrency: Number.parseInt(
+      envOrConfig("WEBHOOK_CONCURRENCY", config.webhookConcurrency?.toString(), "3"),
+      10
+    ),
+    webhookQueueLimit: Number.parseInt(
+      envOrConfig("WEBHOOK_QUEUE_LIMIT", config.webhookQueueLimit?.toString(), "50"),
+      10
+    ),
+    webhookJobTimeoutMs: Number.parseInt(
+      envOrConfig("WEBHOOK_JOB_TIMEOUT_MS", config.webhookJobTimeoutMs?.toString(), "600000"),
+      10
+    ), // 10 mins default
     openaiApiUrl: envOrConfig("OPENAI_API_URL", config.openaiApiUrl, ""),
     openaiApiKey: envOrConfig("OPENAI_API_KEY", config.openaiApiKey, ""),
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),
