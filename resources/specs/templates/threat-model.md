@@ -33,4 +33,4 @@ Traceability rules:
 Output:
 - Return feature folder path.
 - Return concise summary.
-- End with: `Next command to run: /refine`.
+- End with: `Next command to run: /spec.refine`.

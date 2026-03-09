@@ -52,4 +52,4 @@ Traceability rules:
 Output:
 - Return feature folder path.
 - Return concise summary.
-- End with: `Next command to run: /threat-model`.
+- End with: `Next command to run: /spec.threat-model`.

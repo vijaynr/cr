@@ -46,4 +46,4 @@ Quality checklist (must be explicit):
 Output:
 - Return created feature folder path.
 - Return a short summary.
-- End with: `Next command to run: /design`.
+- End with: `Next command to run: /spec.design`.

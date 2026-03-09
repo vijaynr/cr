@@ -285,6 +285,10 @@ export function printError(message: string): void {
   console.error(COLORS.red + `${DOT} ` + message + COLORS.reset);
 }
 
+export function printEmptyLine(): void {
+  console.log();
+}
+
 export function printAlert(props: {
   title: string;
   message: string;

@@ -40,4 +40,4 @@ Traceability rules:
 Output:
 - Return feature folder path.
 - Return concise summary.
-- End with: `Next command to run: /doit`.
+- End with: `Next command to run: /spec.doit`.

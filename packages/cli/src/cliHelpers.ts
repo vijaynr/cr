@@ -41,38 +41,45 @@ export async function readStdinDiff(): Promise<string | undefined> {
 
 export function getWorkflowHeadingAndDescription(
   workflow: ReviewWorkflowKind,
-  local: boolean
+  local: boolean,
+  provider?: string
 ): { heading: string; description: string } {
+  const isRB = provider === "reviewboard";
+  const itemType = isRB ? "Review Request (Reviewboard)" : "Merge Request";
+
   if (workflow === "chat") {
     return {
       heading: "Code Review Chat",
-      description: "Interactive Q&A over merge request context.",
+      description: `Interactive Q&A over ${itemType.toLowerCase()} context.`,
     };
   }
 
   if (workflow === "summarize") {
     return {
-      heading: local ? "Local Changes Summary" : "Merge Request Summary",
+      heading: local ? "Local Changes Summary" : `${itemType} Summary`,
       description: local
         ? "Generate a concise summary of local diff changes."
-        : "Generate a concise summary for the selected merge request.",
+        : `Generate a concise summary for the selected ${itemType.toLowerCase()}.`,
     };
   }
 
   return {
-    heading: local ? "Local Code Review" : "Merge Request Review",
+    heading: local ? "Local Code Review" : `${itemType} Review`,
     description: local
       ? "Review local diff changes and generate feedback."
-      : "Review the selected merge request and generate feedback.",
+      : `Review the selected ${itemType.toLowerCase()} and generate feedback.`,
   };
 }
 
-export function getWorkflowResultTitle(workflow: ReviewWorkflowKind, local: boolean): string {
+export function getWorkflowResultTitle(workflow: ReviewWorkflowKind, local: boolean, provider?: string): string {
+  const isRB = provider === "reviewboard";
+  const itemType = isRB ? "Review Request (Reviewboard)" : "Merge Request";
+
   if (workflow === "chat") {
     return "Workflow: Code Review Chat";
   }
   if (workflow === "summarize") {
-    return local ? "Workflow: Local Changes Summary" : "Workflow: Merge Request Summary";
+    return local ? "Workflow: Local Changes Summary" : `Workflow: ${itemType} Summary`;
   }
   return "Workflow: Code Review";
 }

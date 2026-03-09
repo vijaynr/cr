@@ -30,7 +30,23 @@ export {
 // clients (GitLabClient/LlmClient interfaces and factories not in utils barrel)
 export type { GitLabClient } from "./clients/gitlabClient.js";
 export { createGitLabClient } from "./clients/gitlabClient.js";
+export type { ReviewBoardClient } from "./clients/reviewBoardClient.js";
+export { createReviewBoardClient } from "./clients/reviewBoardClient.js";
 export type { LlmClient } from "./clients/llmClient.js";
 export { createLlmClient } from "./clients/llmClient.js";
 // resources
 export * from "./resources/index.js";
+export {
+  rbRequest,
+  getCurrentUser,
+  listReviewRequests,
+  getReviewRequest,
+  getLatestDiffSet,
+  getFileDiffs,
+  getFileDiffData,
+  createReview,
+  addDiffComment,
+  publishReview,
+  reviewBoardToRequestId,
+} from "./utils/reviewBoard.js";
+export { createRuntimeReviewBoardClient } from "./utils/workflowRuntime.js";

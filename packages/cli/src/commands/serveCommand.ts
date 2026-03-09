@@ -52,8 +52,8 @@ export async function runServeCommand(args: string[]): Promise<void> {
     return;
   }
 
-  if (mode !== "gitlab") {
-    printError(`Unsupported mode '${mode}'. Currently only 'gitlab' is supported.`);
+  if (mode !== "gitlab" && mode !== "reviewboard") {
+    printError(`Unsupported mode '${mode}'. Currently 'gitlab' and 'reviewboard' are supported.`);
     process.exitCode = 1;
     return;
   }
@@ -68,6 +68,7 @@ export async function runServeCommand(args: string[]): Promise<void> {
       webhookConcurrency: concurrency ? Number.parseInt(concurrency, 10) : undefined,
       webhookQueueLimit: queueLimit ? Number.parseInt(queueLimit, 10) : undefined,
       webhookJobTimeoutMs: timeoutMs ? Number.parseInt(timeoutMs, 10) : undefined,
+      mode,
     });
   } catch (err) {
     printError(`Failed to start webhook server: ${err instanceof Error ? err.message : String(err)}`);

@@ -63,6 +63,18 @@ export async function runConfigCommand(): Promise<void> {
         initial: existing.gitlabKey ?? "",
       },
       {
+        type: "text",
+        name: "rbUrl",
+        message: "Review Board URL",
+        initial: existing.rbUrl ?? defaultConfig.rbUrl,
+      },
+      {
+        type: "password",
+        name: "rbToken",
+        message: "Review Board API Token",
+        initial: existing.rbToken ?? "",
+      },
+      {
         type: "password",
         name: "gitlabWebhookSecret",
         message: "GitLab Webhook Secret (X-Gitlab-Token)",
@@ -122,6 +134,8 @@ export async function runConfigCommand(): Promise<void> {
     terminalTheme: answers.terminalTheme ?? "auto",
     gitlabUrl: answers.gitlabUrl,
     gitlabKey: answers.gitlabKey ?? "",
+    rbUrl: answers.rbUrl || undefined,
+    rbToken: answers.rbToken || undefined,
     gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
     sslCertPath: answers.sslCertPath || undefined,
     sslKeyPath: answers.sslKeyPath || undefined,

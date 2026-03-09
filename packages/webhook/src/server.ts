@@ -17,9 +17,11 @@ export async function startWebhookServer(
     webhookConcurrency?: number;
     webhookQueueLimit?: number;
     webhookJobTimeoutMs?: number;
+    mode?: string;
   }
 ) {
   const runtime = await loadWorkflowRuntime();
+  const mode = options?.mode || "gitlab";
   
   // Override runtime config with CLI options if provided
   if (options?.webhookConcurrency) runtime.webhookConcurrency = options.webhookConcurrency;
@@ -27,21 +29,25 @@ export async function startWebhookServer(
   if (options?.webhookJobTimeoutMs) runtime.webhookJobTimeoutMs = options.webhookJobTimeoutMs;
 
   const gitlabKey = envOrConfig("GITLAB_KEY", runtime.gitlabKey, "");
+  const rbToken = envOrConfig("RB_TOKEN", runtime.rbToken, "");
   const webhookSecret = envOrConfig("GITLAB_WEBHOOK_SECRET", runtime.gitlabWebhookSecret, "");
   
   const sslCertPath = options?.sslCertPath || envOrConfig("SSL_CERT_PATH", runtime.sslCertPath, "");
   const sslKeyPath = options?.sslKeyPath || envOrConfig("SSL_KEY_PATH", runtime.sslKeyPath, "");
   const sslCaPath = options?.sslCaPath || envOrConfig("SSL_CA_PATH", runtime.sslCaPath, "");
 
-  if (!runtime.gitlabUrl || !gitlabKey) {
+  if (mode === "gitlab" && (!runtime.gitlabUrl || !gitlabKey)) {
     throw new Error("Missing GitLab configuration. Run `cr init` or set GITLAB_URL/GITLAB_KEY.");
   }
+  if (mode === "reviewboard" && (!runtime.rbUrl || !rbToken)) {
+    throw new Error("Missing Review Board configuration. Run `cr init --rb` or set RB_URL/RB_TOKEN.");
+  }
 
-  const workQueue = new WorkQueue(runtime, gitlabKey);
+  const workQueue = new WorkQueue(runtime, mode === "reviewboard" ? rbToken : gitlabKey, mode);
 
   // Define the main handler logic
   const requestListener = async (req: IncomingMessage, res: ServerResponse) => {
-    console.log(`[WEBHOOK] Incoming ${req.method} request to ${req.url}`);
+    console.log(`[WEBHOOK] Incoming ${req.method} request to ${req.url} (Mode: ${mode})`);
 
     // Health check or Status
     if (req.url === "/status" && req.method === "GET") {
@@ -57,8 +63,8 @@ export async function startWebhookServer(
       return;
     }
 
-    // Verify secret if set
-    if (webhookSecret) {
+    // Verify secret if set (only for GitLab for now)
+    if (mode === "gitlab" && webhookSecret) {
       const token = req.headers["x-gitlab-token"];
       if (token !== webhookSecret) {
         console.error("[WEBHOOK] Forbidden: Invalid GitLab token received.");
@@ -82,46 +88,56 @@ export async function startWebhookServer(
           return;
         }
 
-        const event = JSON.parse(body);
-        const objectKind = event.object_kind;
-
-        if (objectKind !== "merge_request") {
-          console.log(`[WEBHOOK] Ignored event: ${objectKind}`);
-          res.statusCode = 200;
-          res.end("Ignored non-merge-request event");
-          return;
+        let event: any;
+        const contentType = req.headers["content-type"] || "";
+        if (contentType.includes("application/x-www-form-urlencoded")) {
+          const params = new URLSearchParams(body);
+          const payload = params.get("payload");
+          event = payload ? JSON.parse(payload) : {};
+        } else {
+          event = JSON.parse(body);
         }
 
-        const mrAttributes = event.object_attributes;
-        const action = mrAttributes?.action;
+        let requestId: number | undefined;
+        let projectId: string | number | undefined;
 
-        // Trigger on open or update (new commits)
-        if (action !== "open" && action !== "update" && action !== "reopen") {
-          console.log(`[WEBHOOK] Ignored MR action: ${action}`);
-          res.statusCode = 200;
-          res.end(`Ignored merge request action: ${action}`);
-          return;
+        if (mode === "gitlab") {
+          const objectKind = event.object_kind;
+          if (objectKind !== "merge_request") {
+            res.statusCode = 200;
+            res.end("Ignored non-merge-request event");
+            return;
+          }
+          const mrAttributes = event.object_attributes;
+          const action = mrAttributes?.action;
+          if (action !== "open" && action !== "update" && action !== "reopen") {
+            res.statusCode = 200;
+            res.end(`Ignored merge request action: ${action}`);
+            return;
+          }
+          requestId = mrAttributes?.iid;
+          projectId = event.project?.id;
+        } else if (mode === "reviewboard") {
+          // Review Board webhook payload structure
+          // Event: review_request_published
+          const rr = event.review_request;
+          if (!rr) {
+            res.statusCode = 200;
+            res.end("Ignored non-review-request event");
+            return;
+          }
+          requestId = rr.id;
+          projectId = rr.repository?.name || "default";
         }
 
-        // For "update" actions, check if commits were added
-        if (action === "update" && !mrAttributes.oldrev) {
-          console.log("[WEBHOOK] Ignored update without new commits (metadata only change)");
-          res.statusCode = 200;
-          res.end("Ignored update without new commits");
-          return;
-        }
-
-        const projectId = event.project?.id;
-        const mrIid = mrAttributes?.iid;
-
-        if (!projectId || !mrIid) {
-          console.error("[WEBHOOK] Bad Request: Missing project ID or MR IID");
+        if (!requestId) {
+          console.error("[WEBHOOK] Bad Request: Missing request ID");
           res.statusCode = 400;
-          res.end("Missing project ID or MR IID");
+          res.end("Missing request ID");
           return;
         }
 
-        const jobId = workQueue.enqueue(projectId, mrIid);
+        const jobId = workQueue.enqueue(projectId || "default", requestId);
 
         if (!jobId) {
           console.error(`[WEBHOOK] Rejected: Queue is full`);
@@ -130,7 +146,7 @@ export async function startWebhookServer(
           return;
         }
 
-        console.log(`[WEBHOOK] Accepted MR !${mrIid} from project ${projectId}. Job ID: ${jobId}`);
+        console.log(`[WEBHOOK] Accepted ${mode === "gitlab" ? "MR !" : "RR #"} ${requestId} from project ${projectId}. Job ID: ${jobId}`);
         
         // Respond early with 202 Accepted
         res.statusCode = 202;

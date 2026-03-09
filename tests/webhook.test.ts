@@ -64,8 +64,9 @@ describe("Webhook Server", () => {
     });
 
     expect(response.status).toBe(202);
-    const text = await response.text();
-    expect(text).toBe("Review accepted and queued");
+    const json = await response.json();
+    expect(json.status).toBe("accepted");
+    expect(json.message).toBe("Review queued for processing");
 
     server.close();
   });

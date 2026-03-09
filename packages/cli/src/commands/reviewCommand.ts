@@ -4,6 +4,10 @@ import {
   printCommandHelp,
   printReviewComment,
   printReviewSummary,
+  createSpinner,
+  printDivider,
+  COLORS,
+  DOT,
 } from "@cr/ui";
 import { askForOptionalFeedback, promptWithFrame } from "@cr/ui";
 import {
@@ -13,7 +17,12 @@ import {
   type LiveController,
   type WorkflowStatusController,
 } from "@cr/ui";
-import { envOrConfig, loadCRConfig } from "@cr/core";
+import {
+  envOrConfig,
+  loadCRConfig,
+  listReviewRequests as rbListRequests,
+  getCurrentUser as rbGetCurrentUser,
+} from "@cr/core";
 import { getOriginRemoteUrl } from "@cr/core";
 import { listMergeRequests, remoteToProjectPath } from "@cr/core";
 import { repoRootFromModule } from "@cr/core";
@@ -27,11 +36,13 @@ import {
 } from "../cliHelpers.js";
 import {
   maybePostReviewComment,
+  maybePostReviewBoardComment,
   runReviewWorkflow,
+  runReviewBoardWorkflow,
   type ReviewWorkflowInput,
 } from "@cr/workflows";
 import { answerReviewChatQuestion, runReviewChatWorkflow } from "@cr/workflows";
-import type { WorkflowMode } from "@cr/core";
+import type { WorkflowMode, MergeRequestState } from "@cr/core";
 import { runReviewSummarizeWorkflow } from "@cr/workflows";
 
 async function askForFeedbackIteration(): Promise<string | null> {
@@ -42,6 +53,95 @@ async function askForFeedbackIteration(): Promise<string | null> {
 
 async function resolveInteractiveRemoteSelection(input: ReviewWorkflowInput): Promise<boolean> {
   const config = await loadCRConfig();
+
+  if (input.provider === "reviewboard") {
+    const rbUrl = envOrConfig("RB_URL", config.rbUrl, "");
+    const rbToken = envOrConfig("RB_TOKEN", config.rbToken, "");
+    if (!rbUrl || !rbToken) {
+      throw new Error(
+        "Missing Review Board configuration. Run `cr init --rb` or set RB_URL/RB_TOKEN."
+      );
+    }
+
+    const rbStatusMap: Record<MergeRequestState, "pending" | "submitted" | "all"> = {
+      opened: "pending",
+      closed: "all", // RB doesn't have a direct 'closed' state that is common, 'discarded' is another
+      merged: "submitted",
+      all: "all",
+    };
+
+    const fromUser = getFlag(process.argv, "from", "", "-f") || undefined;
+    printDivider();
+    const spinner = createSpinner("Loading review requests...").start();
+    let rrs: any[] = [];
+
+    try {
+      rrs = await rbListRequests(rbUrl, rbToken, rbStatusMap[input.state] || "pending", fromUser);
+
+      if (rrs.length === 0 && !fromUser && input.state === "opened") {
+        // If no global pending requests found, fetch specifically for the current user
+        const user = await rbGetCurrentUser(rbUrl, rbToken);
+
+        // 1. Outgoing (from the user)
+        const outgoing = await rbListRequests(rbUrl, rbToken, "pending", user.username);
+
+        // 2. Incoming (directly to the user)
+        const incomingDirectUrl = `/api/review-requests/?status=pending&to-users-directly=${encodeURIComponent(user.username)}&expand=submitter`;
+        const incomingDirectResp = await (
+          await import("@cr/core")
+        ).rbRequest<{ review_requests: any[] }>(rbUrl, rbToken, incomingDirectUrl);
+        const incomingDirect = incomingDirectResp.review_requests ?? [];
+
+        // 3. Incoming (via groups)
+        const incomingGroupsUrl = `/api/review-requests/?status=pending&to-users=${encodeURIComponent(user.username)}&expand=submitter`;
+        const incomingGroupsResp = await (
+          await import("@cr/core")
+        ).rbRequest<{ review_requests: any[] }>(rbUrl, rbToken, incomingGroupsUrl);
+        const incomingGroups = incomingGroupsResp.review_requests ?? [];
+
+        // Combine and deduplicate by ID
+        const allRrs = [...outgoing, ...incomingDirect, ...incomingGroups];
+        const seenIds = new Set<number>();
+        rrs = allRrs.filter((rr) => {
+          if (seenIds.has(rr.id)) return false;
+          seenIds.add(rr.id);
+          return true;
+        });
+      }
+    } finally {
+      spinner.stopAndPersist({
+        symbol: COLORS.green + DOT + COLORS.reset,
+        text: "Review requests loaded.",
+      });
+    }
+
+    if (rrs.length === 0) {
+      throw new Error(`No ${rbStatusMap[input.state] || "pending"} review requests found.`);
+    }
+    const choices = rrs.map((rr) => ({
+      title: `#${rr.id} [by ${rr.submitter?.username || "unknown"}] ${rr.summary}`,
+      value: rr.id,
+    }));
+    const selection = await promptWithFrame(
+      {
+        type: "autocomplete",
+        name: "requestId",
+        message: "Select review request (type to search)",
+        choices,
+        suggest: (input: string, choices: Array<{ title: string; value?: number }>) => {
+          const searchTerm = input.toLowerCase();
+          return Promise.resolve(
+            choices.filter((choice) => choice.title.toLowerCase().includes(searchTerm))
+          );
+        },
+      },
+      { onCancel: () => true }
+    );
+    if (!selection.requestId) return false;
+    input.mrIid = Number(selection.requestId);
+    return true;
+  }
+
   const gitlabUrl = envOrConfig("GITLAB_URL", config.gitlabUrl, "");
   const gitlabKey = envOrConfig("GITLAB_KEY", config.gitlabKey, "");
   if (!gitlabUrl || !gitlabKey) {
@@ -97,11 +197,14 @@ async function confirmInteractiveStartIfNeeded(args: {
   }
 
   if (args.workflow === "review") {
+    const itemType = args.workflowResultTitle.includes("Review Request")
+      ? "review request"
+      : "merge request";
     const confirm = await promptWithFrame(
       {
         type: "confirm",
         name: "runReview",
-        message: "Do you want to run the code review for this merge request?",
+        message: `Do you want to run the code review for this ${itemType}?`,
         initial: false,
       },
       { onCancel: () => true }
@@ -169,6 +272,39 @@ async function maybePostReviewNotes(args: {
   }
 
   const config = await loadCRConfig();
+
+  if (args.input.provider === "reviewboard") {
+    const rbToken = envOrConfig("RB_TOKEN", config.rbToken, "");
+    if (!rbToken) return { postedInlineCount: 0 };
+
+    let shouldPost = !args.input.local;
+    if (shouldPost && args.input.mode === "interactive") {
+      const response = await promptWithFrame(
+        {
+          type: "confirm",
+          name: "shouldPost",
+          message: "Post this review comment to Review Board?",
+          initial: false,
+        },
+        { onCancel: () => true }
+      );
+      shouldPost = Boolean(response.shouldPost);
+    }
+    if (!shouldPost) return { postedInlineCount: 0 };
+
+    const posted = await maybePostReviewBoardComment(
+      args.result,
+      args.input.mode,
+      shouldPost,
+      rbToken
+    );
+    if (!posted) return { postedInlineCount: 0 };
+    return {
+      postedSummaryNoteId: posted.summaryNoteId,
+      postedInlineCount: posted.inlineNoteIds.length,
+    };
+  }
+
   const gitlabKey = envOrConfig("GITLAB_KEY", config.gitlabKey, "");
   if (!gitlabKey) {
     return { postedInlineCount: 0 };
@@ -198,7 +334,7 @@ async function maybePostReviewNotes(args: {
 
   const postedSummaryNoteId = posted.summaryNoteId;
   const postedInlineCount = posted.inlineNoteIds.length;
-  
+
   return { postedSummaryNoteId, postedInlineCount };
 }
 
@@ -226,13 +362,22 @@ async function runReviewFlow(args: {
   status: WorkflowStatusController;
 }): Promise<void> {
   const { input, workflowResultTitle, ui, status } = args;
-  const runOnce = async (userFeedback?: string) =>
-    runReviewWorkflow({
+  const runOnce = async (userFeedback?: string) => {
+    if (input.provider === "reviewboard") {
+      return runReviewBoardWorkflow({
+        ...input,
+        userFeedback,
+        status: status.status,
+        events: status.events,
+      });
+    }
+    return runReviewWorkflow({
       ...input,
       userFeedback,
       status: status.status,
       events: status.events,
     });
+  };
   let result = await runOnce();
   while (true) {
     status.stop();
@@ -273,7 +418,8 @@ async function runReviewWorkflowTask(args: {
   if (!input.local && input.mode === "interactive") {
     const didSelectMergeRequest = await resolveInteractiveRemoteSelection(input);
     if (!didSelectMergeRequest) {
-      ui.warning("Merge request selection cancelled by user. No actions were taken.");
+      const itemType = input.provider === "reviewboard" ? "Review request" : "Merge request";
+      ui.warning(`${itemType} selection cancelled by user. No actions were taken.`);
       ui.setResult(workflowResultTitle, "Status: Cancelled.");
       return;
     }
@@ -348,10 +494,12 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "",
           "--path, -p <path>      Path to repository (default: current directory)",
           "--url, -u <url>        GitLab merge request URL",
+          "--from, -f <user>      Filter Review Board requests by user",
+          "--rb                   Use Review Board provider",
           "--mode, -m <mode>      Mode: interactive or ci (default: interactive)",
           "--local                Review uncommitted changes via git diff",
           "--state, -s <state>    MR state filter: opened, closed, merged, all (default: opened)",
-          "--inline-comments      Post inline review comments to GitLab",
+          "--inline-comments      Post inline review comments to GitLab/ReviewBoard",
         ],
       },
       {
@@ -360,6 +508,8 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "cr review",
           "cr review --workflow summarize",
           "cr review --workflow chat",
+          "cr review --rb",
+          "cr review --rb --from username",
           "cr review --path /path/to/repo",
           "cr review --url https://gitlab.com/org/repo/-/merge_requests/123",
           "cr review --local",
@@ -387,13 +537,14 @@ export async function runReviewCommand(args: string[]): Promise<void> {
   const stateRaw = getFlag(args, "state", "opened", "-s");
   const local = hasFlag(args, "local");
   const inlineComments = hasFlag(args, "inline-comments");
+  const rb = hasFlag(args, "rb");
   const repoRoot = repoRootFromModule(import.meta.url);
   const stdinDiff = await readStdinDiff();
 
-  if (workflowRaw === "chat" && local) {
+  if (workflowRaw === "chat" && (local || rb)) {
     printAlert({
       title: "Unsupported Combination",
-      message: "The --local option is not supported in chat mode. Run without --local.",
+      message: "The --local or --rb option is not supported in chat mode.",
       tone: "error",
     });
     process.exitCode = 1;
@@ -416,9 +567,10 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     url,
     state,
     stdinDiff,
+    provider: rb ? "reviewboard" : "gitlab",
   };
-  const intro = getWorkflowHeadingAndDescription(workflow, local);
-  const workflowResultTitle = getWorkflowResultTitle(workflow, local);
+  const intro = getWorkflowHeadingAndDescription(workflow, local, input.provider);
+  const workflowResultTitle = getWorkflowResultTitle(workflow, local, input.provider);
 
   try {
     await runLiveTask(

@@ -19,3 +19,11 @@ export type {
   GitLabDiscussion,
   GitLabInlineComment,
 } from "./gitlab.js";
+export type {
+  ReviewBoardRequest,
+  ReviewBoardDiffSet,
+  ReviewBoardFileDiff,
+  ReviewBoardDiffData,
+  ReviewBoardComment,
+  ReviewBoardReview,
+} from "./reviewBoard.js";

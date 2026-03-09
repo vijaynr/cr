@@ -1,4 +1,4 @@
-import { runReviewWorkflow, maybePostReviewComment } from "@cr/workflows";
+import { runReviewWorkflow, maybePostReviewComment, runReviewBoardWorkflow, maybePostReviewBoardComment } from "@cr/workflows";
 import { logger, repoRootFromModule, type WorkflowRuntime } from "@cr/core";
 import type { ReviewJob } from "./index.js";
 
@@ -10,7 +10,8 @@ export class WorkQueue {
 
   constructor(
     private runtime: WorkflowRuntime,
-    private gitlabKey: string
+    private token: string,
+    private mode: string = "gitlab"
   ) {}
 
   public enqueue(projectId: number | string, mrIid: number): string | null {
@@ -57,7 +58,7 @@ export class WorkQueue {
     job.status = "processing";
     job.startedAt = new Date();
 
-    console.log(`[WORKER] Starting job ${job.id} (Active: ${this.activeWorkers}/${this.runtime.webhookConcurrency})`);
+    console.log(`[WORKER] Starting job ${job.id} (Active: ${this.activeWorkers}/${this.runtime.webhookConcurrency}, Mode: ${this.mode})`);
 
     try {
       // Create a promise that rejects after timeout
@@ -69,24 +70,40 @@ export class WorkQueue {
 
       // Run the actual review
       const reviewPromise = (async () => {
-        const projectPath = String(job.projectId);
-        const gitlabUrl = this.runtime.gitlabUrl;
         const repoRoot = repoRootFromModule(import.meta.url);
 
-        const result = await runReviewWorkflow({
-          repoPath: process.cwd(),
-          repoRoot,
-          mode: "ci",
-          workflow: "review",
-          local: false,
-          mrIid: Number(job.mrIid),
-          url: `${gitlabUrl}/${projectPath}/-/merge_requests/${job.mrIid}`,
-          state: "opened",
-          inlineComments: true,
-        });
+        if (this.mode === "reviewboard") {
+          const result = await runReviewBoardWorkflow({
+            repoPath: process.cwd(),
+            repoRoot,
+            mode: "ci",
+            workflow: "review",
+            local: false,
+            mrIid: Number(job.mrIid),
+            state: "opened",
+            inlineComments: true,
+            provider: "reviewboard",
+          });
+          await maybePostReviewBoardComment(result, "ci", true, this.token);
+          return result;
+        } else {
+          const projectPath = String(job.projectId);
+          const gitlabUrl = this.runtime.gitlabUrl;
+          const result = await runReviewWorkflow({
+            repoPath: process.cwd(),
+            repoRoot,
+            mode: "ci",
+            workflow: "review",
+            local: false,
+            mrIid: Number(job.mrIid),
+            url: `${gitlabUrl}/${projectPath}/-/merge_requests/${job.mrIid}`,
+            state: "opened",
+            inlineComments: true,
+          });
 
-        await maybePostReviewComment(result, "ci", true, this.gitlabKey);
-        return result;
+          await maybePostReviewComment(result, "ci", true, this.token);
+          return result;
+        }
       })();
 
       // Wait for either completion or timeout

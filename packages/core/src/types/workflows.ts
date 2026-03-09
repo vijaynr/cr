@@ -41,6 +41,7 @@ export type ReviewWorkflowInput = {
   mode: WorkflowMode;
   workflow: WorkflowKind;
   local: boolean;
+  provider?: "gitlab" | "reviewboard";
   url?: string;
   state: MergeRequestState;
   mrIid?: number;
@@ -64,6 +65,7 @@ export type ReviewWorkflowResult = {
   mrIid?: number;
   projectPath?: string;
   gitlabUrl?: string;
+  rbUrl?: string;
   guidelines?: string;
 };
 

@@ -1,11 +1,14 @@
 import { createGitLabClient, type GitLabClient } from "../clients/gitlabClient.js";
 import { createLlmClient, type LlmClient } from "../clients/llmClient.js";
+import { createReviewBoardClient, type ReviewBoardClient } from "../clients/reviewBoardClient.js";
 import { envOrConfig, loadCRConfig } from "./config.js";
 import { logger } from "./logger.js";
 
 export type WorkflowRuntime = {
   gitlabUrl: string;
   gitlabKey: string;
+  rbUrl: string;
+  rbToken: string;
   gitlabWebhookSecret?: string;
   sslCertPath?: string;
   sslKeyPath?: string;
@@ -32,6 +35,8 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   const runtime: WorkflowRuntime = {
     gitlabUrl: envOrConfig("GITLAB_URL", config.gitlabUrl, ""),
     gitlabKey: envOrConfig("GITLAB_KEY", config.gitlabKey, ""),
+    rbUrl: envOrConfig("RB_URL", config.rbUrl, ""),
+    rbToken: envOrConfig("RB_TOKEN", config.rbToken, ""),
     gitlabWebhookSecret: envOrConfig("GITLAB_WEBHOOK_SECRET", config.gitlabWebhookSecret, ""),
     sslCertPath: envOrConfig("SSL_CERT_PATH", config.sslCertPath, ""),
     sslKeyPath: envOrConfig("SSL_KEY_PATH", config.sslKeyPath, ""),
@@ -48,6 +53,8 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   logger.debug("runtime", "workflow runtime loaded", {
     gitlabUrl: runtime.gitlabUrl,
     gitlabKey: runtime.gitlabKey ? "***" : "(not set)",
+    rbUrl: runtime.rbUrl,
+    rbToken: runtime.rbToken ? "***" : "(not set)",
     openaiApiUrl: runtime.openaiApiUrl,
     openaiApiKey: runtime.openaiApiKey ? "***" : "(not set)",
     openaiModel: runtime.openaiModel,
@@ -68,4 +75,8 @@ export function createRuntimeLlmClient(runtime: WorkflowRuntime): LlmClient {
 
 export function createRuntimeGitLabClient(runtime: WorkflowRuntime): GitLabClient {
   return createGitLabClient(runtime.gitlabUrl, runtime.gitlabKey);
+}
+
+export function createRuntimeReviewBoardClient(runtime: WorkflowRuntime): ReviewBoardClient {
+  return createReviewBoardClient(runtime.rbUrl, runtime.rbToken);
 }

@@ -16,4 +16,4 @@ Read:
 
 Output:
 - Summary of changes made.
-- End with: `Next command to run: /plan`.
+- End with: `Next command to run: /spec.plan`.
