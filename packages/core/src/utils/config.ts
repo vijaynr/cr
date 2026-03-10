@@ -19,6 +19,7 @@ const configSchema = z.object({
   rbUrl: z.string().optional(),
   rbToken: z.string().optional(),
   gitlabWebhookSecret: z.string().optional(),
+  rbWebhookSecret: z.string().optional(),
   sslCertPath: z.string().optional(),
   sslKeyPath: z.string().optional(),
   sslCaPath: z.string().optional(),
@@ -175,6 +176,9 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
     gitlabWebhookSecret: await maybeDecryptConfigSecret(
       section.gitlab_webhook_secret_enc ?? section.gitlab_webhook_secret ?? undefined
     ),
+    rbWebhookSecret: await maybeDecryptConfigSecret(
+      section.rb_webhook_secret_enc ?? section.rb_webhook_secret ?? undefined
+    ),
     sslCertPath: section.ssl_cert_path ?? undefined,
     sslKeyPath: section.ssl_key_path ?? undefined,
     sslCaPath: section.ssl_ca_path ?? undefined,
@@ -201,6 +205,7 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
     svnPassword: await maybeEncryptConfigSecret(parsed.svnPassword),
     rbToken: await maybeEncryptConfigSecret(parsed.rbToken),
     gitlabWebhookSecret: await maybeEncryptConfigSecret(parsed.gitlabWebhookSecret),
+    rbWebhookSecret: await maybeEncryptConfigSecret(parsed.rbWebhookSecret),
   };
 
   const output = toIni({
@@ -220,6 +225,9 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       ...(encryptedSecrets.rbToken && { rb_token_enc: encryptedSecrets.rbToken }),
       ...(encryptedSecrets.gitlabWebhookSecret && {
         gitlab_webhook_secret_enc: encryptedSecrets.gitlabWebhookSecret,
+      }),
+      ...(encryptedSecrets.rbWebhookSecret && {
+        rb_webhook_secret_enc: encryptedSecrets.rbWebhookSecret,
       }),
       ...(parsed.sslCertPath && { ssl_cert_path: parsed.sslCertPath }),
       ...(parsed.sslKeyPath && { ssl_key_path: parsed.sslKeyPath }),
@@ -247,3 +255,4 @@ export function envOrConfig(
   }
   return configValue ?? fallback;
 }
+

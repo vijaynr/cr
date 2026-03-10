@@ -55,7 +55,8 @@ describe("config encryption", () => {
       svnPassword: "svn-pass",
       rbUrl: "https://reviews.example.com",
       rbToken: "rb-token",
-      gitlabWebhookSecret: "webhook-secret",
+      gitlabWebhookSecret: "gitlab-webhook-secret",
+      rbWebhookSecret: "rb-webhook-secret",
     });
 
     const raw = await fs.readFile(confPath, "utf-8");
@@ -63,18 +64,21 @@ describe("config encryption", () => {
     expect(raw.includes("gitlab_key = gitlab-key")).toBe(false);
     expect(raw.includes("svn_password = svn-pass")).toBe(false);
     expect(raw.includes("rb_token = rb-token")).toBe(false);
-    expect(raw.includes("gitlab_webhook_secret = webhook-secret")).toBe(false);
+    expect(raw.includes("gitlab_webhook_secret = gitlab-webhook-secret")).toBe(false);
+    expect(raw.includes("rb_webhook_secret = rb-webhook-secret")).toBe(false);
     expect(raw.includes("openai_api_key_enc = enc:v1:")).toBe(true);
     expect(raw.includes("gitlab_key_enc = enc:v1:")).toBe(true);
     expect(raw.includes("svn_password_enc = enc:v1:")).toBe(true);
     expect(raw.includes("rb_token_enc = enc:v1:")).toBe(true);
     expect(raw.includes("gitlab_webhook_secret_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("rb_webhook_secret_enc = enc:v1:")).toBe(true);
 
     const loaded = await loadCRConfig();
     expect(loaded.openaiApiKey).toBe("openai-key");
     expect(loaded.gitlabKey).toBe("gitlab-key");
     expect(loaded.svnPassword).toBe("svn-pass");
     expect(loaded.rbToken).toBe("rb-token");
-    expect(loaded.gitlabWebhookSecret).toBe("webhook-secret");
+    expect(loaded.gitlabWebhookSecret).toBe("gitlab-webhook-secret");
+    expect(loaded.rbWebhookSecret).toBe("rb-webhook-secret");
   });
 });

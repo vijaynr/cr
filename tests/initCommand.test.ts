@@ -13,6 +13,7 @@ mock.module("@cr/ui", () => ({
       if (q.name === "gitlabWebhookSecret") answers[q.name] = "new-secret";
       else if (q.name === "rbUrl") answers[q.name] = "https://new-rb.com";
       else if (q.name === "rbToken") answers[q.name] = "new-token";
+      else if (q.name === "rbWebhookSecret") answers[q.name] = "new-rb-secret";
       else if (q.name === "svnRepositoryUrl") answers[q.name] = "https://svn.example.com/repos/project";
       else if (q.name === "svnUsername") answers[q.name] = "svn-user";
       else if (q.name === "svnPassword") answers[q.name] = "svn-pass";
@@ -73,7 +74,7 @@ describe("initCommand - specialized setup flows", () => {
   });
 
   it("should ask for Review Board specific configs in reviewboard mode", async () => {
-    mockConfig = { rbUrl: "https://old-rb.com", rbToken: "old-token" };
+    mockConfig = { rbUrl: "https://old-rb.com", rbToken: "old-token", rbWebhookSecret: "old-rb-secret" };
     lastQuestions = [];
     lastSavedConfig = null;
 
@@ -82,8 +83,10 @@ describe("initCommand - specialized setup flows", () => {
     expect(lastQuestions.some((q) => q.name === "gitlabWebhookSecret")).toBe(false);
     expect(lastQuestions.some((q) => q.name === "rbUrl")).toBe(true);
     expect(lastQuestions.some((q) => q.name === "rbToken")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "rbWebhookSecret")).toBe(true);
     expect(lastSavedConfig.rbUrl).toBe("https://new-rb.com");
     expect(lastSavedConfig.rbToken).toBe("new-token");
+    expect(lastSavedConfig.rbWebhookSecret).toBe("new-rb-secret");
   });
 
   it("should preserve existing config fields", async () => {

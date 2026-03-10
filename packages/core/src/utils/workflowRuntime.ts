@@ -14,6 +14,7 @@ export type WorkflowRuntime = {
   rbUrl: string;
   rbToken: string;
   gitlabWebhookSecret?: string;
+  rbWebhookSecret?: string;
   sslCertPath?: string;
   sslKeyPath?: string;
   sslCaPath?: string;
@@ -48,6 +49,7 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     rbUrl: envOrConfig("RB_URL", config.rbUrl, ""),
     rbToken: envOrConfig("RB_TOKEN", config.rbToken, ""),
     gitlabWebhookSecret: envOrConfig("GITLAB_WEBHOOK_SECRET", config.gitlabWebhookSecret, ""),
+    rbWebhookSecret: envOrConfig("RB_WEBHOOK_SECRET", config.rbWebhookSecret, ""),
     sslCertPath: envOrConfig("SSL_CERT_PATH", config.sslCertPath, ""),
     sslKeyPath: envOrConfig("SSL_KEY_PATH", config.sslKeyPath, ""),
     sslCaPath: envOrConfig("SSL_CA_PATH", config.sslCaPath, ""),
@@ -77,6 +79,8 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     svnPassword: runtime.svnPassword ? "***" : "(not set)",
     rbUrl: runtime.rbUrl,
     rbToken: runtime.rbToken ? "***" : "(not set)",
+    gitlabWebhookSecret: runtime.gitlabWebhookSecret ? "***" : "(not set)",
+    rbWebhookSecret: runtime.rbWebhookSecret ? "***" : "(not set)",
     openaiApiUrl: runtime.openaiApiUrl,
     openaiApiKey: runtime.openaiApiKey ? "***" : "(not set)",
     openaiModel: runtime.openaiModel,
@@ -114,3 +118,4 @@ export function createRuntimeSvnClient(runtime: WorkflowRuntime): SvnClient | nu
 export function createRuntimeReviewBoardClient(runtime: WorkflowRuntime): ReviewBoardClient {
   return createReviewBoardClient(runtime.rbUrl, runtime.rbToken);
 }
+

@@ -88,7 +88,7 @@ export class WorkQueue {
             local: false,
             mrIid: Number(job.mrIid),
             state: "opened",
-            inlineComments: true,
+            inlineComments: false,
             provider: "reviewboard",
           });
           await maybePostReviewBoardComment(result, "ci", true, this.token);
@@ -105,7 +105,7 @@ export class WorkQueue {
             mrIid: Number(job.mrIid),
             url: `${gitlabUrl}/${projectPath}/-/merge_requests/${job.mrIid}`,
             state: "opened",
-            inlineComments: true,
+            inlineComments: false,
           });
 
           await maybePostReviewComment(result, "ci", true, this.token);
@@ -150,3 +150,4 @@ export class WorkQueue {
     };
   }
 }
+

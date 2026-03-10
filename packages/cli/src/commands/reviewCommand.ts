@@ -270,7 +270,7 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "--mode, -m <mode>      Mode: interactive or ci (default: interactive)",
           "--local                Review uncommitted changes via git diff",
           "--state, -s <state>    MR state filter: opened, closed, merged, all (default: opened)",
-          "--inline-comments      Post inline review comments to GitLab/ReviewBoard",
+          "--inline-comments      Post inline review comments to GitLab only",
         ],
       },
       {
@@ -323,6 +323,16 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     return;
   }
 
+  if (rb && inlineComments) {
+    printAlert({
+      title: "Unsupported Combination",
+      message: "Review Board reviews currently support summary comments only. Remove --inline-comments.",
+      tone: "error",
+    });
+    process.exitCode = 1;
+    return;
+  }
+
   const workflow: ReviewWorkflowKind =
     workflowRaw === "chat" ? "chat" : workflowRaw === "summarize" ? "summarize" : "review";
   const state = ["opened", "closed", "merged", "all"].includes(stateRaw)
@@ -362,3 +372,4 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     process.exitCode = 1;
   }
 }
+

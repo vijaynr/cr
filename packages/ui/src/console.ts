@@ -339,7 +339,7 @@ export function printHelpView(): void {
     { cmd: "cr config", desc: "View or edit complete configuration." },
     { cmd: "cr review", desc: "Run review, summarize, or chat workflows." },
     { cmd: "cr create-mr", desc: "Generate or update a merge request draft." },
-    { cmd: "cr serve", desc: "Start a webhook server for GitLab events." },
+    { cmd: "cr serve", desc: "Start a webhook server for GitLab or Review Board events." },
     { cmd: "cr help", desc: "Show this help screen." },
   ]);
 
@@ -413,3 +413,4 @@ export const __test__ = {
   wrapTextByWidth,
   centerLine,
 };
+

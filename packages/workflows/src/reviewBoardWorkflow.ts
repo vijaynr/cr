@@ -42,6 +42,14 @@ function reportFeedbackRegeneration(input: Pick<ReviewWorkflowInput, "status">):
   input.status?.info("Regenerating review with your feedback...");
 }
 
+function reportInlineCommentLimitation(input: Pick<ReviewWorkflowInput, "inlineComments" | "status">): void {
+  if (input.inlineComments) {
+    input.status?.warning(
+      "Review Board inline diff comments are not supported yet. This review will post a summary comment only."
+    );
+  }
+}
+
 function assertResponseType(
   response: ReviewWorkflowResponseInput
 ): ReviewWorkflowResponse {
@@ -55,6 +63,8 @@ function assertResponseType(
 export async function runReviewBoardWorkflow(
   input: ReviewWorkflowInput & { userFeedback?: string }
 ): Promise<ReviewWorkflowResult> {
+  reportInlineCommentLimitation(input);
+
   const initialState: ReviewBoardGraphState = {
     input,
     runtime: null,
@@ -98,15 +108,13 @@ export async function runReviewBoardWorkflow(
         const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
         phaseReporter.started("generate_review", "Analyzing Review Board changes...");
 
-        // RB doesn't easily expose individual commits like GitLab MRs in one call,
-        // and we are disabling inline comments for now.
         const rawDiff = await rb.getRawDiff(context.requestId, context.diffSet.revision);
 
         const template = await loadPrompt("review.txt", state.input.repoRoot);
         let prompt = injectMergeRequestContextIntoTemplate(template, {
           mrContent: `${context.request.summary}\n\n${context.request.description}`,
           mrChanges: rawDiff || context.files.map((f) => f.dest_file).join("\n"),
-          mrCommits: "N/A", // Not easily available for RB
+          mrCommits: "N/A",
         });
 
         const effectiveFeedback = state.pendingFeedback;
@@ -185,31 +193,9 @@ export async function maybePostReviewBoardComment(
 
   const rb = createReviewBoardClient(result.rbUrl, rbToken);
   const requestId = result.mrIid;
-
-  // 1. Create a review
   const summaryBody = result.overallSummary || result.output;
   const review = await rb.createReview(requestId, summaryBody);
-
-  const inlineNoteIds: string[] = [];
-  // 2. Add diff comments
-  for (const inline of result.inlineComments) {
-    // We need the fileDiffId which we should have stashed in the inline comment object
-    const fileDiffId = "id" in inline && typeof inline.id === "number" ? inline.id : undefined;
-    if (fileDiffId) {
-      await rb.addDiffComment(
-        requestId,
-        review.id,
-        fileDiffId,
-        inline.line,
-        1, // num_lines, default to 1
-        inline.comment
-      );
-      inlineNoteIds.push(`comment-${fileDiffId}-${inline.line}`);
-    }
-  }
-
-  // 3. Publish the review
   await rb.publishReview(requestId, review.id);
 
-  return { summaryNoteId: String(review.id), inlineNoteIds };
+  return { summaryNoteId: String(review.id), inlineNoteIds: [] };
 }

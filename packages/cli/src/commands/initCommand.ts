@@ -23,6 +23,7 @@ type WebhookSetupAnswers = {
   gitlabUrl?: string;
   gitlabKey?: string;
   gitlabWebhookSecret?: string;
+  rbWebhookSecret?: string;
   sslCertPath?: string;
   sslKeyPath?: string;
   sslCaPath?: string;
@@ -207,7 +208,7 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
   if (isRb) {
     printEmptyLine();
     printWarning(
-      "Review Board integration is in early preview. Please report any issues you encounter."
+      "Review Board webhook mode is summary-only today. Configure only the review_request_published event and use the same HMAC secret in Review Board and CR."
     );
   } else {
     printEmptyLine();
@@ -231,6 +232,12 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
         name: "rbToken",
         message: "Review Board API Token",
         initial: existing.rbToken ?? "",
+      },
+      {
+        type: "password",
+        name: "rbWebhookSecret",
+        message: "Review Board Webhook Secret (HMAC signing secret)",
+        initial: existing.rbWebhookSecret ?? "",
       }
     );
   } else {
@@ -316,6 +323,7 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
       ? {
           rbUrl: answers.rbUrl || undefined,
           rbToken: answers.rbToken || undefined,
+          rbWebhookSecret: answers.rbWebhookSecret || undefined,
         }
       : {
           gitlabUrl: answers.gitlabUrl || existing.gitlabUrl || defaultConfig.gitlabUrl,
@@ -536,3 +544,5 @@ async function runRbSetup(_args: string[] = []): Promise<void> {
   printSuccess(`Review Board configuration updated in ${CR_CONF_PATH}`);
   printDivider();
 }
+
+

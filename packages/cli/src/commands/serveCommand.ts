@@ -12,8 +12,8 @@ export async function runServeCommand(args: string[]): Promise<void> {
       {
         title: "OPTIONS",
         lines: [
-          "--webhook             Start a webhook server for GitLab MR events",
-          "--mode <mode>         Mode: gitlab (default)",
+          "--webhook             Start a webhook server for GitLab or Review Board events",
+          "--mode <mode>         Mode: gitlab or reviewboard (default: gitlab)",
           "--port, -p <number>   Port to listen on (default: 3000)",
           "--ssl-cert <path>     Path to SSL certificate (optional)",
           "--ssl-key <path>      Path to SSL private key (optional)",
@@ -27,8 +27,11 @@ export async function runServeCommand(args: string[]): Promise<void> {
         title: "EXAMPLES",
         lines: [
           "cr serve --webhook",
+          "cr serve --webhook --mode reviewboard",
           "cr serve --webhook --concurrency 5 --timeout 300000",
           "cr serve --webhook --port 8443 --ssl-cert ./cert.crt --ssl-key ./cert.key --ssl-ca ./ca.crt",
+          "Review Board mode: configure only the review_request_published webhook event.",
+          "Review Board mode: provide the same HMAC secret here and in Review Board.",
         ],
       },
     ]);

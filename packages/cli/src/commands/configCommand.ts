@@ -96,6 +96,12 @@ export async function runConfigCommand(): Promise<void> {
       },
       {
         type: "password",
+        name: "rbWebhookSecret",
+        message: "Review Board Webhook Secret (HMAC signing secret)",
+        initial: existing.rbWebhookSecret ?? "",
+      },
+      {
+        type: "password",
         name: "gitlabWebhookSecret",
         message: "GitLab Webhook Secret (X-Gitlab-Token)",
         initial: existing.gitlabWebhookSecret ?? "",
@@ -158,6 +164,7 @@ export async function runConfigCommand(): Promise<void> {
     svnPassword: answers.svnPassword || undefined,
     rbUrl: answers.rbUrl || undefined,
     rbToken: answers.rbToken || undefined,
+    rbWebhookSecret: answers.rbWebhookSecret || undefined,
     gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
     sslCertPath: answers.sslCertPath || undefined,
     sslKeyPath: answers.sslKeyPath || undefined,
@@ -171,3 +178,4 @@ export async function runConfigCommand(): Promise<void> {
   printSuccess(`Configuration updated in ${CR_CONF_PATH}`);
   printDivider();
 }
+

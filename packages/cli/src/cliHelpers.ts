@@ -45,7 +45,7 @@ export function getWorkflowHeadingAndDescription(
   provider?: string
 ): { heading: string; description: string } {
   const isRB = provider === "reviewboard";
-  const itemType = isRB ? "Review Request (Reviewboard)" : "Merge Request";
+  const itemType = isRB ? "Review Request (Review Board)" : "Merge Request";
 
   if (workflow === "chat") {
     return {
@@ -77,7 +77,7 @@ export function getWorkflowResultTitle(
   provider?: string
 ): string {
   const isRB = provider === "reviewboard";
-  const itemType = isRB ? "Review Request (Reviewboard)" : "Merge Request";
+  const itemType = isRB ? "Review Request (Review Board)" : "Merge Request";
 
   if (workflow === "chat") {
     return "Workflow: Code Review Chat";
@@ -87,3 +87,4 @@ export function getWorkflowResultTitle(
   }
   return "Workflow: Code Review";
 }
+

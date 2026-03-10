@@ -11,6 +11,7 @@ export type CRConfig = {
   rbUrl?: string;
   rbToken?: string;
   gitlabWebhookSecret?: string;
+  rbWebhookSecret?: string;
   sslCertPath?: string;
   sslKeyPath?: string;
   sslCaPath?: string;
@@ -27,3 +28,4 @@ export const defaultConfig: Pick<CRConfig, "openaiApiUrl" | "openaiModel" | "git
     gitlabUrl: "https://gitlab.otxlab.net",
     rbUrl: "https://reviews.otxlab.net",
   };
+
