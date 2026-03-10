@@ -37,6 +37,12 @@ export { generateTextWithLlm } from "./llm.js";
 
 // Prompts exports
 export { loadPrompt } from "./promptsManager.js";
+export {
+  loadLocalRepositoryGuidelines,
+  loadGitLabRepositoryGuidelines,
+  loadSvnRepositoryGuidelines,
+} from "./repositoryGuidelines.js";
+export { svnGetFile, resolveSvnFileUrl } from "./svn.js";
 
 // Bootstrap exports
 export { initializeCRHome } from "./bootstrap.js";
@@ -49,5 +55,6 @@ export {
   loadWorkflowRuntime,
   createRuntimeLlmClient,
   createRuntimeGitLabClient,
+  createRuntimeSvnClient,
   type WorkflowRuntime,
 } from "./workflowRuntime.js";

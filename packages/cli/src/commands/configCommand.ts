@@ -66,6 +66,24 @@ export async function runConfigCommand(): Promise<void> {
       },
       {
         type: "text",
+        name: "svnRepositoryUrl",
+        message: "SVN Repository URL",
+        initial: existing.svnRepositoryUrl ?? "",
+      },
+      {
+        type: "text",
+        name: "svnUsername",
+        message: "SVN Username (optional)",
+        initial: existing.svnUsername ?? "",
+      },
+      {
+        type: "password",
+        name: "svnPassword",
+        message: "SVN Password (optional)",
+        initial: existing.svnPassword ?? "",
+      },
+      {
+        type: "text",
         name: "rbUrl",
         message: "Review Board URL",
         initial: existing.rbUrl ?? defaultConfig.rbUrl,
@@ -122,7 +140,6 @@ export async function runConfigCommand(): Promise<void> {
     { onCancel: () => true }
   );
 
-  // If critical fields are missing, assume cancel (or at least don't save broken config)
   if (!answers.openaiApiUrl || !answers.openaiModel || !answers.gitlabUrl) {
     printWarning("Configuration update cancelled.");
     return;
@@ -136,6 +153,9 @@ export async function runConfigCommand(): Promise<void> {
     terminalTheme: answers.terminalTheme ?? "auto",
     gitlabUrl: answers.gitlabUrl,
     gitlabKey: answers.gitlabKey ?? "",
+    svnRepositoryUrl: answers.svnRepositoryUrl || undefined,
+    svnUsername: answers.svnUsername || undefined,
+    svnPassword: answers.svnPassword || undefined,
     rbUrl: answers.rbUrl || undefined,
     rbToken: answers.rbToken || undefined,
     gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,

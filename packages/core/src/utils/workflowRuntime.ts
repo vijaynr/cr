@@ -1,12 +1,16 @@
 import { createGitLabClient, type GitLabClient } from "../clients/gitlabClient.js";
 import { createLlmClient, type LlmClient } from "../clients/llmClient.js";
 import { createReviewBoardClient, type ReviewBoardClient } from "../clients/reviewBoardClient.js";
+import { createSvnClient, type SvnClient } from "../clients/svnClient.js";
 import { envOrConfig, loadCRConfig } from "./config.js";
 import { logger } from "./logger.js";
 
 export type WorkflowRuntime = {
   gitlabUrl: string;
   gitlabKey: string;
+  svnRepositoryUrl: string;
+  svnUsername: string;
+  svnPassword: string;
   rbUrl: string;
   rbToken: string;
   gitlabWebhookSecret?: string;
@@ -25,7 +29,6 @@ export type WorkflowRuntime = {
 export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   const config = await loadCRConfig();
 
-  // Parse boolean from environment variable
   const envCustomStreaming = process.env.USE_CUSTOM_STREAMING;
   const useCustomStreaming =
     envCustomStreaming !== undefined
@@ -35,6 +38,13 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   const runtime: WorkflowRuntime = {
     gitlabUrl: envOrConfig("GITLAB_URL", config.gitlabUrl, ""),
     gitlabKey: envOrConfig("GITLAB_KEY", config.gitlabKey, ""),
+    svnRepositoryUrl:
+      process.env.SVN_REPOSITORY_URL ||
+      process.env.SVN_GUIDELINES_BASE_URL ||
+      config.svnRepositoryUrl ||
+      "",
+    svnUsername: envOrConfig("SVN_USERNAME", config.svnUsername, ""),
+    svnPassword: envOrConfig("SVN_PASSWORD", config.svnPassword, ""),
     rbUrl: envOrConfig("RB_URL", config.rbUrl, ""),
     rbToken: envOrConfig("RB_TOKEN", config.rbToken, ""),
     gitlabWebhookSecret: envOrConfig("GITLAB_WEBHOOK_SECRET", config.gitlabWebhookSecret, ""),
@@ -52,7 +62,7 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     webhookJobTimeoutMs: Number.parseInt(
       envOrConfig("WEBHOOK_JOB_TIMEOUT_MS", config.webhookJobTimeoutMs?.toString(), "600000"),
       10
-    ), // 10 mins default
+    ),
     openaiApiUrl: envOrConfig("OPENAI_API_URL", config.openaiApiUrl, ""),
     openaiApiKey: envOrConfig("OPENAI_API_KEY", config.openaiApiKey, ""),
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),
@@ -62,6 +72,9 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   logger.debug("runtime", "workflow runtime loaded", {
     gitlabUrl: runtime.gitlabUrl,
     gitlabKey: runtime.gitlabKey ? "***" : "(not set)",
+    svnRepositoryUrl: runtime.svnRepositoryUrl,
+    svnUsername: runtime.svnUsername ? "***" : "(not set)",
+    svnPassword: runtime.svnPassword ? "***" : "(not set)",
     rbUrl: runtime.rbUrl,
     rbToken: runtime.rbToken ? "***" : "(not set)",
     openaiApiUrl: runtime.openaiApiUrl,
@@ -84,6 +97,18 @@ export function createRuntimeLlmClient(runtime: WorkflowRuntime): LlmClient {
 
 export function createRuntimeGitLabClient(runtime: WorkflowRuntime): GitLabClient {
   return createGitLabClient(runtime.gitlabUrl, runtime.gitlabKey);
+}
+
+export function createRuntimeSvnClient(runtime: WorkflowRuntime): SvnClient | null {
+  if (!runtime.svnRepositoryUrl) {
+    return null;
+  }
+
+  return createSvnClient(
+    runtime.svnRepositoryUrl,
+    runtime.svnUsername || undefined,
+    runtime.svnPassword || undefined
+  );
 }
 
 export function createRuntimeReviewBoardClient(runtime: WorkflowRuntime): ReviewBoardClient {

@@ -47,11 +47,18 @@ type ReviewBoardSetupAnswers = {
   rbToken?: string;
 };
 
+type SubversionSetupAnswers = {
+  svnRepositoryUrl?: string;
+  svnUsername?: string;
+  svnPassword?: string;
+};
+
 export async function runInitCommand(args: string[] = []): Promise<void> {
   const isSdd = hasFlag(args, "sdd");
   const isWebhook = hasFlag(args, "webhook");
   const isRb = hasFlag(args, "rb");
   const isGitlab = hasFlag(args, "gitlab");
+  const isSubversion = hasFlag(args, "subversion") || hasFlag(args, "svn");
 
   if (isSdd) {
     await runSddSetup(args);
@@ -70,6 +77,11 @@ export async function runInitCommand(args: string[] = []): Promise<void> {
 
   if (isGitlab) {
     await runGitLabSetup(args);
+    return;
+  }
+
+  if (isSubversion) {
+    await runSubversionSetup(args);
     return;
   }
 
@@ -322,6 +334,74 @@ async function runWebhookSetup(args: string[] = []): Promise<void> {
 
   printDivider();
   printSuccess(`Webhook configuration updated in ${CR_CONF_PATH}`);
+  printDivider();
+}
+
+async function runSubversionSetup(_args: string[] = []): Promise<void> {
+  const existing = await loadCRConfig();
+
+  createSpinner("Loading settings...")
+    .start()
+    .stopAndPersist({
+      symbol: COLORS.cyan + DOT + COLORS.reset,
+      text: "Initialize Subversion configuration",
+    });
+
+  printEmptyLine();
+  printInfo(
+    "Store SVN credentials for basic-auth HTTP access. Enter the repository URL that CR should use when fetching repository files from SVN."
+  );
+
+  const answers = (await promptWithFrame(
+    [
+      {
+        type: "text",
+        name: "svnRepositoryUrl",
+        message: "SVN Repository URL",
+        initial: existing.svnRepositoryUrl ?? "",
+      },
+      {
+        type: "text",
+        name: "svnUsername",
+        message: "SVN Username (optional)",
+        initial: existing.svnUsername ?? "",
+      },
+      {
+        type: "password",
+        name: "svnPassword",
+        message: "SVN Password (optional)",
+        initial: existing.svnPassword ?? "",
+      },
+    ],
+    { onCancel: () => true }
+  )) as SubversionSetupAnswers;
+
+  if (
+    answers.svnRepositoryUrl === undefined &&
+    answers.svnUsername === undefined &&
+    answers.svnPassword === undefined
+  ) {
+    printWarning("Subversion initialization cancelled.");
+    return;
+  }
+
+  const nextConfig: CRConfig = {
+    ...existing,
+    openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+    openaiApiKey: existing.openaiApiKey ?? "",
+    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+    useCustomStreaming: existing.useCustomStreaming ?? false,
+    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+    gitlabKey: existing.gitlabKey ?? "",
+    svnRepositoryUrl: answers.svnRepositoryUrl || undefined,
+    svnUsername: answers.svnUsername || undefined,
+    svnPassword: answers.svnPassword || undefined,
+  };
+
+  await saveCRConfig(nextConfig);
+
+  printDivider();
+  printSuccess(`Subversion configuration updated in ${CR_CONF_PATH}`);
   printDivider();
 }
 

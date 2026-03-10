@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import path from "node:path";
 import { z } from "zod";
-import { CR_CONF_PATH } from "./paths.js";
+import { CR_CONF_KEY_PATH, CR_CONF_PATH } from "./paths.js";
 import type { CRConfig } from "../types/config.js";
 
 const configSchema = z.object({
@@ -11,6 +13,9 @@ const configSchema = z.object({
   useCustomStreaming: z.boolean(),
   gitlabUrl: z.string(),
   gitlabKey: z.string(),
+  svnRepositoryUrl: z.string().optional(),
+  svnUsername: z.string().optional(),
+  svnPassword: z.string().optional(),
   rbUrl: z.string().optional(),
   rbToken: z.string().optional(),
   gitlabWebhookSecret: z.string().optional(),
@@ -24,10 +29,11 @@ const configSchema = z.object({
 });
 
 const crSection = "cr";
+const ENCRYPTED_SECRET_PREFIX = "enc:v1";
+const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+const ENCRYPTION_KEY_BYTES = 32;
+const ENCRYPTION_IV_BYTES = 12;
 
-/**
- * Generic INI file parser that extracts [section] and key=value pairs.
- */
 function parseIni(content: string): Record<string, Record<string, string>> {
   const sections: Record<string, Record<string, string>> = {};
   let current = "";
@@ -55,9 +61,6 @@ function parseIni(content: string): Record<string, Record<string, string>> {
   return sections;
 }
 
-/**
- * Converts an object structure to INI format with [section] headers.
- */
 function toIni(data: Record<string, Record<string, string>>): string {
   return Object.entries(data)
     .map(([section, values]) => {
@@ -70,10 +73,80 @@ function toIni(data: Record<string, Record<string, string>>): string {
     .concat("\n");
 }
 
-/**
- * Loads CR configuration from the standard config file.
- * Returns a partial config that can be combined with environment variables.
- */
+function isEncryptedSecret(value: string | undefined): value is string {
+  return Boolean(value?.startsWith(`${ENCRYPTED_SECRET_PREFIX}:`));
+}
+
+export function encryptConfigSecret(value: string, key: Buffer): string {
+  const iv = randomBytes(ENCRYPTION_IV_BYTES);
+  const cipher = createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf-8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [
+    ENCRYPTED_SECRET_PREFIX,
+    iv.toString("base64"),
+    tag.toString("base64"),
+    encrypted.toString("base64"),
+  ].join(":");
+}
+
+export function decryptConfigSecret(value: string, key: Buffer): string {
+  if (!isEncryptedSecret(value)) {
+    return value;
+  }
+
+  const [, version, ivBase64, tagBase64, encryptedBase64] = value.split(":");
+  if (version !== "v1" || !ivBase64 || !tagBase64 || !encryptedBase64) {
+    throw new Error("Unsupported encrypted config secret format.");
+  }
+
+  const decipher = createDecipheriv(
+    ENCRYPTION_ALGORITHM,
+    key,
+    Buffer.from(ivBase64, "base64")
+  );
+  decipher.setAuthTag(Buffer.from(tagBase64, "base64"));
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(encryptedBase64, "base64")),
+    decipher.final(),
+  ]);
+  return decrypted.toString("utf-8");
+}
+
+async function loadOrCreateConfigEncryptionKey(): Promise<Buffer> {
+  if (existsSync(CR_CONF_KEY_PATH)) {
+    const key = Buffer.from((await fs.readFile(CR_CONF_KEY_PATH, "utf-8")).trim(), "base64");
+    if (key.length !== ENCRYPTION_KEY_BYTES) {
+      throw new Error("Invalid CR config encryption key.");
+    }
+    return key;
+  }
+
+  const key = randomBytes(ENCRYPTION_KEY_BYTES);
+  await fs.mkdir(path.dirname(CR_CONF_KEY_PATH), { recursive: true });
+  await fs.writeFile(CR_CONF_KEY_PATH, key.toString("base64"), { encoding: "utf-8", mode: 0o600 });
+  return key;
+}
+
+async function maybeDecryptConfigSecret(value: string | undefined): Promise<string | undefined> {
+  if (!value) {
+    return undefined;
+  }
+  if (!isEncryptedSecret(value)) {
+    return value;
+  }
+
+  return decryptConfigSecret(value, await loadOrCreateConfigEncryptionKey());
+}
+
+async function maybeEncryptConfigSecret(value: string | undefined): Promise<string | undefined> {
+  if (!value) {
+    return undefined;
+  }
+
+  return encryptConfigSecret(value, await loadOrCreateConfigEncryptionKey());
+}
+
 export async function loadCRConfig(): Promise<Partial<CRConfig>> {
   if (!existsSync(CR_CONF_PATH)) {
     return {};
@@ -85,14 +158,23 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
 
   const parsed = {
     openaiApiUrl: section.openai_api_url ?? "",
-    openaiApiKey: section.openai_api_key ?? "",
+    openaiApiKey: await maybeDecryptConfigSecret(
+      section.openai_api_key_enc ?? section.openai_api_key ?? ""
+    ),
     openaiModel: section.openai_model ?? "",
     useCustomStreaming: (section.use_custom_streaming ?? "false").toLowerCase() === "true",
     gitlabUrl: section.gitlab_url ?? "",
-    gitlabKey: section.gitlab_key ?? "",
+    gitlabKey: await maybeDecryptConfigSecret(section.gitlab_key_enc ?? section.gitlab_key ?? ""),
+    svnRepositoryUrl: section.svn_repository_url ?? section.svn_guidelines_base_url ?? undefined,
+    svnUsername: section.svn_username ?? undefined,
+    svnPassword: await maybeDecryptConfigSecret(
+      section.svn_password_enc ?? section.svn_password ?? undefined
+    ),
     rbUrl: section.rb_url ?? undefined,
-    rbToken: section.rb_token ?? undefined,
-    gitlabWebhookSecret: section.gitlab_webhook_secret ?? undefined,
+    rbToken: await maybeDecryptConfigSecret(section.rb_token_enc ?? section.rb_token ?? undefined),
+    gitlabWebhookSecret: await maybeDecryptConfigSecret(
+      section.gitlab_webhook_secret_enc ?? section.gitlab_webhook_secret ?? undefined
+    ),
     sslCertPath: section.ssl_cert_path ?? undefined,
     sslKeyPath: section.ssl_key_path ?? undefined,
     sslCaPath: section.ssl_ca_path ?? undefined,
@@ -111,23 +193,34 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
   return configSchema.partial().parse(parsed);
 }
 
-/**
- * Saves CR configuration to the standard config file in INI format.
- */
 export async function saveCRConfig(config: CRConfig): Promise<void> {
   const parsed = configSchema.parse(config);
+  const encryptedSecrets = {
+    openaiApiKey: await maybeEncryptConfigSecret(parsed.openaiApiKey),
+    gitlabKey: await maybeEncryptConfigSecret(parsed.gitlabKey),
+    svnPassword: await maybeEncryptConfigSecret(parsed.svnPassword),
+    rbToken: await maybeEncryptConfigSecret(parsed.rbToken),
+    gitlabWebhookSecret: await maybeEncryptConfigSecret(parsed.gitlabWebhookSecret),
+  };
 
   const output = toIni({
     [crSection]: {
       openai_api_url: parsed.openaiApiUrl,
-      openai_api_key: parsed.openaiApiKey,
+      ...(encryptedSecrets.openaiApiKey && { openai_api_key_enc: encryptedSecrets.openaiApiKey }),
       openai_model: parsed.openaiModel,
       use_custom_streaming: parsed.useCustomStreaming ? "true" : "false",
       gitlab_url: parsed.gitlabUrl,
-      gitlab_key: parsed.gitlabKey,
+      ...(encryptedSecrets.gitlabKey && { gitlab_key_enc: encryptedSecrets.gitlabKey }),
+      ...(parsed.svnRepositoryUrl && {
+        svn_repository_url: parsed.svnRepositoryUrl,
+      }),
+      ...(parsed.svnUsername && { svn_username: parsed.svnUsername }),
+      ...(encryptedSecrets.svnPassword && { svn_password_enc: encryptedSecrets.svnPassword }),
       ...(parsed.rbUrl && { rb_url: parsed.rbUrl }),
-      ...(parsed.rbToken && { rb_token: parsed.rbToken }),
-      ...(parsed.gitlabWebhookSecret && { gitlab_webhook_secret: parsed.gitlabWebhookSecret }),
+      ...(encryptedSecrets.rbToken && { rb_token_enc: encryptedSecrets.rbToken }),
+      ...(encryptedSecrets.gitlabWebhookSecret && {
+        gitlab_webhook_secret_enc: encryptedSecrets.gitlabWebhookSecret,
+      }),
       ...(parsed.sslCertPath && { ssl_cert_path: parsed.sslCertPath }),
       ...(parsed.sslKeyPath && { ssl_key_path: parsed.sslKeyPath }),
       ...(parsed.sslCaPath && { ssl_ca_path: parsed.sslCaPath }),
@@ -143,10 +236,6 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
   await fs.writeFile(CR_CONF_PATH, output, "utf-8");
 }
 
-/**
- * Returns a value from environment or config with optional fallback.
- * Environment variables take precedence.
- */
 export function envOrConfig(
   envKey: string,
   configValue: string | undefined,

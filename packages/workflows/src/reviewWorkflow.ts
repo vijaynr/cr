@@ -2,6 +2,12 @@ import { getCurrentBranch, getOriginRemoteUrl } from "@cr/core";
 import { type GitLabInlineComment, type GitLabClient, remoteToProjectPath } from "@cr/core";
 import { type LlmClient } from "@cr/core";
 import { loadPrompt } from "@cr/core";
+import {
+  createRuntimeSvnClient,
+  loadGitLabRepositoryGuidelines,
+  loadLocalRepositoryGuidelines,
+  loadSvnRepositoryGuidelines,
+} from "@cr/core";
 import { createWorkflowPhaseReporter } from "./workflowEvents.js";
 import {
   injectMergeRequestContextIntoTemplate,
@@ -93,7 +99,8 @@ function assertRemoteContext(context: RemoteMrContext | null): RemoteMrContext {
 
 async function resolveRemoteMrContext(
   input: ReviewWorkflowInput,
-  gitlab: GitLabClient
+  gitlab: GitLabClient,
+  runtime: WorkflowRuntime
 ): Promise<RemoteMrContext> {
   const repoUrl = input.url ?? (await getOriginRemoteUrl(input.repoPath));
   const projectPath = remoteToProjectPath(repoUrl);
@@ -125,12 +132,12 @@ async function resolveRemoteMrContext(
   let guidelines: string | undefined;
   try {
     const ref = mr.diff_refs?.head_sha || "HEAD";
-    const content =
-      (await gitlab.getFileRaw(projectPath, "GUIDELINES.md", ref)) ||
-      (await gitlab.getFileRaw(projectPath, "Guidelines.md", ref));
-    if (content) {
-      guidelines = content;
-    }
+    guidelines =
+      (await loadGitLabRepositoryGuidelines({
+        gitlab,
+        projectPath,
+        ref,
+      })) ?? (await loadSvnRepositoryGuidelines(createRuntimeSvnClient(runtime)));
   } catch {
     // Ignore errors fetching guidelines
   }
@@ -282,6 +289,7 @@ async function generateRemoteReviewResult(
   input: ReviewWorkflowInput,
   gitlab: GitLabClient,
   llm: LlmClient,
+  runtime: WorkflowRuntime,
   gitlabUrl: string,
   remoteContext?: RemoteMrContext,
   userFeedback?: string
@@ -289,7 +297,7 @@ async function generateRemoteReviewResult(
   const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
 
   const { projectPath, mrIid, mr, changes, commits, guidelines } =
-    remoteContext ?? (await resolveRemoteMrContext(input, gitlab));
+    remoteContext ?? (await resolveRemoteMrContext(input, gitlab, runtime));
 
   const template = await loadPrompt("review.txt", input.repoRoot);
 
@@ -340,6 +348,7 @@ async function generateRemoteReviewResult(
 async function buildLocalPrompt(
   input: ReviewWorkflowInput,
   llm: LlmClient,
+  runtime: WorkflowRuntime,
   userFeedback?: string
 ): Promise<ReviewWorkflowResult> {
   const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
@@ -350,22 +359,9 @@ async function buildLocalPrompt(
 
   let guidelines: string | undefined;
   try {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const gPath1 = path.join(input.repoPath, "GUIDELINES.md");
-    const gPath2 = path.join(input.repoPath, "Guidelines.md");
-
-    const exists = async (p: string) =>
-      fs
-        .access(p)
-        .then(() => true)
-        .catch(() => false);
-
-    if (await exists(gPath1)) {
-      guidelines = await fs.readFile(gPath1, "utf-8");
-    } else if (await exists(gPath2)) {
-      guidelines = await fs.readFile(gPath2, "utf-8");
-    }
+    guidelines =
+      (await loadLocalRepositoryGuidelines(input.repoPath)) ??
+      (await loadSvnRepositoryGuidelines(createRuntimeSvnClient(runtime)));
   } catch {
     // ignore
   }
@@ -427,10 +423,15 @@ async function initializeGitLabClientNode(state: { runtime: WorkflowRuntime | nu
 
 async function getMergeRequestContextNode(state: {
   input: ReviewWorkflowInput;
+  runtime: WorkflowRuntime | null;
   gitlab: GitLabClient | null;
 }): Promise<{ remoteContext: RemoteMrContext }> {
   return {
-    remoteContext: await resolveRemoteMrContext(state.input, assertGitLab(state.gitlab)),
+    remoteContext: await resolveRemoteMrContext(
+      state.input,
+      assertGitLab(state.gitlab),
+      assertRuntime(state.runtime)
+    ),
   };
 }
 
@@ -440,7 +441,9 @@ async function performCodeReviewNode(
   const runtime = assertRuntime(state.runtime);
   const llm = assertLlm(state.llm);
   if (state.input.local) {
-    return { result: await buildLocalPrompt(state.input, llm, state.pendingFeedback) };
+    return {
+      result: await buildLocalPrompt(state.input, llm, runtime, state.pendingFeedback),
+    };
   }
   const remoteContext = assertRemoteContext(state.remoteContext);
   return {
@@ -448,6 +451,7 @@ async function performCodeReviewNode(
       state.input,
       assertGitLab(state.gitlab),
       llm,
+      runtime,
       runtime.gitlabUrl,
       remoteContext,
       state.pendingFeedback

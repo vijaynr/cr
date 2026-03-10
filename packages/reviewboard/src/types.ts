@@ -2,6 +2,12 @@
  * Review Board API response types.
  */
 
+export type ReviewBoardRepository = {
+  title: string;
+  name: string;
+  path?: string;
+};
+
 export type ReviewBoardRequest = {
   id: number;
   summary: string;
@@ -12,13 +18,11 @@ export type ReviewBoardRequest = {
     username: string;
     title: string;
   };
-  repository?: {
-    title: string;
-    name: string;
-  };
+  repository?: ReviewBoardRepository;
   links: {
     diffs: { href: string };
     reviews: { href: string };
+    repository?: { href: string };
   };
 };
 

@@ -1,5 +1,6 @@
 import type {
   ReviewBoardRequest,
+  ReviewBoardRepository,
   ReviewBoardDiffSet,
   ReviewBoardFileDiff,
   ReviewBoardDiffData,
@@ -21,6 +22,7 @@ export interface ReviewBoardClient {
     fromUser?: string
   ): Promise<ReviewBoardRequest[]>;
   getReviewRequest(requestId: number): Promise<ReviewBoardRequest>;
+  getRepository(repositoryHref: string): Promise<ReviewBoardRepository>;
   getLatestDiffSet(requestId: number): Promise<ReviewBoardDiffSet | null>;
   getFileDiffs(requestId: number, diffSetId: number): Promise<ReviewBoardFileDiff[]>;
   getFileDiffData(
@@ -93,6 +95,22 @@ export async function rbRequest<T>(
   return data as T;
 }
 
+async function getRepository(
+  baseUrl: string,
+  token: string,
+  repositoryHref: string,
+  username?: string
+): Promise<ReviewBoardRepository> {
+  const response = await rbRequest<{ repository: ReviewBoardRepository }>(
+    baseUrl,
+    token,
+    repositoryHref,
+    {},
+    username
+  );
+  return response.repository;
+}
+
 export async function getCurrentUser(
   baseUrl: string,
   token: string,
@@ -141,11 +159,26 @@ export function createReviewBoardClient(
       const response = await rbRequest<{ review_request: ReviewBoardRequest }>(
         baseUrl,
         token,
-        `/api/review-requests/${requestId}/?expand=submitter`,
+        `/api/review-requests/${requestId}/?expand=submitter,repository`,
         {},
         username
       );
-      return response.review_request;
+
+      const request = response.review_request;
+      if (!request.repository?.path && request.links.repository?.href) {
+        request.repository = await getRepository(
+          baseUrl,
+          token,
+          request.links.repository.href,
+          username
+        );
+      }
+
+      return request;
+    },
+
+    async getRepository(repositoryHref) {
+      return getRepository(baseUrl, token, repositoryHref, username);
     },
 
     async getLatestDiffSet(requestId) {

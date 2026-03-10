@@ -8,6 +8,7 @@ export const CR_PROMPTS_DIR = path.join(CR_DIR, "prompts");
 export const CR_ASSETS_DIR = path.join(CR_DIR, "assets");
 export const CR_LOGS_DIR = path.join(CR_DIR, "logs");
 export const CR_CONF_PATH = path.join(HOME_DIR, ".cr.conf");
+export const CR_CONF_KEY_PATH = path.join(CR_DIR, "config.key");
 
 export function repoRootFromModule(metaUrl: string): string {
   const thisFile = fileURLToPath(metaUrl);

@@ -5,6 +5,9 @@ export type CRConfig = {
   useCustomStreaming: boolean; // Use custom SSE streaming instead of standard OpenAI SDK
   gitlabUrl: string;
   gitlabKey: string;
+  svnRepositoryUrl?: string;
+  svnUsername?: string;
+  svnPassword?: string;
   rbUrl?: string;
   rbToken?: string;
   gitlabWebhookSecret?: string;

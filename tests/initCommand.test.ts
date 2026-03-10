@@ -1,13 +1,10 @@
 import { describe, it, expect, mock } from "bun:test";
 import { runInitCommand } from "../packages/cli/src/commands/initCommand.js";
-import * as ui from "@cr/ui";
-import * as core from "@cr/core";
 
 let lastQuestions: any[] = [];
 let lastSavedConfig: any = null;
 let mockConfig: any = {};
 
-// Mock @cr/ui
 mock.module("@cr/ui", () => ({
   promptWithFrame: mock(async (questions: any) => {
     lastQuestions = questions;
@@ -16,6 +13,9 @@ mock.module("@cr/ui", () => ({
       if (q.name === "gitlabWebhookSecret") answers[q.name] = "new-secret";
       else if (q.name === "rbUrl") answers[q.name] = "https://new-rb.com";
       else if (q.name === "rbToken") answers[q.name] = "new-token";
+      else if (q.name === "svnRepositoryUrl") answers[q.name] = "https://svn.example.com/repos/project";
+      else if (q.name === "svnUsername") answers[q.name] = "svn-user";
+      else if (q.name === "svnPassword") answers[q.name] = "svn-pass";
       else if (q.name === "webhookConcurrency") answers[q.name] = 10;
       else answers[q.name] = q.initial;
     }
@@ -43,7 +43,6 @@ mock.module("@cr/ui", () => ({
   DOT: ".",
 }));
 
-// Mock @cr/core
 mock.module("@cr/core", () => ({
   loadCRConfig: mock(async () => mockConfig),
   saveCRConfig: mock(async (config: any) => {
@@ -60,7 +59,7 @@ mock.module("@cr/core", () => ({
   },
 }));
 
-describe("initCommand - runWebhookSetup", () => {
+describe("initCommand - specialized setup flows", () => {
   it("should ask for GitLab specific configs in gitlab mode", async () => {
     mockConfig = { gitlabWebhookSecret: "old-secret" };
     lastQuestions = [];
@@ -98,5 +97,24 @@ describe("initCommand - runWebhookSetup", () => {
 
     expect(lastSavedConfig.openaiApiKey).toBe("existing-key");
     expect(lastSavedConfig.gitlabKey).toBe("existing-gitlab-key");
+  });
+
+  it("should support subversion setup", async () => {
+    mockConfig = {
+      openaiApiUrl: "https://api.openai.com/v1",
+      openaiModel: "gpt-4",
+      gitlabUrl: "https://gitlab.com",
+    };
+    lastQuestions = [];
+    lastSavedConfig = null;
+
+    await runInitCommand(["--subversion"]);
+
+    expect(lastQuestions.some((q) => q.name === "svnRepositoryUrl")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "svnUsername")).toBe(true);
+    expect(lastQuestions.some((q) => q.name === "svnPassword")).toBe(true);
+    expect(lastSavedConfig.svnRepositoryUrl).toBe("https://svn.example.com/repos/project");
+    expect(lastSavedConfig.svnUsername).toBe("svn-user");
+    expect(lastSavedConfig.svnPassword).toBe("svn-pass");
   });
 });

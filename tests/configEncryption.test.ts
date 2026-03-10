@@ -1,0 +1,80 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
+
+const tempRoot = path.join(os.tmpdir(), `cr-config-test-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+const confPath = path.join(tempRoot, ".cr.conf");
+const crDir = path.join(tempRoot, ".cr");
+const keyPath = path.join(crDir, "config.key");
+
+mock.module("../packages/core/src/utils/paths.js", () => ({
+  HOME_DIR: tempRoot,
+  CR_DIR: crDir,
+  CR_PROMPTS_DIR: path.join(crDir, "prompts"),
+  CR_ASSETS_DIR: path.join(crDir, "assets"),
+  CR_LOGS_DIR: path.join(crDir, "logs"),
+  CR_CONF_PATH: confPath,
+  CR_CONF_KEY_PATH: keyPath,
+  repoRootFromModule: () => tempRoot,
+  resourcesPathFromRepoRoot: (repoRoot: string) => path.join(repoRoot, "resources"),
+}));
+
+const { decryptConfigSecret, encryptConfigSecret, loadCRConfig, saveCRConfig } = await import(
+  "../packages/core/src/utils/config.js"
+);
+
+describe("config encryption", () => {
+  beforeAll(async () => {
+    await fs.mkdir(tempRoot, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  it("round-trips encrypted secrets", () => {
+    const key = Buffer.alloc(32, 7);
+    const encrypted = encryptConfigSecret("svn-pass", key);
+
+    expect(encrypted.startsWith("enc:v1:")).toBe(true);
+    expect(encrypted.includes("svn-pass")).toBe(false);
+    expect(decryptConfigSecret(encrypted, key)).toBe("svn-pass");
+  });
+
+  it("stores secret fields encrypted on disk and decrypts them on load", async () => {
+    await saveCRConfig({
+      openaiApiUrl: "https://api.example.com/v1",
+      openaiApiKey: "openai-key",
+      openaiModel: "gpt-4o",
+      useCustomStreaming: false,
+      gitlabUrl: "https://gitlab.example.com",
+      gitlabKey: "gitlab-key",
+      svnRepositoryUrl: "https://svn.example.com/repos/project",
+      svnUsername: "svn-user",
+      svnPassword: "svn-pass",
+      rbUrl: "https://reviews.example.com",
+      rbToken: "rb-token",
+      gitlabWebhookSecret: "webhook-secret",
+    });
+
+    const raw = await fs.readFile(confPath, "utf-8");
+    expect(raw.includes("openai_api_key = openai-key")).toBe(false);
+    expect(raw.includes("gitlab_key = gitlab-key")).toBe(false);
+    expect(raw.includes("svn_password = svn-pass")).toBe(false);
+    expect(raw.includes("rb_token = rb-token")).toBe(false);
+    expect(raw.includes("gitlab_webhook_secret = webhook-secret")).toBe(false);
+    expect(raw.includes("openai_api_key_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("gitlab_key_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("svn_password_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("rb_token_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("gitlab_webhook_secret_enc = enc:v1:")).toBe(true);
+
+    const loaded = await loadCRConfig();
+    expect(loaded.openaiApiKey).toBe("openai-key");
+    expect(loaded.gitlabKey).toBe("gitlab-key");
+    expect(loaded.svnPassword).toBe("svn-pass");
+    expect(loaded.rbToken).toBe("rb-token");
+    expect(loaded.gitlabWebhookSecret).toBe("webhook-secret");
+  });
+});

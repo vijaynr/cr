@@ -21,6 +21,7 @@ export type {
 } from "./gitlab.js";
 export type {
   ReviewBoardRequest,
+  ReviewBoardRepository,
   ReviewBoardDiffSet,
   ReviewBoardFileDiff,
   ReviewBoardDiffData,
