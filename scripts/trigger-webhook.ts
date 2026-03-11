@@ -17,14 +17,14 @@ const payload = {
     id: 118153,
     name: "project-118153",
     path_with_namespace: "org/project-118153",
-    web_url: "https://gitlab.otxlab.net/org/project-118153",
+    web_url: "https://gitlab.example.com/org/project-118153",
   },
   object_attributes: {
     action: "update", // Can be 'open', 'update', 'reopen'
     iid: 7, // MR IID
     title: "Test Merge Request",
     state: "opened",
-    url: "https://gitlab.otxlab.net/org/project-118153/-/merge_requests/7",
+    url: "https://gitlab.example.com/org/project-118153/-/merge_requests/7",
     oldrev: "abc123456", // Include oldrev to satisfy the 'update' commit check
   },
 };
@@ -48,3 +48,4 @@ try {
 } catch (error) {
   console.error("Error sending request:", error instanceof Error ? error.message : String(error));
 }
+

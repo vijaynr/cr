@@ -23,9 +23,10 @@ export type CRConfig = {
 
 export const defaultConfig: Pick<CRConfig, "openaiApiUrl" | "openaiModel" | "gitlabUrl" | "rbUrl"> =
   {
-    openaiApiUrl: "https://model-broker.aviator-model.bp.anthos.otxlab.net/v1",
+    openaiApiUrl: "https://api.example.com/v1",
     openaiModel: "llama-3.3-70b",
-    gitlabUrl: "https://gitlab.otxlab.net",
-    rbUrl: "https://reviews.otxlab.net",
+    gitlabUrl: "https://gitlab.example.com",
+    rbUrl: "https://reviews.example.com",
   };
+
 

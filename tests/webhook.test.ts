@@ -27,7 +27,7 @@ mock.module("@cr/workflows", () => ({
 
 mock.module("@cr/core", () => ({
   loadWorkflowRuntime: async () => ({
-    gitlabUrl: "https://gitlab.otxlab.net",
+    gitlabUrl: "https://gitlab.example.com",
     gitlabKey: "mock-key",
     rbUrl: "https://reviews.example.com",
     rbToken: "rb-token",
@@ -274,4 +274,5 @@ describe("Webhook Server", () => {
     expect(response.status).toBe(405);
   });
 });
+
 
