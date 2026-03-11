@@ -36,7 +36,13 @@ export {
 export { generateTextWithLlm } from "./llm.js";
 
 // Prompts exports
-export { loadPrompt } from "./promptsManager.js";
+export {
+  DEFAULT_REVIEW_AGENT_NAME,
+  loadPrompt,
+  loadReviewAgentPrompt,
+  listBundledReviewAgentNames,
+  normalizeReviewAgentNames,
+} from "./promptsManager.js";
 export {
   loadLocalRepositoryGuidelines,
   loadGitLabRepositoryGuidelines,

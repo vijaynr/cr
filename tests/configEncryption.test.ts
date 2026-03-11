@@ -48,6 +48,7 @@ describe("config encryption", () => {
       openaiApiKey: "openai-key",
       openaiModel: "gpt-4o",
       useCustomStreaming: false,
+      defaultReviewAgents: ["general", "security"],
       gitlabUrl: "https://gitlab.example.com",
       gitlabKey: "gitlab-key",
       svnRepositoryUrl: "https://svn.example.com/repos/project",
@@ -72,8 +73,10 @@ describe("config encryption", () => {
     expect(raw.includes("rb_token_enc = enc:v1:")).toBe(true);
     expect(raw.includes("gitlab_webhook_secret_enc = enc:v1:")).toBe(true);
     expect(raw.includes("rb_webhook_secret_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("default_review_agents = general,security")).toBe(true);
 
     const loaded = await loadCRConfig();
+    expect(loaded.defaultReviewAgents).toEqual(["general", "security"]);
     expect(loaded.openaiApiKey).toBe("openai-key");
     expect(loaded.gitlabKey).toBe("gitlab-key");
     expect(loaded.svnPassword).toBe("svn-pass");

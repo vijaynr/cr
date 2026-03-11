@@ -46,6 +46,8 @@ export type ReviewWorkflowInput = {
   workflow: WorkflowKind;
   local: boolean;
   provider?: "gitlab" | "reviewboard";
+  agentNames?: string[];
+  agentMode?: "single" | "multi";
   url?: string;
   fromUser?: string;
   state: MergeRequestState;
@@ -61,6 +63,15 @@ export type ReviewWorkflowResult = {
   output: string;
   contextLabel: string;
   overallSummary?: string;
+  selectedAgents: string[];
+  aggregated: boolean;
+  agentResults?: Array<{
+    name: string;
+    output: string;
+    overallSummary?: string;
+    failed?: boolean;
+    error?: string;
+  }>;
   inlineComments: Array<{
     filePath: string;
     line: number;
@@ -94,6 +105,13 @@ export type ReviewSelectionOption = {
   value: number;
 };
 
+export type ReviewAgentSelectionOption = {
+  title: string;
+  value: string;
+  description?: string;
+  selected?: boolean;
+};
+
 export type ReviewSessionEffect =
   | ReviewWorkflowEffect
   | {
@@ -101,6 +119,11 @@ export type ReviewSessionEffect =
       provider: "gitlab" | "reviewboard";
       message: string;
       options: ReviewSelectionOption[];
+    }
+  | {
+      type: "select_review_agents";
+      message: string;
+      options: ReviewAgentSelectionOption[];
     }
   | {
       type: "confirm_review_start";
@@ -112,6 +135,10 @@ export type ReviewSessionResponse =
   | {
       type: "review_target_selected";
       mrIid: number | null;
+    }
+  | {
+      type: "review_agents_selected";
+      agentNames: string[] | null;
     }
   | {
       type: "review_action_confirmed";

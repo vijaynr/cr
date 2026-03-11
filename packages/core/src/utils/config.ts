@@ -11,6 +11,7 @@ const configSchema = z.object({
   openaiApiKey: z.string(),
   openaiModel: z.string(),
   useCustomStreaming: z.boolean(),
+  defaultReviewAgents: z.array(z.string()).optional(),
   gitlabUrl: z.string(),
   gitlabKey: z.string(),
   svnRepositoryUrl: z.string().optional(),
@@ -164,6 +165,9 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
     ),
     openaiModel: section.openai_model ?? "",
     useCustomStreaming: (section.use_custom_streaming ?? "false").toLowerCase() === "true",
+    defaultReviewAgents: section.default_review_agents
+      ? section.default_review_agents.split(",").map((value) => value.trim()).filter(Boolean)
+      : undefined,
     gitlabUrl: section.gitlab_url ?? "",
     gitlabKey: await maybeDecryptConfigSecret(section.gitlab_key_enc ?? section.gitlab_key ?? ""),
     svnRepositoryUrl: section.svn_repository_url ?? section.svn_guidelines_base_url ?? undefined,
@@ -222,6 +226,9 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       ...(encryptedSecrets.openaiApiKey && { openai_api_key_enc: encryptedSecrets.openaiApiKey }),
       openai_model: parsed.openaiModel,
       use_custom_streaming: parsed.useCustomStreaming ? "true" : "false",
+      ...(parsed.defaultReviewAgents?.length && {
+        default_review_agents: parsed.defaultReviewAgents.join(","),
+      }),
       gitlab_url: parsed.gitlabUrl,
       ...(encryptedSecrets.gitlabKey && { gitlab_key_enc: encryptedSecrets.gitlabKey }),
       ...(parsed.svnRepositoryUrl && {
@@ -263,4 +270,3 @@ export function envOrConfig(
   }
   return configValue ?? fallback;
 }
-

@@ -8,6 +8,7 @@ export type {
   ReviewChatHistoryEntry,
   WorkflowMode,
   MergeRequestState,
+  ReviewAgentSelectionOption,
 } from "./workflows.js";
 export type {
   GitLabBranch,

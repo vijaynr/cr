@@ -189,6 +189,30 @@ async function runReviewWorkflowTask(args: {
         continue;
       }
 
+      if (effect.type === "select_review_agents") {
+        const selection = await promptWithFrame(
+          {
+            type: "multiselect",
+            name: "agentNames",
+            message: effect.message,
+            choices: effect.options.map((option) => ({
+              title: option.title,
+              value: option.value,
+              description: option.description,
+              selected: option.selected,
+            })),
+            min: 1,
+            instructions: false,
+          },
+          { onCancel: () => true }
+        );
+        step = await session.next({
+          type: "review_agents_selected",
+          agentNames: Array.isArray(selection.agentNames) ? selection.agentNames : null,
+        });
+        continue;
+      }
+
       const confirmation = await promptWithFrame(
         {
           type: "confirm",
@@ -372,4 +396,7 @@ export async function runReviewCommand(args: string[]): Promise<void> {
     process.exitCode = 1;
   }
 }
+
+
+
 

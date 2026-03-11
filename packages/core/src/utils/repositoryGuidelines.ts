@@ -3,7 +3,7 @@ import path from "node:path";
 import type { GitLabClient } from "../clients/gitlabClient.js";
 import type { SvnClient } from "../clients/svnClient.js";
 
-const GUIDELINE_FILE_NAMES = ["GUIDELINES.md", "Guidelines.md"] as const;
+const GUIDELINE_FILE_NAMES = ["GUIDELINES.md", "Guidelines.md", "guidelines.md"] as const;
 
 async function tryReadLocalFile(filePath: string): Promise<string | undefined> {
   try {

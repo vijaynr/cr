@@ -3,6 +3,7 @@ export type CRConfig = {
   openaiApiKey: string;
   openaiModel: string;
   useCustomStreaming: boolean; // Use custom SSE streaming instead of standard OpenAI SDK
+  defaultReviewAgents?: string[];
   gitlabUrl: string;
   gitlabKey: string;
   svnRepositoryUrl?: string;
@@ -28,5 +29,3 @@ export const defaultConfig: Pick<CRConfig, "openaiApiUrl" | "openaiModel" | "git
     gitlabUrl: "https://gitlab.example.com",
     rbUrl: "https://reviews.example.com",
   };
-
-

@@ -7,13 +7,20 @@ const runReviewWorkflowMock = mock(async () => ({
   output: "Mocked GitLab review result",
   contextLabel: "Mocked MR",
   inlineComments: [],
+  selectedAgents: ["general", "security"],
+  aggregated: true,
 }));
 const runReviewBoardWorkflowMock = mock(async (input: unknown) => ({
   output: "Mocked Review Board review result",
   contextLabel: "Mocked RR",
   inlineComments: [],
+  selectedAgents: ["general", "security"],
+  aggregated: true,
   rbUrl: "https://reviews.example.com",
-  mrIid: typeof input === "object" && input && "mrIid" in input ? Number((input as { mrIid: number }).mrIid) : 42,
+  mrIid:
+    typeof input === "object" && input && "mrIid" in input
+      ? Number((input as { mrIid: number }).mrIid)
+      : 42,
 }));
 
 const maybePostReviewBoardCommentMock = mock(async () => null);
@@ -35,8 +42,18 @@ mock.module("@cr/core", () => ({
     webhookConcurrency: 1,
     webhookQueueLimit: 50,
     webhookJobTimeoutMs: 600000,
+    defaultReviewAgents: ["general", "security"],
   }),
   envOrConfig: (_key: string, value: string | undefined, fallback: string) => value || fallback,
+  getCurrentBranch: async () => "feature/demo",
+  getOriginRemoteUrl: async () => "https://gitlab.example.com/group/project.git",
+  remoteToProjectPath: () => "group/project",
+  createRuntimeReviewBoardClient: () => ({
+    getReviewRequest: async () => ({}),
+    getLatestDiffSet: async () => null,
+    getFileDiffs: async () => [],
+    getRawDiff: async () => "",
+  }),
   logger: {
     info: () => {},
     success: () => {},
@@ -149,11 +166,14 @@ describe("Webhook Server", () => {
     expect(runReviewBoardWorkflowMock.mock.calls[0]?.[0]).toMatchObject({
       inlineComments: false,
       provider: "reviewboard",
+      agentNames: ["general", "security"],
+      agentMode: "multi",
     });
     expect(maybePostReviewBoardCommentMock).toHaveBeenCalledTimes(1);
     expect(maybePostReviewBoardCommentMock.mock.calls[0]?.[0]).toMatchObject({
       inlineComments: [],
       mrIid: 42,
+      selectedAgents: ["general", "security"],
     });
   });
 
@@ -274,5 +294,3 @@ describe("Webhook Server", () => {
     expect(response.status).toBe(405);
   });
 });
-
-

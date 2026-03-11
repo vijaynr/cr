@@ -25,6 +25,7 @@ export type WorkflowRuntime = {
   openaiApiKey: string;
   openaiModel: string;
   useCustomStreaming: boolean;
+  defaultReviewAgents: string[];
 };
 
 export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
@@ -69,6 +70,7 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     openaiApiKey: envOrConfig("OPENAI_API_KEY", config.openaiApiKey, ""),
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),
     useCustomStreaming,
+    defaultReviewAgents: config.defaultReviewAgents?.length ? config.defaultReviewAgents : ["general"],
   };
 
   logger.debug("runtime", "workflow runtime loaded", {
@@ -85,6 +87,7 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     openaiApiKey: runtime.openaiApiKey ? "***" : "(not set)",
     openaiModel: runtime.openaiModel,
     useCustomStreaming: runtime.useCustomStreaming,
+    defaultReviewAgents: runtime.defaultReviewAgents,
   });
 
   return runtime;
@@ -118,4 +121,3 @@ export function createRuntimeSvnClient(runtime: WorkflowRuntime): SvnClient | nu
 export function createRuntimeReviewBoardClient(runtime: WorkflowRuntime): ReviewBoardClient {
   return createReviewBoardClient(runtime.rbUrl, runtime.rbToken);
 }
-

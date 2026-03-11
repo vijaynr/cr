@@ -15,6 +15,7 @@ export type {
   ReviewSessionResponse,
   ReviewSessionResult,
   ReviewSelectionOption,
+  ReviewAgentSelectionOption,
   ReviewWorkflowResponse,
   CreateReviewProvider,
   CreateReviewDraft,
@@ -30,7 +31,54 @@ export type {
 } from "./types/workflows.js";
 // utils
 export * from "./utils/index.js";
-// extra utils not covered by utils/index.ts barrel
+// explicit utils re-exports for Bun's static named export resolution
+export {
+  DEFAULT_REVIEW_AGENT_NAME,
+  loadPrompt,
+  loadReviewAgentPrompt,
+  listBundledReviewAgentNames,
+  normalizeReviewAgentNames,
+  loadCRConfig,
+  saveCRConfig,
+  readCRConfigContents,
+  envOrConfig,
+  repoRootFromModule,
+  CR_CONF_PATH,
+  getOriginRemoteUrl,
+  getCurrentBranch,
+  remoteToProjectPath,
+  listBranches,
+  listMergeRequests,
+  findOpenMergeRequestBySourceBranch,
+  getMergeRequest,
+  getMergeRequestChanges,
+  getMergeRequestCommits,
+  compareBranches,
+  findExistingMergeRequest,
+  createMergeRequest,
+  updateMergeRequest,
+  addMergeRequestComment,
+  getMergeRequestInlineComments,
+  addInlineMergeRequestComment,
+  generateTextWithLlm,
+  loadLocalRepositoryGuidelines,
+  loadGitLabRepositoryGuidelines,
+  loadSvnRepositoryGuidelines,
+  svnGetFile,
+  resolveSvnFileUrl,
+  isSvnWorkingCopy,
+  getSvnDiff,
+  getSvnRepoRootUrl,
+  getSvnWorkingCopyUrl,
+  getSvnWorkingCopyRoot,
+  initializeCRHome,
+  setupSpecs,
+  loadWorkflowRuntime,
+  createRuntimeLlmClient,
+  createRuntimeGitLabClient,
+  createRuntimeSvnClient,
+} from "./utils/index.js";
+// extra utils not covered by utils barrel
 export { runWorkflow, runSequentialWorkflow } from "./utils/workflow.js";
 export type { WorkflowStep, ConditionalRoute } from "./utils/workflow.js";
 export {

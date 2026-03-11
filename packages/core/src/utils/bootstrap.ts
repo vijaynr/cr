@@ -7,6 +7,7 @@ async function writeBundledFiles(targetDir: string, files: Record<string, string
   await fs.mkdir(targetDir, { recursive: true });
   for (const [name, content] of Object.entries(files)) {
     const targetPath = path.join(targetDir, name);
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
     await fs.writeFile(targetPath, content, "utf-8");
   }
 }

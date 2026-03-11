@@ -166,6 +166,8 @@ async function performSummaryNode(
         output,
         inlineComments: [],
         contextLabel: "local diff",
+        selectedAgents: [],
+        aggregated: false,
       },
     };
   }
@@ -186,6 +188,8 @@ async function performSummaryNode(
       output,
       inlineComments: [],
       contextLabel: `MR !${remoteContext.mrIid} (${remoteContext.projectPath})`,
+      selectedAgents: [],
+      aggregated: false,
       mrIid: remoteContext.mrIid,
       projectPath: remoteContext.projectPath,
       gitlabUrl: runtime.gitlabUrl,

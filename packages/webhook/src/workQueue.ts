@@ -78,6 +78,8 @@ export class WorkQueue {
       // Run the actual review
       const reviewPromise = (async () => {
         const repoRoot = repoRootFromModule(import.meta.url);
+        const agentNames = this.runtime.defaultReviewAgents;
+        const agentMode = agentNames.length > 1 ? "multi" : "single";
 
         if (this.mode === "reviewboard") {
           const result = await runReviewBoardWorkflow({
@@ -90,6 +92,8 @@ export class WorkQueue {
             state: "opened",
             inlineComments: false,
             provider: "reviewboard",
+            agentNames,
+            agentMode,
           });
           await maybePostReviewBoardComment(result, "ci", true, this.token);
           return result;
@@ -106,6 +110,8 @@ export class WorkQueue {
             url: `${gitlabUrl}/${projectPath}/-/merge_requests/${job.mrIid}`,
             state: "opened",
             inlineComments: false,
+            agentNames,
+            agentMode,
           });
 
           await maybePostReviewComment(result, "ci", true, this.token);
@@ -150,4 +156,3 @@ export class WorkQueue {
     };
   }
 }
-

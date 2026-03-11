@@ -7,7 +7,10 @@ import {
   loadCRConfig,
   rbRequest,
   remoteToProjectPath,
+  listBundledReviewAgentNames,
+  normalizeReviewAgentNames,
   type MergeRequestState,
+  type ReviewAgentSelectionOption,
   type ReviewBoardRequest,
   type ReviewSessionEffect,
   type ReviewSessionResponse,
@@ -43,6 +46,47 @@ function getReviewBoardStatusMap(
     all: "all",
   };
   return rbStatusMap[state] || "pending";
+}
+
+function formatReviewAgentTitle(name: string): string {
+  return name
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getReviewAgentDescription(name: string): string {
+  switch (name) {
+    case "general":
+      return "Checks correctness, reliability, tests, and overall code quality.";
+    case "security":
+      return "Focuses on auth, secrets, permissions, validation, and exploit risks.";
+    case "clean-code":
+      return "Looks for readability, maintainability, duplication, and refactor opportunities.";
+    case "performance":
+      return "Checks hot paths, query patterns, rendering churn, and likely runtime regressions.";
+    case "test-quality":
+      return "Looks for missing coverage, weak assertions, flaky tests, and untested edge cases.";
+    default:
+      return "Runs a specialized review prompt for this agent.";
+  }
+}
+
+async function loadReviewAgentSelectionOptions(
+  input: ReviewWorkflowInput
+): Promise<ReviewAgentSelectionOption[]> {
+  const config = await loadCRConfig();
+  const defaultAgents = normalizeReviewAgentNames(input.agentNames ?? config.defaultReviewAgents);
+  const availableAgents = Array.from(
+    new Set([...listBundledReviewAgentNames(), ...defaultAgents])
+  ).sort();
+
+  return availableAgents.map((name) => ({
+    title: formatReviewAgentTitle(name),
+    value: name,
+    description: getReviewAgentDescription(name),
+    selected: defaultAgents.includes(name),
+  }));
 }
 
 async function loadReviewBoardSelectionOptions(
@@ -175,7 +219,42 @@ export async function* runInteractiveReviewSession(
         resolvedInput.mrIid = selection.mrIid;
       }
     }
+  }
 
+  if (resolvedInput.workflow === "review") {
+    if (resolvedInput.mode === "interactive") {
+      const agentOptions = await loadReviewAgentSelectionOptions(resolvedInput);
+      const selectedAgents = assertResponseType(
+        yield {
+          type: "select_review_agents",
+          message: "Select review agents",
+          options: agentOptions,
+        },
+        "review_agents_selected"
+      );
+      if (!selectedAgents.agentNames || selectedAgents.agentNames.length === 0) {
+        return {
+          action: "cancelled",
+          message: "Review agent selection cancelled.",
+        };
+      }
+      resolvedInput.agentNames = normalizeReviewAgentNames(selectedAgents.agentNames);
+    } else {
+      const config = await loadCRConfig();
+      resolvedInput.agentNames = normalizeReviewAgentNames(
+        resolvedInput.agentNames ?? config.defaultReviewAgents
+      );
+    }
+
+    resolvedInput.agentMode = resolvedInput.agentNames.length > 1 ? "multi" : "single";
+  }
+
+  if (!resolvedInput.agentNames?.length && resolvedInput.workflow === "review") {
+    resolvedInput.agentNames = normalizeReviewAgentNames();
+    resolvedInput.agentMode = "single";
+  }
+
+  if (!resolvedInput.local && resolvedInput.mode === "interactive") {
     const startMessage = getReviewStartMessage(resolvedInput);
     if (startMessage) {
       const confirmation = assertResponseType(
