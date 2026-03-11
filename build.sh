@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 if ! command -v bun >/dev/null 2>&1; then
   echo "Error: bun is required but not installed or not in PATH."
+  exit 1
+fi
+
+TSC_BIN="./node_modules/.bin/tsc"
+CLI_ENTRYPOINT="packages/cli/src/cli.ts"
+
+if [[ ! -f "$CLI_ENTRYPOINT" ]]; then
+  echo "Error: CLI entrypoint not found at $CLI_ENTRYPOINT."
   exit 1
 fi
 
@@ -22,8 +33,17 @@ elif [[ "$UNAME_OUT" == MINGW* || "$UNAME_OUT" == CYGWIN* || "$UNAME_OUT" == MSY
 fi
 
 bun install
-bun run typecheck
-bun build --compile src/cli.ts --outfile "dist/$EXE_NAME"
+
+if [[ -x "$TSC_BIN" ]]; then
+  "$TSC_BIN" --noEmit
+elif [[ -f "$TSC_BIN.exe" ]]; then
+  "${TSC_BIN}.exe" --noEmit
+else
+  echo "Error: local TypeScript binary not found. Run 'bun install' and try again."
+  exit 1
+fi
+
+bun build --compile --minify "$CLI_ENTRYPOINT" --outfile "dist/$EXE_NAME"
 
 cp USAGE.txt dist/
 cp install.sh dist/
