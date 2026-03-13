@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.gitlab
+.idea
+.vscode
+coverage
+*.tar.gz
+*.log
+*.tmp
+*.swp
+*.swo
+*.pem
+*.key
+*.crt
+

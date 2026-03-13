@@ -1,0 +1,30 @@
+services:
+  webhook:
+    build:
+      context: .
+    image: cr-webhook
+    container_name: cr-webhook
+    restart: unless-stopped
+    ports:
+      - "${WEBHOOK_HOST_PORT:-3000}:${CR_WEBHOOK_PORT:-3000}"
+    environment:
+      CR_WEBHOOK_TLS_MODE: ${CR_WEBHOOK_TLS_MODE:-http}
+      CR_WEBHOOK_PORT: ${CR_WEBHOOK_PORT:-3000}
+      CR_WEBHOOK_CONCURRENCY: ${CR_WEBHOOK_CONCURRENCY:-3}
+      CR_WEBHOOK_QUEUE_LIMIT: ${CR_WEBHOOK_QUEUE_LIMIT:-50}
+      CR_WEBHOOK_TIMEOUT_MS: ${CR_WEBHOOK_TIMEOUT_MS:-600000}
+      GITLAB_URL: ${GITLAB_URL:-}
+      GITLAB_KEY: ${GITLAB_KEY:-}
+      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
+      RB_URL: ${RB_URL:-}
+      RB_TOKEN: ${RB_TOKEN:-}
+      RB_WEBHOOK_SECRET: ${RB_WEBHOOK_SECRET:-}
+      OPENAI_API_URL: ${OPENAI_API_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      SSL_CERT_PATH: ${SSL_CERT_PATH:-/certs/tls.crt}
+      SSL_KEY_PATH: ${SSL_KEY_PATH:-/certs/tls.key}
+      SSL_CA_PATH: ${SSL_CA_PATH:-}
+    volumes:
+      - ./docker/certs:/certs:ro
+
