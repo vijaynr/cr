@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
 
 const runReviewWorkflowMock = mock(async () => ({
   output: "gitlab review",
@@ -19,14 +20,14 @@ const runReviewBoardWorkflowMock = mock(async () => ({
 }));
 const maybePostReviewBoardCommentMock = mock(async () => null);
 
-mock.module("@cr/workflows", () => ({
+mock.module("@cr/workflows", () => makeWorkflowsMock({
   runReviewWorkflow: runReviewWorkflowMock,
   maybePostReviewComment: maybePostReviewCommentMock,
   runReviewBoardWorkflow: runReviewBoardWorkflowMock,
   maybePostReviewBoardComment: maybePostReviewBoardCommentMock,
 }));
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   logger: {
     success: () => {},
     error: () => {},

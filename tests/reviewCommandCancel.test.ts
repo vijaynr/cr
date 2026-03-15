@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { makeUiMock, makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
 
 const promptWithFrameMock = mock(async () => ({}));
 const setResultMock = mock(() => {});
@@ -8,7 +9,7 @@ const runLiveTaskMock = mock(async (_title: string, run: (ui: any) => Promise<vo
   });
 });
 
-mock.module("@cr/ui", () => ({
+mock.module("@cr/ui", () => makeUiMock({
   abortOnCancel: { onCancel: () => false },
   askForOptionalFeedback: mock(async () => null),
   promptWithFrame: promptWithFrameMock,
@@ -26,13 +27,15 @@ mock.module("@cr/ui", () => ({
   printReviewSummary: mock(() => {}),
 }));
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   envOrConfig: (_key: string, value: string | undefined, fallback: string) => value || fallback,
   loadCRConfig: mock(async () => ({})),
   repoRootFromModule: () => "/mock/root",
+  detectGitProvider: mock(async () => "gitlab"),
+  getOriginRemoteUrl: mock(async () => "https://gitlab.example.com/group/project.git"),
 }));
 
-mock.module("@cr/workflows", () => ({
+mock.module("@cr/workflows", () => makeWorkflowsMock({
   maybePostReviewComment: mock(async () => null),
   maybePostReviewBoardComment: mock(async () => null),
   runReviewWorkflow: mock(async () => ({})),

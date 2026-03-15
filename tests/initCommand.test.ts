@@ -1,11 +1,12 @@
 import { describe, it, expect, mock } from "bun:test";
+import { makeUiMock, makeCoreMock } from "./mocks.ts";
 import { runInitCommand } from "../packages/cli/src/commands/initCommand.js";
 
 let lastQuestions: any[] = [];
 let lastSavedConfig: any = null;
 let mockConfig: any = {};
 
-mock.module("@cr/ui", () => ({
+mock.module("@cr/ui", () => makeUiMock({
   promptWithFrame: mock(async (questions: any) => {
     lastQuestions = questions;
     const answers: any = {};
@@ -40,11 +41,9 @@ mock.module("@cr/ui", () => ({
   printDivider: mock(() => {}),
   printEmptyLine: mock(() => {}),
   printWorkflowOutput: mock(() => {}),
-  COLORS: { cyan: "", green: "", reset: "" },
-  DOT: ".",
 }));
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   loadCRConfig: mock(async () => mockConfig),
   saveCRConfig: mock(async (config: any) => {
     lastSavedConfig = config;

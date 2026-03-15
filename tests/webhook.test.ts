@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, mock } from "bun:test";
+import { makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
 import { startWebhookServer } from "../packages/webhook/src/server.js";
 
 const REVIEW_BOARD_WEBHOOK_SECRET = "rb-webhook-secret";
@@ -36,14 +37,14 @@ const runReviewBoardWorkflowMock = mock(async (input: unknown) => ({
 
 const maybePostReviewBoardCommentMock = mock(async () => null);
 
-mock.module("@cr/workflows", () => ({
+mock.module("@cr/workflows", () => makeWorkflowsMock({
   runReviewWorkflow: runReviewWorkflowMock,
   maybePostReviewComment: async () => null,
   runReviewBoardWorkflow: runReviewBoardWorkflowMock,
   maybePostReviewBoardComment: maybePostReviewBoardCommentMock,
 }));
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   loadWorkflowRuntime: async () => ({ ...runtime }),
   envOrConfig: (_key: string, value: string | undefined, fallback: string) => value || fallback,
   getCurrentBranch: async () => "feature/demo",

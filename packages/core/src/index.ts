@@ -33,6 +33,7 @@ export type {
 export * from "./utils/index.js";
 // explicit utils re-exports for Bun's static named export resolution
 export {
+  logger,
   DEFAULT_REVIEW_AGENT_NAME,
   loadPrompt,
   loadReviewAgentPrompt,
@@ -95,6 +96,7 @@ export {
   createRuntimeLlmClient,
   createRuntimeGitLabClient,
   createRuntimeGitHubClient,
+  createRuntimeSvnClient,
 } from "./utils/index.js";
 // extra utils not covered by utils barrel
 export { runWorkflow, runSequentialWorkflow } from "./utils/workflow.js";

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { makeCoreMock } from "./mocks.ts";
 
 let startedAgents: string[] = [];
 let aggregateCallCount = 0;
@@ -33,7 +34,7 @@ async function waitForAgentStarts(): Promise<void> {
   }
 }
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   DEFAULT_REVIEW_AGENT_NAME: "general",
   getCurrentBranch: async () => "feature/demo",
   getOriginRemoteUrl: async () => "https://gitlab.example.com/group/project.git",

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { makeCoreMock } from "./mocks.ts";
 
 const loadCRConfigMock = mock(async () => ({
   defaultReviewAgents: ["general", "security"],
@@ -23,7 +24,7 @@ const runInteractiveReviewWorkflowMock = mock((input: any) =>
   })()
 );
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   envOrConfig: (_key: string, value: string | undefined, fallback: string) => value || fallback,
   getCurrentUser: async () => ({ username: "demo" }),
   getOriginRemoteUrl: async () => "https://gitlab.example.com/group/project.git",

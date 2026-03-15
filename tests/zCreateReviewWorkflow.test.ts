@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { makeCoreMock } from "./mocks.ts";
 
 const rbCallLog: string[] = [];
 const isSvnWorkingCopyMock = mock(async () => true);
@@ -75,7 +76,7 @@ const rbClient = {
   }),
 };
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   remoteToProjectPath: (remoteUrl: string) => remoteUrl,
   getCurrentBranch: mock(async () => "feature/test"),
   getOriginRemoteUrl: mock(async () => "https://gitlab.example.com/group/project.git"),

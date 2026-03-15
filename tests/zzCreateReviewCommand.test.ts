@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
+import { makeUiMock, makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
 
 const printCommandHelpMock = mock(() => {});
 const runLiveTaskMock = mock(async (_title: string, run: (ui: unknown) => Promise<void>) => {
@@ -39,18 +40,18 @@ const runCreateReviewWorkflowMock = mock((input: any) =>
   })()
 );
 
-mock.module("@cr/ui", () => ({
+mock.module("@cr/ui", () => makeUiMock({
   printCommandHelp: printCommandHelpMock,
   runLiveTask: runLiveTaskMock,
   createWorkflowStatusController: createWorkflowStatusControllerMock,
   runLiveCreateReviewTask: runLiveCreateReviewTaskMock,
 }));
 
-mock.module("@cr/core", () => ({
+mock.module("@cr/core", () => makeCoreMock({
   repoRootFromModule: () => "/mock/root",
 }));
 
-mock.module("@cr/workflows", () => ({
+mock.module("@cr/workflows", () => makeWorkflowsMock({
   runCreateReviewWorkflow: runCreateReviewWorkflowMock,
 }));
 

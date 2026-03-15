@@ -1,9 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
+import { makeUiMock } from "./mocks.ts";
 
 const printCommandHelpMock = mock(() => {});
 const printErrorMock = mock(() => {});
 
-mock.module("@cr/ui", () => ({
+mock.module("@cr/ui", () => makeUiMock({
   printCommandHelp: printCommandHelpMock,
   printError: printErrorMock,
 }));
