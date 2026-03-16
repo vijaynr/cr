@@ -37,6 +37,8 @@ Folder rules:
 - Normalize topic name to kebab-case as `<topic-name>`.
 - Generate a random 4-digit numeric id and build `<topic-folder>` as `<topic-name>-<random-number>`.
 - Create `.rpi/<topic-folder>/` if missing.
+- Only create one markdown file in this step: `.rpi/<topic-folder>/research.md`.
+- Do not create `plan.md`, `implementation.md`, or any other markdown file during `/rpi.research`.
 
 Research rules:
 

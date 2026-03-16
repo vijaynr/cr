@@ -40,6 +40,8 @@ Write `.rpi/<topic-folder>/plan.md` using this exact section order:
 
 Plan rules:
 
+- Only create one markdown file in this step: `.rpi/<topic-folder>/plan.md`.
+- Do not create `research.md`, `implementation.md`, or any other markdown file during `/rpi.plan`.
 - Each item in `Implementation stages` must include:
   - Goal
   - Changes

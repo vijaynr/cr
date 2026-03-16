@@ -43,6 +43,8 @@ Write `.rpi/<topic-folder>/implementation.md` using this exact section order:
 
 Output:
 
+- Only create one markdown file in this step: `.rpi/<topic-folder>/implementation.md`.
+- Do not create `research.md`, `plan.md`, or any other markdown file during `/rpi.implement`.
 - Return topic folder path.
 - Return a concise implementation summary.
 - Include verification commands or checks that were run.
