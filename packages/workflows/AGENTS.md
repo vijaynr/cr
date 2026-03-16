@@ -7,10 +7,16 @@ Stateless workflow implementations. Each workflow takes structured input and ret
 ## Structure
 
 - `src/index.ts` — public barrel export.
-- `src/reviewWorkflow.ts` — full code-review workflow: fetches MR diff, runs LLM review, posts inline comments.
-- `src/reviewSummarizeWorkflow.ts` — summarises a review result into a short paragraph.
+- `src/reviewWorkflow.ts` — full review workflow for GitLab/GitHub/Review Board contexts, including multi-agent review generation support.
+- `src/reviewSummarizeWorkflow.ts` — summarises a review context into a short paragraph.
 - `src/reviewChatWorkflow.ts` — interactive Q&A over a review context using chat history.
-- `src/createMrWorkflow.ts` — creates or updates a GitLab MR: generates description draft, handles feedback loop, upserts via API.
+- `src/reviewSession.ts` — shared interactive review state machine used by review, summarize, and chat command flows.
+- `src/createReviewWorkflow.ts` — creates or updates a GitLab merge request draft or publishes a Review Board review request from local changes.
+- `src/createMrWorkflow.ts` — create-MR compatibility workflow exports/types.
+- `src/reviewBoardWorkflow.ts` — Review Board-specific review execution helpers.
+- `src/reviewWorkflowComments.ts` / `src/reviewWorkflowInlineHelper.ts` / `src/reviewWorkflowHelper.ts` — comment formatting, inline resolution, and provider-specific review helpers.
+- `src/diffUtils.ts` — diff normalization utilities shared across workflows.
+- `src/workflowEvents.ts` — workflow event helpers for live status reporting.
 
 ## Dependencies
 
@@ -21,4 +27,5 @@ Stateless workflow implementations. Each workflow takes structured input and ret
 - No `console.log`, no `ora`, no ANSI — workflows are pure logic; UI is injected by the caller via `status`, `events`, and callback props on the input object.
 - Workflows must be deterministic given the same inputs (side effects only through injected clients).
 - All public exports must go through `src/index.ts`.
+- Keep provider branching localized and explicit; prefer shared helpers for diff parsing, inline mapping, and comment shaping instead of duplicating workflow logic.
 - Validate with `bun run typecheck` and `bun run lint` after changes.

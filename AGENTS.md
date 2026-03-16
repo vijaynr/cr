@@ -2,37 +2,45 @@
 
 ## Project Structure & Module Organization
 
-`cr-cli` is a TypeScript monorepo running on Bun with six packages under `packages/`:
+`cr-cli` is a TypeScript monorepo running on Bun with eight packages under `packages/`:
 
 | Package            | Path                     | Role                                                               |
 | ------------------ | ------------------------ | ------------------------------------------------------------------ |
 | `@cr/cli`          | `packages/cli/`          | Binary entrypoint and command handlers                             |
 | `@cr/core`         | `packages/core/`         | Shared business logic, types, resource loading, and integrations   |
+| `@cr/github`       | `packages/github/`       | GitHub API client/types adapter used by `@cr/core`                 |
+| `@cr/gitlab`       | `packages/gitlab/`       | GitLab API client/types adapter used by `@cr/core`                 |
 | `@cr/tui`          | `packages/tui/`          | Terminal rendering, prompts, spinners, banners, and help output    |
-| `@cr/workflows`    | `packages/workflows/`    | Review, summarize, chat, MR creation, and Review Board workflows   |
+| `@cr/workflows`    | `packages/workflows/`    | Review, summarize, chat, MR/PR draft creation, and Review Board workflows |
 | `@cr/reviewboard`  | `packages/reviewboard/`  | Review Board client/types adapter used by `@cr/core`               |
 | `@cr/webhook`      | `packages/webhook/`      | Webhook server and work queue for automated review processing      |
 
 Package-specific `AGENTS.md` files exist in `packages/cli`, `packages/core`, `packages/tui`, and `packages/workflows`. If a package has no local guide, follow this root file.
 
-- `resources/prompts/` — bundled prompt templates (`review.txt`, `summarize.txt`, `chat.txt`, `mr.txt`).
+- `resources/prompts/` — bundled prompt templates for review, summarize, chat, MR drafting, aggregate review synthesis, and review agents.
 - `resources/specs/templates/` — bundled spec templates (`prd.md`, `design.md`, `threat-model.md`, `refine.md`, `plan.md`, `doit.md`).
+- `resources/rpi/templates/` — bundled Research / Plan / Implement prompt templates used by `cr init --rpi`.
 - `tests/` — Bun test suite for command and webhook behavior.
 
 ## Build, Test, and Development Commands
 
 - `bun install`: Install dependencies.
-- `bun run dev`: Run the CLI entrypoint directly.
+- `bun run dev -- <command>`: Run the CLI entrypoint directly with any `cr` command.
 - `bun run help`: CLI smoke check.
-- `bun run init`: Configure API and GitLab settings.
-- `bun run config`: View or edit saved configuration.
-- `bun run review`: Run review workflow.
+- `bun run init -- [--gitlab|--github|--reviewboard|--subversion|--webhook|--sdd|--rpi]`: Run configuration/setup flows.
+- `bun run review -- [flags]`: Run review workflows (`default`, `summarize`, `chat`) for GitLab, GitHub, local diffs, or Review Board where supported.
+- `bun run create-review -- [flags]`: Generate or update a GitLab merge request draft or Review Board review request from local changes.
 - `bun run create-mr`: Run create MR workflow.
-- `bun run serve -- --webhook`: Start the webhook server.
+- `bun run dev -- config [--edit]`: Print the saved config or open it in `$CR_EDITOR` / `$VISUAL` / `$EDITOR`.
+- `bun run dev -- serve --webhook [flags]`: Start the webhook server for GitLab and Review Board events.
 - `bun run test`: Run the Bun test suite in `tests/`.
 - `bun run typecheck`: Run TypeScript typecheck (primary correctness guardrail).
-- `bun run lint`: Run ESLint across all packages.
-- `bun run format`: Run Prettier across `packages/`.
+- `bun run lint`: Run Biome lint across `packages/` and `tests/`.
+- `bun run lint:fix`: Apply Biome lint fixes where possible.
+- `bun run format`: Run Biome format across `packages/` and `tests/`.
+- `bun run format:check`: Check formatting without writing changes.
+- `bun run build:bin`: Compile the binary to `dist/cr`.
+- `bun run build:bin-compress`: Compile the binary and attempt optional UPX compression.
 - `bun run build`: Typecheck and compile binary to `dist/cr`.
 - `bash build.sh`: Build executable and platform tarball.
 
@@ -48,6 +56,7 @@ Package-specific `AGENTS.md` files exist in `packages/cli`, `packages/core`, `pa
 - Primary guardrails are `bun run typecheck`, `bun run lint`, and `bun run test` when behavior changes.
 - Keep automated tests under the top-level `tests/` directory using Bun's test runner.
 - For workflow, CLI, or webhook changes, add or update at least one regression-oriented case when practical.
+- When command help, workflow routing, or provider selection changes, prefer tests that exercise the affected command path.
 
 ## Commit & Pull Request Guidelines
 
