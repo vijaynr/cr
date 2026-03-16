@@ -30,6 +30,9 @@ import specRefine from "../../../../resources/specs/templates/refine.md" with { 
 import specThreat from "../../../../resources/specs/templates/threat-model.md" with {
   type: "text",
 };
+import rpiImplement from "../../../../resources/rpi/templates/implement.md" with { type: "text" };
+import rpiPlan from "../../../../resources/rpi/templates/plan.md" with { type: "text" };
+import rpiResearch from "../../../../resources/rpi/templates/research.md" with { type: "text" };
 
 export const bundledPrompts = {
   "chat.txt": chatPrompt,
@@ -51,4 +54,10 @@ export const bundledSpecTemplates = {
   "refine.md": specRefine,
   "plan.md": specPlan,
   "doit.md": specDoit,
+} as const;
+
+export const bundledRpiTemplates = {
+  "research.md": rpiResearch,
+  "plan.md": rpiPlan,
+  "implement.md": rpiImplement,
 } as const;

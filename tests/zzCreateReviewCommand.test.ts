@@ -82,8 +82,8 @@ describe("create review command", () => {
       sections.find((section) => section.title === "EXAMPLES")?.lines.join("\n") ?? "";
 
     expect(options).toContain("--gl");
-    expect(options).toContain("--rb");
-    expect(examples).toContain("cr create-review --rb");
+    expect(options).toContain("--reviewboard");
+    expect(examples).toContain("cr create-review --reviewboard");
   });
 
   it("defaults create-review to GitLab", async () => {
@@ -95,10 +95,10 @@ describe("create review command", () => {
     expect(runCreateReviewWorkflowMock.mock.calls[0]?.[0]).toMatchObject({ provider: "gitlab" });
   });
 
-  it("routes --rb to Review Board", async () => {
+  it("routes --reviewboard to Review Board", async () => {
     runCreateReviewWorkflowMock.mockClear();
 
-    await runCreateReviewCommand(["--rb"]);
+    await runCreateReviewCommand(["--reviewboard"]);
 
     expect(runCreateReviewWorkflowMock).toHaveBeenCalledTimes(1);
     expect(runCreateReviewWorkflowMock.mock.calls[0]?.[0]).toMatchObject({
@@ -116,7 +116,7 @@ describe("create review command", () => {
   });
 
   it("rejects conflicting provider flags", async () => {
-    await expect(runCreateReviewCommand(["--gl", "--rb"])).rejects.toThrow(
+    await expect(runCreateReviewCommand(["--gl", "--reviewboard"])).rejects.toThrow(
       "Pass only one provider flag"
     );
   });

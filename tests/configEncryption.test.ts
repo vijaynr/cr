@@ -54,27 +54,33 @@ describe("config encryption", () => {
       defaultReviewAgents: ["general", "security"],
       gitlabUrl: "https://gitlab.example.com",
       gitlabKey: "gitlab-key",
+      githubToken: "github-token",
       svnRepositoryUrl: "https://svn.example.com/repos/project",
       svnUsername: "svn-user",
       svnPassword: "svn-pass",
       rbUrl: "https://reviews.example.com",
       rbToken: "rb-token",
       gitlabWebhookSecret: "gitlab-webhook-secret",
+      githubWebhookSecret: "github-webhook-secret",
       rbWebhookSecret: "rb-webhook-secret",
     });
 
     const raw = await fs.readFile(confPath, "utf-8");
     expect(raw.includes("openai_api_key = openai-key")).toBe(false);
     expect(raw.includes("gitlab_key = gitlab-key")).toBe(false);
+    expect(raw.includes("github_token = github-token")).toBe(false);
     expect(raw.includes("svn_password = svn-pass")).toBe(false);
     expect(raw.includes("rb_token = rb-token")).toBe(false);
     expect(raw.includes("gitlab_webhook_secret = gitlab-webhook-secret")).toBe(false);
+    expect(raw.includes("github_webhook_secret = github-webhook-secret")).toBe(false);
     expect(raw.includes("rb_webhook_secret = rb-webhook-secret")).toBe(false);
     expect(raw.includes("openai_api_key_enc = enc:v1:")).toBe(true);
     expect(raw.includes("gitlab_key_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("github_token_enc = enc:v1:")).toBe(true);
     expect(raw.includes("svn_password_enc = enc:v1:")).toBe(true);
     expect(raw.includes("rb_token_enc = enc:v1:")).toBe(true);
     expect(raw.includes("gitlab_webhook_secret_enc = enc:v1:")).toBe(true);
+    expect(raw.includes("github_webhook_secret_enc = enc:v1:")).toBe(true);
     expect(raw.includes("rb_webhook_secret_enc = enc:v1:")).toBe(true);
     expect(raw.includes("default_review_agents = general,security")).toBe(true);
 
@@ -82,9 +88,11 @@ describe("config encryption", () => {
     expect(loaded.defaultReviewAgents).toEqual(["general", "security"]);
     expect(loaded.openaiApiKey).toBe("openai-key");
     expect(loaded.gitlabKey).toBe("gitlab-key");
+    expect(loaded.githubToken).toBe("github-token");
     expect(loaded.svnPassword).toBe("svn-pass");
     expect(loaded.rbToken).toBe("rb-token");
     expect(loaded.gitlabWebhookSecret).toBe("gitlab-webhook-secret");
+    expect(loaded.githubWebhookSecret).toBe("github-webhook-secret");
     expect(loaded.rbWebhookSecret).toBe("rb-webhook-secret");
   });
 });

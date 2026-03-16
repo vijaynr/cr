@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cr-reviewboard-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RB_DATABASE_NAME:-reviewboard}
+      POSTGRES_USER: ${RB_DATABASE_USERNAME:-reviewboard}
+      POSTGRES_PASSWORD: ${RB_DATABASE_PASSWORD:-reviewboard}
+    volumes:
+      - reviewboard-postgres-data:/var/lib/postgresql/data
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: cr-reviewboard-memcached
+    restart: unless-stopped
+
+  reviewboard:
+    image: beanbag/reviewboard:${RB_IMAGE_TAG:-6.0}
+    container_name: cr-reviewboard-app
+    restart: unless-stopped
+    depends_on:
+      - db
+      - memcached
+    environment:
+      DOMAIN: ${RB_DOMAIN:-localhost}
+      COMPANY: ${RB_COMPANY:-CR Local Testing}
+      DATABASE_TYPE: postgresql
+      DATABASE_SERVER: db
+      DATABASE_NAME: ${RB_DATABASE_NAME:-reviewboard}
+      DATABASE_USERNAME: ${RB_DATABASE_USERNAME:-reviewboard}
+      DATABASE_PASSWORD: ${RB_DATABASE_PASSWORD:-reviewboard}
+      MEMCACHED_SERVER: memcached:11211
+      REVIEWBOARD_CRONTAB: /site/conf/cron.conf
+      # Optional:
+      # EMAIL_HOST:
+      # EMAIL_PORT:
+      # EMAIL_HOST_USER:
+      # EMAIL_HOST_PASSWORD:
+    volumes:
+      - reviewboard-site-data:/site
+    expose:
+      - "8080"
+
+  svn:
+    image: elleflorio/svn-server:latest
+    container_name: cr-reviewboard-svn
+    restart: unless-stopped
+    working_dir: /home/svn
+    ports:
+      - "${SVN_HTTP_PORT:-7443}:80"
+      - "${SVN_SVN_PORT:-3690}:3690"
+    volumes:
+      - reviewboard-svn-data:/home/svn
+
+  svn-bootstrap:
+    image: elleflorio/svn-server:latest
+    container_name: cr-reviewboard-svn-bootstrap
+    restart: "no"
+    depends_on:
+      - svn
+    working_dir: /home/svn
+    environment:
+      SVN_REPO_NAME: ${SVN_REPO_NAME:-Test}
+      SVN_CREATE_LAYOUT: ${SVN_CREATE_LAYOUT:-true}
+    command: ["sh", "/bootstrap/bootstrap-svn.sh"]
+    volumes:
+      - reviewboard-svn-data:/home/svn
+      - ./bootstrap-svn.sh:/bootstrap/bootstrap-svn.sh:ro
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cr-reviewboard-nginx
+    restart: unless-stopped
+    depends_on:
+      - reviewboard
+    ports:
+      - "${RB_HTTP_PORT:-8081}:80"
+    volumes:
+      - reviewboard-site-data:/var/www/reviewboard:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  reviewboard-postgres-data:
+  reviewboard-site-data:
+  reviewboard-svn-data:

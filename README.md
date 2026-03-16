@@ -275,6 +275,66 @@ The container runs `cr serve --webhook`, exposing:
 - `POST /reviewboard`
 - `GET /status`
 
+### Local Review Board Test Stack
+
+For local Review Board testing, there is a dedicated Compose stack under [`docker/reviewboard/docker-compose.yml`](/Users/vijay/Documents/code/gh/vijaynr/cr/docker/reviewboard/docker-compose.yml).
+
+It starts:
+
+- `beanbag/reviewboard:6.0`
+- `postgres:16-alpine`
+- `memcached:1.6-alpine`
+- `elleflorio/svn-server:latest`
+- `nginx:1.27-alpine`
+
+Start it with:
+
+```bash
+cp docker/reviewboard/.env.example docker/reviewboard/.env
+docker compose -f docker/reviewboard/docker-compose.yml --env-file docker/reviewboard/.env up -d
+```
+
+Then open [http://localhost:8081](http://localhost:8081).
+
+For a local SVN repository to pair with Review Board, the same stack also starts `elleflorio/svn-server:latest`, following the approach in this gist:
+[Set up SVN server on docker](https://gist.github.com/dpmex4527/1d702357697162384d31d033a7d505eb?permalink_comment_id=4151706)
+
+On startup, a one-shot bootstrap service creates the default repository automatically using [`docker/reviewboard/bootstrap-svn.sh`](/Users/vijay/Documents/code/gh/vijaynr/cr/docker/reviewboard/bootstrap-svn.sh).
+
+The defaults are:
+
+- repository name: `Test`
+- initial layout: `trunk`, `branches`, `tags`
+
+You can override those in `docker/reviewboard/.env`:
+
+```dotenv
+SVN_REPO_NAME=MyRepo
+SVN_CREATE_LAYOUT=true
+```
+
+If you also want HTTP credentials for WebDAV access, you can still add them manually:
+
+```bash
+docker compose -f docker/reviewboard/docker-compose.yml --env-file docker/reviewboard/.env exec svn \
+  htpasswd -b /etc/subversion/passwd svnadmin reviewboard
+```
+
+Then verify the repository:
+
+```bash
+svn info svn://localhost:3690/Test
+```
+
+The container also exposes HTTP/WebDAV on [http://localhost:7443/svn](http://localhost:7443/svn).
+
+Notes:
+
+- The Review Board backend stores its site data in the named volume `reviewboard-site-data`.
+- The SVN server stores repositories in the named volume `reviewboard-svn-data`.
+- The stack is intended for local testing, not production hardening.
+- If you need a different host port or database password, edit `docker/reviewboard/.env` before starting.
+
 ## Project Layout
 
 - `src/cli.ts`: entrypoint

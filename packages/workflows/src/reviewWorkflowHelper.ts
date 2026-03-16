@@ -91,6 +91,25 @@ export function injectMergeRequestContextIntoTemplate(
 // Backward-compatible alias; prefer injectMergeRequestContextIntoTemplate.
 export const applyReviewTemplate = injectMergeRequestContextIntoTemplate;
 
+export function resolveGitLabBaseUrl(
+  configuredGitLabUrl: string,
+  input: { provider?: string; url?: string }
+): string {
+  if (input.provider !== "gitlab" || !input.url) {
+    return configuredGitLabUrl;
+  }
+
+  try {
+    const parsed = new URL(input.url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return configuredGitLabUrl;
+    }
+    return parsed.origin;
+  } catch {
+    return configuredGitLabUrl;
+  }
+}
+
 function formatChatHistory(history: ReviewChatHistoryEntry[]): string {
   return history.map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`).join("\n\n");
 }

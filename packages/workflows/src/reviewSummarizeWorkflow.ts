@@ -1,18 +1,24 @@
 import type { ReviewWorkflowInput, ReviewWorkflowResult } from "@cr/core";
 import {
+  createRuntimeGitHubClient,
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
+  type GitHubClient,
   type GitLabClient,
   getCurrentBranch,
   getOriginRemoteUrl,
   type LlmClient,
   loadPrompt,
   loadWorkflowRuntime,
+  remoteToGitHubRepoPath,
   remoteToProjectPath,
   runWorkflow,
   type WorkflowRuntime,
 } from "@cr/core";
-import { injectMergeRequestContextIntoTemplate } from "./reviewWorkflowHelper.js";
+import {
+  injectMergeRequestContextIntoTemplate,
+  resolveGitLabBaseUrl,
+} from "./reviewWorkflowHelper.js";
 import { createWorkflowPhaseReporter } from "./workflowEvents.js";
 
 type RemoteMrContext = {
@@ -21,6 +27,14 @@ type RemoteMrContext = {
   mr: Awaited<ReturnType<GitLabClient["getMergeRequest"]>>;
   changes: Awaited<ReturnType<GitLabClient["getMergeRequestChanges"]>>;
   commits: Awaited<ReturnType<GitLabClient["getMergeRequestCommits"]>>;
+};
+
+type RemotePrContext = {
+  repoPath: string;
+  prNumber: number;
+  pr: Awaited<ReturnType<GitHubClient["getPullRequest"]>>;
+  files: Awaited<ReturnType<GitHubClient["getPullRequestFiles"]>>;
+  commits: Awaited<ReturnType<GitHubClient["getPullRequestCommits"]>>;
 };
 
 type SummarizeGraphState = {
@@ -101,8 +115,49 @@ async function resolveRemoteMrContext(
   return { projectPath, mrIid, mr, changes, commits };
 }
 
-async function initializeRuntimeNode(): Promise<{ runtime: WorkflowRuntime }> {
-  return { runtime: await loadWorkflowRuntime() };
+async function resolveRemotePrContext(
+  input: ReviewWorkflowInput,
+  github: GitHubClient
+): Promise<RemotePrContext> {
+  const repoUrl = input.url ?? (await getOriginRemoteUrl(input.repoPath));
+  const repoPath = remoteToGitHubRepoPath(repoUrl);
+
+  let prNumber: number;
+  if (typeof input.prNumber === "number" && Number.isFinite(input.prNumber)) {
+    prNumber = input.prNumber;
+  } else if (input.mode === "ci") {
+    const currentBranch = await getCurrentBranch(input.repoPath);
+    const found = await github.findOpenPullRequestByHead(repoPath, currentBranch);
+    if (!found) {
+      throw new Error(`No open pull request found for current branch '${currentBranch}'.`);
+    }
+    prNumber = found.number;
+  } else {
+    throw new Error("Interactive mode requires a selected pull request number from the command layer.");
+  }
+
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
+  phaseReporter.started("load_mr_context", "Loading pull request context...");
+  const [pr, files, commits] = await Promise.all([
+    github.getPullRequest(repoPath, prNumber),
+    github.getPullRequestFiles(repoPath, prNumber),
+    github.getPullRequestCommits(repoPath, prNumber),
+  ]);
+  phaseReporter.completed("load_mr_context", "Loaded pull request context.");
+
+  return { repoPath, prNumber, pr, files, commits };
+}
+
+async function initializeRuntimeNode(state: {
+  input: ReviewWorkflowInput;
+}): Promise<{ runtime: WorkflowRuntime }> {
+  const runtime = await loadWorkflowRuntime();
+  return {
+    runtime: {
+      ...runtime,
+      gitlabUrl: resolveGitLabBaseUrl(runtime.gitlabUrl, state.input),
+    },
+  };
 }
 
 async function validateLlmConfigNode(state: {
@@ -202,6 +257,41 @@ async function performSummaryNode(
 export async function runReviewSummarizeWorkflow(
   input: ReviewWorkflowInput
 ): Promise<ReviewWorkflowResult> {
+  if (!input.local && input.provider === "github") {
+    const runtime = await loadWorkflowRuntime();
+    if (!runtime.openaiApiKey || !runtime.openaiApiUrl) {
+      throw new Error(
+        "Missing LLM configuration. Run `cr init` or set OPENAI_API_KEY/OPENAI_API_URL."
+      );
+    }
+    if (!runtime.githubToken) {
+      throw new Error("Missing GitHub configuration. Run `cr init --github` or set GITHUB_TOKEN.");
+    }
+    const llm = createRuntimeLlmClient(runtime);
+    const github = createRuntimeGitHubClient(runtime);
+    const remoteContext = await resolveRemotePrContext(input, github);
+    const template = await loadPrompt("summarize.txt", input.repoRoot);
+    const prompt = injectMergeRequestContextIntoTemplate(template, {
+      mrContent: JSON.stringify(remoteContext.pr, null, 2),
+      mrChanges: JSON.stringify(remoteContext.files, null, 2),
+      mrCommits: JSON.stringify(remoteContext.commits, null, 2),
+    });
+    const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
+    phaseReporter.started("generate_summary", "Generating summary...");
+    const output = await runLlmPrompt(prompt, llm);
+    phaseReporter.completed("generate_summary", "Summary generated.");
+    return {
+      output,
+      inlineComments: [],
+      contextLabel: `PR #${remoteContext.prNumber} (${remoteContext.repoPath})`,
+      selectedAgents: [],
+      aggregated: false,
+      prNumber: remoteContext.prNumber,
+      repoPath: remoteContext.repoPath,
+      githubUrl: "https://github.com",
+    };
+  }
+
   const finalState = await runWorkflow<SummarizeGraphState>({
     initialState: {
       input: { ...input, workflow: "summarize" },

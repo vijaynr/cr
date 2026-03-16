@@ -5,7 +5,7 @@ import type {
   ReviewSessionResult,
   WorkflowMode,
 } from "@cr/core";
-import { detectGitProvider, envOrConfig, loadCRConfig, repoRootFromModule } from "@cr/core";
+import { envOrConfig, loadCRConfig, repoRootFromModule } from "@cr/core";
 import {
   abortOnCancel,
   askForOptionalFeedback,
@@ -13,6 +13,7 @@ import {
   type LiveController,
   printAlert,
   printCommandHelp,
+  printDivider,
   printReviewComment,
   printReviewSummary,
   promptWithFrame,
@@ -21,6 +22,7 @@ import {
 } from "@cr/ui";
 import {
   answerReviewChatQuestion,
+  maybePostGitHubReviewComment,
   maybePostReviewBoardComment,
   maybePostReviewComment,
   type ReviewWorkflowInput,
@@ -108,10 +110,20 @@ async function maybePostReviewNotes(args: {
       return { postedInlineCount: 0 };
     }
 
-    // TODO: Implement GitHub comment posting
-    // const posted = await maybePostGitHubComment(args.result, args.input.mode, shouldPost, githubToken);
-    // For now, just return empty result
-    return { postedInlineCount: 0 };
+    const posted = await maybePostGitHubReviewComment(
+      args.result,
+      args.input.mode,
+      shouldPost,
+      githubToken
+    );
+    if (!posted) {
+      return { postedInlineCount: 0 };
+    }
+
+    return {
+      postedSummaryNoteId: posted.summaryNoteId,
+      postedInlineCount: posted.inlineNoteIds.length,
+    };
   }
 
   const gitlabKey = envOrConfig("GITLAB_KEY", config.gitlabKey, "");
@@ -279,6 +291,8 @@ async function runReviewWorkflowTask(args: {
     if (result.action === "summary") {
       status.stop();
       printReviewSummary(result.result);
+      printDivider();
+      ui.setResult(workflowResultTitle, `Context: ${result.result.contextLabel}`);
       return;
     }
 
@@ -313,9 +327,9 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "                       chat: Interactive Q&A over MR context",
           "",
           "--path, -p <path>      Path to repository (default: current directory)",
-          "--url, -u <url>        GitLab merge request URL or GitHub pull request URL",
+          "--url, -u <url>        GitLab MR URL, GitHub PR URL, or Review Board request URL",
           "--from, -f <user>      Filter Review Board requests by user",
-          "--rb                   Use Review Board provider",
+          "--reviewboard          Use Review Board provider",
           "--github               Use GitHub provider",
           "--mode, -m <mode>      Mode: interactive or ci (default: interactive)",
           "--local                Review uncommitted changes via git diff",
@@ -329,10 +343,11 @@ export async function runReviewCommand(args: string[]): Promise<void> {
           "cr review",
           "cr review --workflow summarize",
           "cr review --workflow chat",
-          "cr review --rb",
-          "cr review --rb --from username",
+          "cr review --reviewboard",
+          "cr review --reviewboard --from username",
           "cr review --path /path/to/repo",
           "cr review --url https://gitlab.com/org/repo/-/merge_requests/123",
+          "cr review --reviewboard --url https://reviews.example.com/r/123/",
           "cr review --local",
           "git diff | cr review --local",
           "cr review --state all",
@@ -358,38 +373,33 @@ export async function runReviewCommand(args: string[]): Promise<void> {
   const stateRaw = getFlag(args, "state", "opened", "-s");
   const local = hasFlag(args, "local");
   const inlineComments = hasFlag(args, "inline-comments");
-  const rb = hasFlag(args, "rb");
+  const reviewboard = hasFlag(args, "reviewboard");
   const github = hasFlag(args, "github");
   const fromUser = getFlag(args, "from", "", "-f") || undefined;
   const repoRoot = repoRootFromModule(import.meta.url);
   const stdinDiff = await readStdinDiff();
 
-  if (workflowRaw === "chat" && (local || rb)) {
+  if (workflowRaw === "chat" && (local || reviewboard)) {
     printAlert({
       title: "Unsupported Combination",
-      message: "The --local or --rb option is not supported in chat mode.",
+      message: "The --local or --reviewboard option is not supported in chat mode.",
       tone: "error",
     });
     process.exitCode = 1;
     return;
   }
 
-  // Determine provider: explicit flags take precedence, otherwise auto-detect
+  // Review defaults to GitLab unless an explicit provider switch is passed.
   let provider: "gitlab" | "reviewboard" | "github";
-  if (rb) {
+  if (reviewboard) {
     provider = "reviewboard";
   } else if (github) {
     provider = "github";
-  } else if (!local) {
-    // Auto-detect provider based on git remote
-    const gitProvider = await detectGitProvider(repoPath);
-    provider = gitProvider === "github" ? "github" : "gitlab";
   } else {
-    // For local mode, default to gitlab
     provider = "gitlab";
   }
 
-  if (rb && inlineComments) {
+  if (reviewboard && inlineComments) {
     printAlert({
       title: "Unsupported Combination",
       message:

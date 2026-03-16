@@ -171,6 +171,9 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
       : undefined,
     gitlabUrl: section.gitlab_url ?? "",
     gitlabKey: await maybeDecryptConfigSecret(section.gitlab_key_enc ?? section.gitlab_key ?? ""),
+    githubToken: await maybeDecryptConfigSecret(
+      section.github_token_enc ?? section.github_token ?? undefined
+    ),
     svnRepositoryUrl: section.svn_repository_url ?? section.svn_guidelines_base_url ?? undefined,
     svnUsername: section.svn_username ?? undefined,
     svnPassword: await maybeDecryptConfigSecret(
@@ -180,6 +183,9 @@ export async function loadCRConfig(): Promise<Partial<CRConfig>> {
     rbToken: await maybeDecryptConfigSecret(section.rb_token_enc ?? section.rb_token ?? undefined),
     gitlabWebhookSecret: await maybeDecryptConfigSecret(
       section.gitlab_webhook_secret_enc ?? section.gitlab_webhook_secret ?? undefined
+    ),
+    githubWebhookSecret: await maybeDecryptConfigSecret(
+      section.github_webhook_secret_enc ?? section.github_webhook_secret ?? undefined
     ),
     rbWebhookSecret: await maybeDecryptConfigSecret(
       section.rb_webhook_secret_enc ?? section.rb_webhook_secret ?? undefined
@@ -215,9 +221,11 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
   const encryptedSecrets = {
     openaiApiKey: await maybeEncryptConfigSecret(parsed.openaiApiKey),
     gitlabKey: await maybeEncryptConfigSecret(parsed.gitlabKey),
+    githubToken: await maybeEncryptConfigSecret(parsed.githubToken),
     svnPassword: await maybeEncryptConfigSecret(parsed.svnPassword),
     rbToken: await maybeEncryptConfigSecret(parsed.rbToken),
     gitlabWebhookSecret: await maybeEncryptConfigSecret(parsed.gitlabWebhookSecret),
+    githubWebhookSecret: await maybeEncryptConfigSecret(parsed.githubWebhookSecret),
     rbWebhookSecret: await maybeEncryptConfigSecret(parsed.rbWebhookSecret),
   };
 
@@ -232,6 +240,7 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       }),
       gitlab_url: parsed.gitlabUrl,
       ...(encryptedSecrets.gitlabKey && { gitlab_key_enc: encryptedSecrets.gitlabKey }),
+      ...(encryptedSecrets.githubToken && { github_token_enc: encryptedSecrets.githubToken }),
       ...(parsed.svnRepositoryUrl && {
         svn_repository_url: parsed.svnRepositoryUrl,
       }),
@@ -241,6 +250,9 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       ...(encryptedSecrets.rbToken && { rb_token_enc: encryptedSecrets.rbToken }),
       ...(encryptedSecrets.gitlabWebhookSecret && {
         gitlab_webhook_secret_enc: encryptedSecrets.gitlabWebhookSecret,
+      }),
+      ...(encryptedSecrets.githubWebhookSecret && {
+        github_webhook_secret_enc: encryptedSecrets.githubWebhookSecret,
       }),
       ...(encryptedSecrets.rbWebhookSecret && {
         rb_webhook_secret_enc: encryptedSecrets.rbWebhookSecret,

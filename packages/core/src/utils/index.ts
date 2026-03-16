@@ -66,10 +66,12 @@ export {
   normalizeReviewAgentNames,
 } from "./promptsManager.js";
 export {
+  loadGitHubRepositoryGuidelines,
   loadGitLabRepositoryGuidelines,
   loadLocalRepositoryGuidelines,
   loadSvnRepositoryGuidelines,
 } from "./repositoryGuidelines.js";
+export { type RpiTarget, setupRpi } from "./rpi.js";
 // Specs exports
 export { type SpecTarget, setupSpecs } from "./specs.js";
 export { parseCRSseStream } from "./streamParser.js";

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { GitHubClient } from "../clients/githubClient.js";
 import type { GitLabClient } from "../clients/gitlabClient.js";
 import type { SvnClient } from "../clients/svnClient.js";
 
@@ -30,6 +31,20 @@ export async function loadGitLabRepositoryGuidelines(args: {
 }): Promise<string | undefined> {
   for (const fileName of GUIDELINE_FILE_NAMES) {
     const content = await args.gitlab.getFileRaw(args.projectPath, fileName, args.ref);
+    if (content) {
+      return content;
+    }
+  }
+  return undefined;
+}
+
+export async function loadGitHubRepositoryGuidelines(args: {
+  github: GitHubClient;
+  repoPath: string;
+  ref: string;
+}): Promise<string | undefined> {
+  for (const fileName of GUIDELINE_FILE_NAMES) {
+    const content = await args.github.getFileContent(args.repoPath, fileName, args.ref);
     if (content) {
       return content;
     }

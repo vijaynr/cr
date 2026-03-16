@@ -6,15 +6,19 @@ import type {
 } from "@cr/core";
 import {
   assert,
+  createRuntimeGitHubClient,
   createRuntimeGitLabClient,
   createRuntimeLlmClient,
   createRuntimeSvnClient,
   DEFAULT_REVIEW_AGENT_NAME,
+  type GitHubClient,
+  type GitHubInlineComment,
   type GitLabClient,
   type GitLabInlineComment,
   getCurrentBranch,
   getOriginRemoteUrl,
   type LlmClient,
+  loadGitHubRepositoryGuidelines,
   loadGitLabRepositoryGuidelines,
   loadLocalRepositoryGuidelines,
   loadPrompt,
@@ -22,6 +26,7 @@ import {
   loadSvnRepositoryGuidelines,
   loadWorkflowRuntime,
   normalizeReviewAgentNames,
+  remoteToGitHubRepoPath,
   remoteToProjectPath,
   runWorkflow,
   type WorkflowRuntime,
@@ -32,6 +37,7 @@ import {
   extractJsonObject,
   injectMergeRequestContextIntoTemplate,
   parseDiffHunks,
+  resolveGitLabBaseUrl,
   resolveInlinePosition,
 } from "./reviewWorkflowHelper.js";
 import { createWorkflowPhaseReporter } from "./workflowEvents.js";
@@ -51,6 +57,15 @@ type RemoteMrContext = {
   mr: Awaited<ReturnType<GitLabClient["getMergeRequest"]>>;
   changes: Awaited<ReturnType<GitLabClient["getMergeRequestChanges"]>>;
   commits: Awaited<ReturnType<GitLabClient["getMergeRequestCommits"]>>;
+  guidelines?: string;
+};
+
+type RemotePrContext = {
+  repoPath: string;
+  prNumber: number;
+  pr: Awaited<ReturnType<GitHubClient["getPullRequest"]>>;
+  files: Awaited<ReturnType<GitHubClient["getPullRequestFiles"]>>;
+  commits: Awaited<ReturnType<GitHubClient["getPullRequestCommits"]>>;
   guidelines?: string;
 };
 
@@ -129,8 +144,11 @@ function buildReviewResult(args: {
   overallSummary?: string;
   agentResults?: ReviewWorkflowResult["agentResults"];
   mrIid?: number;
+  prNumber?: number;
   projectPath?: string;
+  repoPath?: string;
   gitlabUrl?: string;
+  githubUrl?: string;
   rbUrl?: string;
   guidelines?: string;
 }): ReviewWorkflowResult {
@@ -143,8 +161,11 @@ function buildReviewResult(args: {
     overallSummary: args.overallSummary,
     agentResults: args.agentResults,
     mrIid: args.mrIid,
+    prNumber: args.prNumber,
     projectPath: args.projectPath,
+    repoPath: args.repoPath,
     gitlabUrl: args.gitlabUrl,
+    githubUrl: args.githubUrl,
     rbUrl: args.rbUrl,
     guidelines: args.guidelines,
   };
@@ -158,6 +179,26 @@ function createPromptContextFromRemoteContext(remoteContext: RemoteMrContext): R
     guidelines: remoteContext.guidelines,
     contextLabel: `MR !${remoteContext.mrIid} (${remoteContext.projectPath})`,
   };
+}
+
+function createPromptContextFromRemotePrContext(remoteContext: RemotePrContext): ReviewPromptContext {
+  return {
+    mrContent: JSON.stringify(remoteContext.pr, null, 2),
+    mrChanges: JSON.stringify(remoteContext.files, null, 2),
+    mrCommits: JSON.stringify(remoteContext.commits, null, 2),
+    guidelines: remoteContext.guidelines,
+    contextLabel: `PR #${remoteContext.prNumber} (${remoteContext.repoPath})`,
+  };
+}
+
+function mapGitHubFilesToDiffChanges(
+  files: RemotePrContext["files"]
+): Array<{ old_path?: string; new_path?: string; diff?: string }> {
+  return files.map((file) => ({
+    old_path: file.previous_filename ?? file.filename,
+    new_path: file.filename,
+    diff: file.patch ?? "",
+  }));
 }
 
 function prependFeedback(prompt: string, feedback?: string): string {
@@ -336,6 +377,54 @@ async function resolveRemoteMrContext(
   return { projectPath, mrIid, mr, changes, commits, guidelines };
 }
 
+async function resolveRemotePrContext(
+  input: ReviewWorkflowInput,
+  github: GitHubClient,
+  runtime: WorkflowRuntime
+): Promise<RemotePrContext> {
+  const repoUrl = input.url ?? (await getOriginRemoteUrl(input.repoPath));
+  const repoPath = remoteToGitHubRepoPath(repoUrl);
+
+  let prNumber: number;
+  if (typeof input.prNumber === "number" && Number.isFinite(input.prNumber)) {
+    prNumber = input.prNumber;
+  } else if (input.mode === "ci") {
+    const currentBranch = await getCurrentBranch(input.repoPath);
+    const found = await github.findOpenPullRequestByHead(repoPath, currentBranch);
+    if (!found) {
+      throw new Error(`No open pull request found for current branch '${currentBranch}'.`);
+    }
+    prNumber = found.number;
+  } else {
+    throw new Error("Interactive mode requires a selected pull request number from the command layer.");
+  }
+
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
+  phaseReporter.started("load_mr_context", "Loading pull request context...");
+  const [pr, files, commits] = await Promise.all([
+    github.getPullRequest(repoPath, prNumber),
+    github.getPullRequestFiles(repoPath, prNumber),
+    github.getPullRequestCommits(repoPath, prNumber),
+  ]);
+
+  let guidelines: string | undefined;
+  try {
+    const ref = pr.head.sha || "HEAD";
+    guidelines =
+      (await loadGitHubRepositoryGuidelines({
+        github,
+        repoPath,
+        ref,
+      })) ?? (await loadSvnRepositoryGuidelines(createRuntimeSvnClient(runtime)));
+  } catch {
+    // Ignore errors fetching guidelines
+  }
+
+  phaseReporter.completed("load_mr_context", "Loaded pull request context.");
+
+  return { repoPath, prNumber, pr, files, commits, guidelines };
+}
+
 async function buildInlineRemoteReview(
   input: ReviewWorkflowInput,
   gitlab: GitLabClient,
@@ -477,6 +566,154 @@ async function buildInlineRemoteReview(
   });
 }
 
+async function buildInlineGitHubReview(
+  input: ReviewWorkflowInput,
+  github: GitHubClient,
+  llm: LlmClient,
+  repoPath: string,
+  prNumber: number,
+  pr: unknown,
+  files: RemotePrContext["files"],
+  commits: unknown,
+  userFeedback?: string,
+  guidelines?: string
+): Promise<ReviewWorkflowResult> {
+  const existingInlineComments = await github.listReviewComments(repoPath, prNumber);
+  const existingByFile = new Map<string, GitLabInlineComment[]>();
+  for (const comment of existingInlineComments) {
+    const items = existingByFile.get(comment.filePath) ?? [];
+    items.push({
+      discussionId: String(comment.id),
+      noteId: comment.id,
+      filePath: comment.filePath,
+      line: comment.line,
+      endLine: comment.endLine,
+      positionType: comment.side === "LEFT" ? "old" : "new",
+      body: comment.body,
+      resolved: false,
+    });
+    existingByFile.set(comment.filePath, items);
+  }
+
+  const inlineCandidates: ReviewWorkflowResult["inlineComments"] = [];
+  const reviewLines: string[] = ["# File Review Summary", ""];
+  const prContent = JSON.stringify(pr, null, 2);
+  const prCommits = JSON.stringify(commits, null, 2);
+
+  for (const file of files) {
+    const filePath = file.filename;
+    const diffText = file.patch ?? "";
+    if (!filePath || !diffText.trim()) {
+      continue;
+    }
+
+    const diffHunks = parseDiffHunks(diffText);
+    const prompt = buildInlineReviewPrompt({
+      filePath,
+      diffText,
+      mrContent: prContent,
+      mrCommits: prCommits,
+      existingInlineComments: existingByFile.get(filePath) ?? [],
+      userFeedback: userFeedback ?? input.userFeedback,
+      guidelines,
+    });
+    const reviewText = await runLlmPrompt(prompt, llm);
+    const parsed = extractJsonObject(reviewText);
+    const rawFindings = Array.isArray(parsed.findings) ? parsed.findings : [];
+
+    let actionableCount = 0;
+    for (const raw of rawFindings) {
+      if (!raw || typeof raw !== "object") {
+        continue;
+      }
+      const finding = raw as Record<string, unknown>;
+      const shouldComment =
+        typeof finding.should_comment === "string"
+          ? finding.should_comment.trim().toLowerCase() === "true"
+          : Boolean(finding.should_comment);
+      if (!shouldComment) {
+        continue;
+      }
+
+      const summary = String(finding.summary ?? "").trim();
+      const severity = String(finding.severity ?? "").trim();
+      const fix = typeof finding.suggested_fix === "string" ? finding.suggested_fix.trim() : "";
+      if (!summary) {
+        continue;
+      }
+
+      actionableCount += 1;
+      const resolved = resolveInlinePosition(
+        finding.line,
+        finding.position_type,
+        finding.evidence_snippet,
+        diffHunks
+      );
+      const lineLabel = resolved ? String(resolved[0]) : "n/a";
+      const suffix = resolved ? "" : " (summary only: ambiguous line targeting)";
+      const severityPrefix = severity ? `[${severity}] ` : "";
+      if (fix) {
+        reviewLines.push(
+          `- \`${filePath}\` line \`${lineLabel}\`: ${severityPrefix}${summary} | Suggested fix: ${fix}${suffix}`
+        );
+      } else {
+        reviewLines.push(
+          `- \`${filePath}\` line \`${lineLabel}\`: ${severityPrefix}${summary}${suffix}`
+        );
+      }
+
+      if (resolved) {
+        const comment = fix ? `${summary}\n\nSuggested fix:\n${fix}` : summary;
+        inlineCandidates.push({
+          filePath,
+          line: resolved[0],
+          positionType: resolved[1],
+          comment,
+        });
+      }
+    }
+
+    if (actionableCount === 0) {
+      reviewLines.push(`- \`${filePath}\`: No issues found in this file.`);
+    }
+  }
+
+  const baseTemplate = await loadPrompt("review.txt", input.repoRoot);
+  const basePrompt = injectMergeRequestContextIntoTemplate(baseTemplate, {
+    mrContent: prContent,
+    mrChanges: JSON.stringify(files, null, 2),
+    mrCommits: prCommits,
+  });
+  const summaryPromptBase = [
+    "Using the following review instructions/context, provide only a PR-level final summary.",
+    "Return markdown with these sections only:",
+    "## Overall Summary",
+    "- 2-4 bullets summarizing key risks and positives.",
+    "## Overall Status",
+    "- One line: Looks good for me! / Needs work / Discussion needed.",
+    "",
+    basePrompt,
+  ].join("\n");
+  const effectiveFeedback = userFeedback ?? input.userFeedback;
+  const summaryPrompt = effectiveFeedback?.trim()
+    ? `Human feedback for this re-run:\n${effectiveFeedback.trim()}\n\n${summaryPromptBase}`
+    : summaryPromptBase;
+  const overallSummary = (await runLlmPrompt(summaryPrompt, llm)).trim();
+
+  return buildReviewResult({
+    output: `${reviewLines.join("\n")}\n\n# Overall PR Summary\n\n${overallSummary}`,
+    overallSummary,
+    inlineComments: inlineCandidates,
+    contextLabel: `PR #${prNumber} (${repoPath})`,
+    prNumber,
+    repoPath,
+    githubUrl: "https://github.com",
+    guidelines,
+    selectedAgents: [DEFAULT_REVIEW_AGENT_NAME],
+    aggregated: false,
+  });
+}
+
 async function generateRemoteReviewResult(
   input: ReviewWorkflowInput,
   gitlab: GitLabClient,
@@ -584,6 +821,110 @@ async function generateRemoteReviewResult(
   });
 }
 
+async function generateGitHubRemoteReviewResult(
+  input: ReviewWorkflowInput,
+  github: GitHubClient,
+  llm: LlmClient,
+  runtime: WorkflowRuntime,
+  remoteContext?: RemotePrContext,
+  userFeedback?: string
+): Promise<ReviewWorkflowResult> {
+  const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, input.events);
+  const { repoPath, prNumber, pr, files, commits, guidelines } =
+    remoteContext ?? (await resolveRemotePrContext(input, github, runtime));
+  const selectedAgents = normalizeReviewAgentNames(input.agentNames);
+  const useAgentProfiles = shouldUseAgentProfiles(selectedAgents);
+
+  if (input.inlineComments && useAgentProfiles) {
+    reportInlineCommentLimitation(input);
+  }
+
+  if (input.inlineComments && !useAgentProfiles) {
+    phaseReporter.started(
+      "generate_review",
+      useAgentProfiles && selectedAgents.length > 1
+        ? `Generating review with ${selectedAgents.length} agents...`
+        : "Generating review..."
+    );
+    const inlineResult = await buildInlineGitHubReview(
+      input,
+      github,
+      llm,
+      repoPath,
+      prNumber,
+      pr,
+      files,
+      commits,
+      userFeedback,
+      guidelines
+    );
+    phaseReporter.completed("generate_review", "Review generated.");
+    return { ...inlineResult, guidelines };
+  }
+
+  const promptContext = createPromptContextFromRemotePrContext({
+    repoPath,
+    prNumber,
+    pr,
+    files,
+    commits,
+    guidelines,
+  });
+
+  phaseReporter.started(
+    "generate_review",
+    useAgentProfiles && selectedAgents.length > 1
+      ? `Generating review with ${selectedAgents.length} agents...`
+      : "Generating review..."
+  );
+
+  if (useAgentProfiles) {
+    const parallelReview = await runParallelAgentReviews({
+      selectedAgents,
+      promptContext,
+      repoRoot: input.repoRoot,
+      llm,
+      userFeedback,
+    });
+    phaseReporter.completed("generate_review", "Review generated.");
+
+    return buildReviewResult({
+      output: parallelReview.output,
+      contextLabel: promptContext.contextLabel,
+      selectedAgents,
+      aggregated: parallelReview.aggregated,
+      agentResults: parallelReview.agentResults,
+      prNumber,
+      repoPath,
+      githubUrl: "https://github.com",
+      guidelines,
+    });
+  }
+
+  const template = await loadPrompt("review.txt", input.repoRoot);
+  let prompt = injectMergeRequestContextIntoTemplate(template, {
+    mrContent: promptContext.mrContent,
+    mrChanges: promptContext.mrChanges,
+    mrCommits: promptContext.mrCommits,
+    guidelines,
+  });
+  prompt = prependFeedback(prompt, userFeedback ?? input.userFeedback);
+
+  const output = await runLlmPrompt(prompt, llm);
+  phaseReporter.completed("generate_review", "Review generated.");
+
+  return buildReviewResult({
+    output,
+    contextLabel: promptContext.contextLabel,
+    selectedAgents,
+    aggregated: false,
+    prNumber,
+    repoPath,
+    githubUrl: "https://github.com",
+    guidelines,
+  });
+}
+
 async function buildLocalPrompt(
   input: ReviewWorkflowInput,
   llm: LlmClient,
@@ -664,8 +1005,16 @@ async function buildLocalPrompt(
   });
 }
 
-async function initializeRuntimeNode(): Promise<{ runtime: WorkflowRuntime }> {
-  return { runtime: await loadWorkflowRuntime() };
+async function initializeRuntimeNode(state: {
+  input: ReviewWorkflowInput;
+}): Promise<{ runtime: WorkflowRuntime }> {
+  const runtime = await loadWorkflowRuntime();
+  return {
+    runtime: {
+      ...runtime,
+      gitlabUrl: resolveGitLabBaseUrl(runtime.gitlabUrl, state.input),
+    },
+  };
 }
 
 async function validateLlmConfigNode(state: {
@@ -750,6 +1099,21 @@ async function submitReviewToGitlabNode(): Promise<Record<string, never>> {
 }
 
 async function runReviewStateGraph(input: ReviewWorkflowInput): Promise<ReviewWorkflowResult> {
+  if (!input.local && input.provider === "github") {
+    const runtime = await loadWorkflowRuntime();
+    if (!runtime.openaiApiKey || !runtime.openaiApiUrl) {
+      throw new Error(
+        "Missing LLM configuration. Run `cr init` or set OPENAI_API_KEY/OPENAI_API_URL."
+      );
+    }
+    if (!runtime.githubToken) {
+      throw new Error("Missing GitHub configuration. Run `cr init --github` or set GITHUB_TOKEN.");
+    }
+    const llm = createRuntimeLlmClient(runtime);
+    const github = createRuntimeGitHubClient(runtime);
+    return generateGitHubRemoteReviewResult(input, github, llm, runtime, undefined, input.userFeedback);
+  }
+
   const finalState = await runWorkflow<ReviewGraphState>({
     initialState: {
       input,

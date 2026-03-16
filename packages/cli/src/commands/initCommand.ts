@@ -6,22 +6,27 @@ import {
   initializeCRHome,
   loadCRConfig,
   repoRootFromModule,
+  type RpiTarget,
   type SpecTarget,
   saveCRConfig,
+  setupRpi,
   setupSpecs,
 } from "@cr/core";
 import {
   COLORS,
   createSpinner,
   DOT,
+  type LiveController,
   printDivider,
   printEmptyLine,
+  printCommandHelp,
   printError,
   printInfo,
   printSuccess,
   printWarning,
   printWorkflowOutput,
   promptWithFrame,
+  runLiveTask,
 } from "@cr/ui";
 import { getFlag, hasFlag } from "../cliHelpers.js";
 
@@ -75,9 +80,61 @@ type SubversionSetupAnswers = {
 };
 
 export async function runInitCommand(args: string[] = []): Promise<void> {
+  if (hasFlag(args, "help") || hasFlag(args, "h")) {
+    printCommandHelp([
+      {
+        title: "USAGE",
+        lines: ["cr init [options]"],
+      },
+      {
+        title: "OPTIONS",
+        lines: [
+          "--gitlab               Configure GitLab settings",
+          "--github               Configure GitHub settings",
+          "--reviewboard          Configure Review Board settings",
+          "--subversion, --svn    Configure Subversion settings",
+          "--webhook              Configure webhook server settings",
+          "--sdd                  Install GitHub Copilot SDD prompt files",
+          "--rpi                  Install GitHub Copilot RPI prompt files",
+          "--path, -p <path>      Target workspace path for template installs",
+          "--target <target>      Template target for installs (supported: copilot)",
+          "--help, -h             Show this help",
+        ],
+      },
+      {
+        title: "EXAMPLES",
+        lines: [
+          "cr init",
+          "cr init --gitlab",
+          "cr init --github",
+          "cr init --reviewboard",
+          "cr init --subversion",
+          "cr init --webhook",
+          "cr init --sdd --path .",
+          "cr init --rpi --path .",
+        ],
+      },
+      {
+        title: "SETUP MODES",
+        lines: [
+          "default     Bootstrap local CR directories, prompts, and bundled assets",
+          "gitlab      Save GitLab URL/token and model settings",
+          "github      Save GitHub token and model settings",
+          "reviewboard Save Review Board and optional SVN settings",
+          "subversion  Save standalone SVN repository credentials",
+          "webhook     Configure shared GitLab/Review Board webhook settings",
+          "sdd         Install GitHub Copilot spec-driven development prompts",
+          "rpi         Install GitHub Copilot research-plan-implement prompts",
+        ],
+      },
+    ]);
+    return;
+  }
+
   const isSdd = hasFlag(args, "sdd");
   const isWebhook = hasFlag(args, "webhook");
-  const isRb = hasFlag(args, "rb");
+  const isReviewBoard = hasFlag(args, "reviewboard");
+  const isRpi = hasFlag(args, "rpi");
   const isGitlab = hasFlag(args, "gitlab");
   const isGithub = hasFlag(args, "github");
   const isSubversion = hasFlag(args, "subversion") || hasFlag(args, "svn");
@@ -92,8 +149,13 @@ export async function runInitCommand(args: string[] = []): Promise<void> {
     return;
   }
 
-  if (isRb) {
+  if (isReviewBoard) {
     await runRbSetup(args);
+    return;
+  }
+
+  if (isRpi) {
+    await runRpiSetup(args);
     return;
   }
 
@@ -115,82 +177,68 @@ export async function runInitCommand(args: string[] = []): Promise<void> {
   await bootstrap(args);
 }
 
-async function bootstrap(_args: string[] = []): Promise<void> {
-  const spinner = createSpinner("Bootstrapping application...").start();
+async function runSetupTask(
+  title: string,
+  description: string,
+  run: (ui: LiveController) => Promise<void>
+): Promise<void> {
   try {
-    const repoRoot = repoRootFromModule(import.meta.url);
-    await initializeCRHome(repoRoot);
-    spinner.stopAndPersist({
-      symbol: COLORS.green + DOT + COLORS.reset,
-      text: "Application ready.",
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    spinner.fail(message);
+    await runLiveTask(title, run, description);
+  } catch {
     process.exitCode = 1;
-    return;
   }
 }
 
-async function runSddSetup(args: string[] = []): Promise<void> {
-  createSpinner("Loading settings...")
-    .start()
-    .stopAndPersist({
-      symbol: COLORS.cyan + DOT + COLORS.reset,
-      text: "Initialize Spec-Driven Development templates",
-    });
-
-  const targetPath = path.resolve(getFlag(args, "path", ".", "-p"));
-  let targetRaw = getFlag(args, "target", "");
-
-  if (!targetRaw) {
-    const answer = await promptWithFrame([
-      {
-        type: "select",
-        name: "target",
-        message: "Which command templates do you want to install?",
-        choices: [
-          { title: "All (Copilot & OpenCode)", value: "all" },
-          { title: "GH Copilot", value: "copilot" },
-          { title: "OpenCode", value: "opencode" },
-        ],
-        initial: 0,
-      },
-    ]);
-
-    if (!answer.target) {
-      printWarning("SDD setup cancelled.");
-      return;
+async function bootstrap(_args: string[] = []): Promise<void> {
+  await runSetupTask(
+    "CR Initialization",
+    "Bootstrap local CR directories, prompts, and bundled assets.",
+    async (ui) => {
+      const spinner = createSpinner("Bootstrapping application...").start();
+      const repoRoot = repoRootFromModule(import.meta.url);
+      await initializeCRHome(repoRoot);
+      spinner.stop();
+      ui.setResult("Workflow: Initialization", `Configuration path: ${CR_CONF_PATH}`);
     }
-    targetRaw = answer.target;
-  }
+  );
+}
 
-  if (!["all", "copilot", "opencode"].includes(targetRaw)) {
-    printError(`Unsupported SDD target: ${targetRaw}. Use all, copilot, or opencode.`);
-    process.exitCode = 1;
-    return;
-  }
+async function runSddSetup(args: string[] = []): Promise<void> {
+  await runSetupTask(
+    "Spec-Driven Development Setup",
+    "Install GitHub Copilot SDD prompt files into the selected workspace.",
+    async (ui) => {
+      createSpinner("Loading settings...").start().stop();
 
-  const target = targetRaw as SpecTarget;
+      const targetPath = path.resolve(getFlag(args, "path", ".", "-p"));
+      const targetRaw = getFlag(args, "target", "copilot");
 
-  printInfo(`Setting up SDD commands for ${target} at ${targetPath}...`);
-
-  try {
-    const copiedFiles = await setupSpecs(targetPath, target);
-
-    if (copiedFiles.length === 0) {
-      printInfo("No files were copied.");
-    } else {
-      printDivider();
-      printSuccess(`Successfully setup ${copiedFiles.length} SDD files:`);
-      for (const file of copiedFiles) {
-        console.log(`  - ${path.relative(targetPath, file)}`);
+      if (targetRaw !== "copilot") {
+        printError(`Unsupported SDD target: ${targetRaw}. Use copilot.`);
+        process.exitCode = 1;
+        ui.setResult("Workflow: SDD Setup", "Status: Cancelled.");
+        return;
       }
 
-      const summary = `
+      const target = targetRaw as SpecTarget;
+
+      printInfo(`Setting up SDD commands for ${target} at ${targetPath}...`);
+
+      const copiedFiles = await setupSpecs(targetPath, target);
+
+      if (copiedFiles.length === 0) {
+        printInfo("No files were copied.");
+      } else {
+        printDivider();
+        printSuccess(`Successfully setup ${copiedFiles.length} SDD files:`);
+        for (const file of copiedFiles) {
+          console.log(`  - ${path.relative(targetPath, file)}`);
+        }
+
+        const summary = `
 ### Spec-Driven Development Workflow
 
-These slash commands are installed for **GitHub Copilot** and **OpenCode**, and are available to run inside those tools.
+These prompt files are installed for **GitHub Copilot**.
 
 1.  Run **/spec.prd** to create \`.features/<feature-name>-<id>/prd.md\`
 2.  Run **/spec.design** to create \`design.md\` from requirements + codebase
@@ -202,34 +250,92 @@ These slash commands are installed for **GitHub Copilot** and **OpenCode**, and 
 Use the same feature name or folder across commands so they reference the same \`.features/<feature-name>-<id>/\` directory.
       `;
 
-      printWorkflowOutput({ title: "Spec-Driven Development Workflow", output: summary });
-      printDivider();
+        printWorkflowOutput({ title: "Spec-Driven Development Workflow", output: summary });
+        printDivider();
+      }
+
+      ui.setResult(
+        "Workflow: SDD Setup",
+        `Target: ${target}\nPath: ${targetPath}`
+      );
     }
-  } catch (err) {
-    printError(`Failed to setup SDD: ${err instanceof Error ? err.message : String(err)}`);
-    process.exitCode = 1;
-  }
+  );
+}
+
+async function runRpiSetup(args: string[] = []): Promise<void> {
+  await runSetupTask(
+    "Research Plan Implement Setup",
+    "Install GitHub Copilot RPI prompt files into the selected workspace.",
+    async (ui) => {
+      createSpinner("Loading settings...").start().stop();
+
+      const targetPath = path.resolve(getFlag(args, "path", ".", "-p"));
+      const targetRaw = getFlag(args, "target", "copilot");
+
+      if (targetRaw !== "copilot") {
+        printError(`Unsupported RPI target: ${targetRaw}. Use copilot.`);
+        process.exitCode = 1;
+        ui.setResult("Workflow: RPI Setup", "Status: Cancelled.");
+        return;
+      }
+
+      const target = targetRaw as RpiTarget;
+
+      printInfo(`Setting up RPI prompts for ${target} at ${targetPath}...`);
+
+      const copiedFiles = await setupRpi(targetPath, target);
+
+      if (copiedFiles.length === 0) {
+        printInfo("No files were copied.");
+      } else {
+        printDivider();
+        printSuccess(`Successfully setup ${copiedFiles.length} RPI files:`);
+        for (const file of copiedFiles) {
+          console.log(`  - ${path.relative(targetPath, file)}`);
+        }
+
+        const summary = `
+### Research Plan Implement Workflow
+
+These prompt files are installed for **GitHub Copilot**.
+
+1.  Run **/rpi.research** to create \`.rpi/<topic-name>-<id>/research.md\`
+2.  Run **/rpi.plan** to create \`plan.md\` from research + codebase findings
+3.  Run **/rpi.implement** to execute the plan and update \`implementation.md\`
+
+Use the same topic name or folder across commands so they reference the same \`.rpi/<topic-name>-<id>/\` directory.
+      `;
+
+        printWorkflowOutput({ title: "Research Plan Implement Workflow", output: summary });
+        printDivider();
+      }
+
+      ui.setResult(
+        "Workflow: RPI Setup",
+        `Target: ${target}\nPath: ${targetPath}`
+      );
+    }
+  );
 }
 
 async function runWebhookSetup(_args: string[] = []): Promise<void> {
-  const existing = await loadCRConfig();
+  await runSetupTask(
+    "Webhook Configuration",
+    "Configure webhook endpoints, secrets, and optional SSL settings for CR automation.",
+    async (ui) => {
+      const existing = await loadCRConfig();
 
-  createSpinner("Loading settings...")
-    .start()
-    .stopAndPersist({
-      symbol: COLORS.cyan + DOT + COLORS.reset,
-      text: "Initialize Webhook and SSL configuration",
-    });
+      createSpinner("Loading settings...").start().stop();
 
-  printEmptyLine();
-  printInfo(
-    "This sets up one webhook server for both providers. Use /gitlab for GitLab and /reviewboard for Review Board."
-  );
-  printWarning(
-    "Review Board webhook support is summary-only today. Configure only the review_request_published event and use the same HMAC secret in Review Board and CR."
-  );
+      printEmptyLine();
+      printInfo(
+        "This sets up one webhook server for both providers. Use /gitlab for GitLab and /reviewboard for Review Board."
+      );
+      printWarning(
+        "Review Board webhook support is summary-only today. Configure only the review_request_published event and use the same HMAC secret in Review Board and CR."
+      );
 
-  const prompts: Parameters<typeof promptWithFrame>[0] = [
+      const prompts: Parameters<typeof promptWithFrame>[0] = [
     {
       type: "text",
       name: "gitlabUrl",
@@ -268,7 +374,7 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
     },
   ];
 
-  prompts.push(
+      prompts.push(
     {
       type: "text",
       name: "sslCertPath",
@@ -307,16 +413,17 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
     }
   );
 
-  const answers = (await promptWithFrame(prompts, {
-    onCancel: () => true,
-  })) as WebhookSetupAnswers;
+      const answers = (await promptWithFrame(prompts, {
+        onCancel: () => true,
+      })) as WebhookSetupAnswers;
 
-  if (answers.webhookConcurrency === undefined) {
-    printWarning("Webhook initialization cancelled.");
-    return;
-  }
+      if (answers.webhookConcurrency === undefined) {
+        printWarning("Webhook initialization cancelled.");
+        ui.setResult("Workflow: Webhook Configuration", "Status: Cancelled.");
+        return;
+      }
 
-  const nextConfig: CRConfig = {
+      const nextConfig: CRConfig = {
     ...existing,
     openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
     openaiApiKey: existing.openaiApiKey ?? "",
@@ -336,303 +443,328 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
     webhookJobTimeoutMs: answers.webhookJobTimeoutMs,
   };
 
-  await saveCRConfig(nextConfig);
+      await saveCRConfig(nextConfig);
 
-  printDivider();
-  printSuccess(`Webhook configuration updated in ${CR_CONF_PATH}`);
-  printDivider();
+      printDivider();
+      printSuccess(`Webhook configuration updated in ${CR_CONF_PATH}`);
+      printDivider();
+      ui.setResult("Workflow: Webhook Configuration", `Saved to: ${CR_CONF_PATH}`);
+    }
+  );
 }
 
 async function runSubversionSetup(_args: string[] = []): Promise<void> {
-  const existing = await loadCRConfig();
+  await runSetupTask(
+    "Subversion Configuration",
+    "Store SVN repository and credential settings for workflows that read from Subversion.",
+    async (ui) => {
+      const existing = await loadCRConfig();
 
-  createSpinner("Loading settings...")
-    .start()
-    .stopAndPersist({
-      symbol: COLORS.cyan + DOT + COLORS.reset,
-      text: "Initialize Subversion configuration",
-    });
+      createSpinner("Loading settings...").start().stop();
 
-  printEmptyLine();
-  printInfo(
-    "Store SVN credentials for basic-auth HTTP access. Enter the repository URL that CR should use when fetching repository files from SVN."
+      printEmptyLine();
+      printInfo(
+        "Store SVN credentials for basic-auth HTTP access. Enter the repository URL that CR should use when fetching repository files from SVN."
+      );
+
+      const answers = (await promptWithFrame(
+        [
+          {
+            type: "text",
+            name: "svnRepositoryUrl",
+            message: "SVN Repository URL",
+            initial: existing.svnRepositoryUrl ?? "",
+          },
+          {
+            type: "text",
+            name: "svnUsername",
+            message: "SVN Username (optional)",
+            initial: existing.svnUsername ?? "",
+          },
+          {
+            type: "password",
+            name: "svnPassword",
+            message: "SVN Password (optional)",
+            initial: existing.svnPassword ?? "",
+          },
+        ],
+        { onCancel: () => true }
+      )) as SubversionSetupAnswers;
+
+      if (
+        answers.svnRepositoryUrl === undefined &&
+        answers.svnUsername === undefined &&
+        answers.svnPassword === undefined
+      ) {
+        printWarning("Subversion initialization cancelled.");
+        ui.setResult("Workflow: Subversion Configuration", "Status: Cancelled.");
+        return;
+      }
+
+      const nextConfig: CRConfig = {
+        ...existing,
+        openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+        openaiApiKey: existing.openaiApiKey ?? "",
+        openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+        useCustomStreaming: existing.useCustomStreaming ?? false,
+        gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+        gitlabKey: existing.gitlabKey ?? "",
+        svnRepositoryUrl: answers.svnRepositoryUrl || undefined,
+        svnUsername: answers.svnUsername || undefined,
+        svnPassword: answers.svnPassword || undefined,
+      };
+
+      await saveCRConfig(nextConfig);
+
+      printDivider();
+      printSuccess(`Subversion configuration updated in ${CR_CONF_PATH}`);
+      printDivider();
+      ui.setResult("Workflow: Subversion Configuration", `Saved to: ${CR_CONF_PATH}`);
+    }
   );
-
-  const answers = (await promptWithFrame(
-    [
-      {
-        type: "text",
-        name: "svnRepositoryUrl",
-        message: "SVN Repository URL",
-        initial: existing.svnRepositoryUrl ?? "",
-      },
-      {
-        type: "text",
-        name: "svnUsername",
-        message: "SVN Username (optional)",
-        initial: existing.svnUsername ?? "",
-      },
-      {
-        type: "password",
-        name: "svnPassword",
-        message: "SVN Password (optional)",
-        initial: existing.svnPassword ?? "",
-      },
-    ],
-    { onCancel: () => true }
-  )) as SubversionSetupAnswers;
-
-  if (
-    answers.svnRepositoryUrl === undefined &&
-    answers.svnUsername === undefined &&
-    answers.svnPassword === undefined
-  ) {
-    printWarning("Subversion initialization cancelled.");
-    return;
-  }
-
-  const nextConfig: CRConfig = {
-    ...existing,
-    openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
-    openaiApiKey: existing.openaiApiKey ?? "",
-    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-    useCustomStreaming: existing.useCustomStreaming ?? false,
-    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
-    gitlabKey: existing.gitlabKey ?? "",
-    svnRepositoryUrl: answers.svnRepositoryUrl || undefined,
-    svnUsername: answers.svnUsername || undefined,
-    svnPassword: answers.svnPassword || undefined,
-  };
-
-  await saveCRConfig(nextConfig);
-
-  printDivider();
-  printSuccess(`Subversion configuration updated in ${CR_CONF_PATH}`);
-  printDivider();
 }
 
 async function runGitLabSetup(_args: string[] = []): Promise<void> {
-  const existing = await loadCRConfig();
+  await runSetupTask(
+    "GitLab Configuration",
+    "Configure the OpenAI and GitLab credentials used for merge request workflows.",
+    async (ui) => {
+      const existing = await loadCRConfig();
 
-  const answers = (await promptWithFrame(
-    [
-      {
-        type: "text",
-        name: "openaiApiUrl",
-        message: "OpenAI API URL",
-        initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
-      },
-      {
-        type: "password",
-        name: "openaiApiKey",
-        message: "OpenAI API Key",
-        initial: existing.openaiApiKey ?? "",
-      },
-      {
-        type: "text",
-        name: "openaiModel",
-        message: "OpenAI Model",
-        initial: existing.openaiModel ?? defaultConfig.openaiModel,
-      },
-      {
-        type: "toggle",
-        name: "useCustomStreaming",
-        message: "Use custom streaming (SSE format)",
-        initial: existing.useCustomStreaming ?? false,
-        active: "yes",
-        inactive: "no",
-      },
-      {
-        type: "text",
-        name: "gitlabUrl",
-        message: "GitLab URL",
-        initial: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
-      },
-      {
-        type: "password",
-        name: "gitlabKey",
-        message: "GitLab Access Token (api scope)",
-        initial: existing.gitlabKey ?? "",
-      },
-    ],
-    { onCancel: () => true }
-  )) as GitLabSetupAnswers;
+      const answers = (await promptWithFrame(
+        [
+          {
+            type: "text",
+            name: "openaiApiUrl",
+            message: "OpenAI API URL",
+            initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+          },
+          {
+            type: "password",
+            name: "openaiApiKey",
+            message: "OpenAI API Key",
+            initial: existing.openaiApiKey ?? "",
+          },
+          {
+            type: "text",
+            name: "openaiModel",
+            message: "OpenAI Model",
+            initial: existing.openaiModel ?? defaultConfig.openaiModel,
+          },
+          {
+            type: "toggle",
+            name: "useCustomStreaming",
+            message: "Use custom streaming (SSE format)",
+            initial: existing.useCustomStreaming ?? false,
+            active: "yes",
+            inactive: "no",
+          },
+          {
+            type: "text",
+            name: "gitlabUrl",
+            message: "GitLab URL",
+            initial: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+          },
+          {
+            type: "password",
+            name: "gitlabKey",
+            message: "GitLab Access Token (api scope)",
+            initial: existing.gitlabKey ?? "",
+          },
+        ],
+        { onCancel: () => true }
+      )) as GitLabSetupAnswers;
 
-  if (!answers.openaiApiUrl || !answers.openaiModel || !answers.gitlabUrl) {
-    printWarning("Initialization cancelled.");
-    return;
-  }
+      if (!answers.openaiApiUrl || !answers.openaiModel || !answers.gitlabUrl) {
+        printWarning("Initialization cancelled.");
+        ui.setResult("Workflow: GitLab Configuration", "Status: Cancelled.");
+        return;
+      }
 
-  const nextConfig: CRConfig = {
-    ...existing,
-    openaiApiUrl: answers.openaiApiUrl,
-    openaiApiKey: answers.openaiApiKey ?? "",
-    openaiModel: answers.openaiModel,
-    useCustomStreaming: answers.useCustomStreaming ?? false,
-    gitlabUrl: answers.gitlabUrl,
-    gitlabKey: answers.gitlabKey ?? "",
-  };
+      const nextConfig: CRConfig = {
+        ...existing,
+        openaiApiUrl: answers.openaiApiUrl,
+        openaiApiKey: answers.openaiApiKey ?? "",
+        openaiModel: answers.openaiModel,
+        useCustomStreaming: answers.useCustomStreaming ?? false,
+        gitlabUrl: answers.gitlabUrl,
+        gitlabKey: answers.gitlabKey ?? "",
+      };
 
-  await saveCRConfig(nextConfig);
+      await saveCRConfig(nextConfig);
 
-  printDivider();
-  printSuccess(`Configuration saved to ${CR_CONF_PATH}`);
-  printDivider();
+      printDivider();
+      printSuccess(`Configuration saved to ${CR_CONF_PATH}`);
+      printDivider();
+      ui.setResult("Workflow: GitLab Configuration", `Saved to: ${CR_CONF_PATH}`);
+    }
+  );
 }
 
 async function runGitHubSetup(_args: string[] = []): Promise<void> {
-  const existing = await loadCRConfig();
+  await runSetupTask(
+    "GitHub Configuration",
+    "Configure the OpenAI and GitHub credentials used for pull request workflows.",
+    async (ui) => {
+      const existing = await loadCRConfig();
 
-  const answers = (await promptWithFrame(
-    [
-      {
-        type: "text",
-        name: "openaiApiUrl",
-        message: "OpenAI API URL",
-        initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
-      },
-      {
-        type: "password",
-        name: "openaiApiKey",
-        message: "OpenAI API Key",
-        initial: existing.openaiApiKey ?? "",
-      },
-      {
-        type: "text",
-        name: "openaiModel",
-        message: "OpenAI Model",
-        initial: existing.openaiModel ?? defaultConfig.openaiModel,
-      },
-      {
-        type: "toggle",
-        name: "useCustomStreaming",
-        message: "Use custom streaming (SSE format)",
-        initial: existing.useCustomStreaming ?? false,
-        active: "yes",
-        inactive: "no",
-      },
-      {
-        type: "password",
-        name: "githubToken",
-        message: "GitHub Personal Access Token",
-        initial: existing.githubToken ?? "",
-      },
-    ],
-    { onCancel: () => true }
-  )) as GitHubSetupAnswers;
+      const answers = (await promptWithFrame(
+        [
+          {
+            type: "text",
+            name: "openaiApiUrl",
+            message: "OpenAI API URL",
+            initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+          },
+          {
+            type: "password",
+            name: "openaiApiKey",
+            message: "OpenAI API Key",
+            initial: existing.openaiApiKey ?? "",
+          },
+          {
+            type: "text",
+            name: "openaiModel",
+            message: "OpenAI Model",
+            initial: existing.openaiModel ?? defaultConfig.openaiModel,
+          },
+          {
+            type: "toggle",
+            name: "useCustomStreaming",
+            message: "Use custom streaming (SSE format)",
+            initial: existing.useCustomStreaming ?? false,
+            active: "yes",
+            inactive: "no",
+          },
+          {
+            type: "password",
+            name: "githubToken",
+            message: "GitHub Personal Access Token",
+            initial: existing.githubToken ?? "",
+          },
+        ],
+        { onCancel: () => true }
+      )) as GitHubSetupAnswers;
 
-  if (!answers.openaiApiUrl || !answers.openaiModel) {
-    printWarning("Initialization cancelled.");
-    return;
-  }
+      if (!answers.openaiApiUrl || !answers.openaiModel) {
+        printWarning("Initialization cancelled.");
+        ui.setResult("Workflow: GitHub Configuration", "Status: Cancelled.");
+        return;
+      }
 
-  const nextConfig: CRConfig = {
-    ...existing,
-    openaiApiUrl: answers.openaiApiUrl,
-    openaiApiKey: answers.openaiApiKey ?? "",
-    openaiModel: answers.openaiModel,
-    useCustomStreaming: answers.useCustomStreaming ?? false,
-    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
-    gitlabKey: existing.gitlabKey ?? "",
-    githubToken: answers.githubToken ?? "",
-  };
+      const nextConfig: CRConfig = {
+        ...existing,
+        openaiApiUrl: answers.openaiApiUrl,
+        openaiApiKey: answers.openaiApiKey ?? "",
+        openaiModel: answers.openaiModel,
+        useCustomStreaming: answers.useCustomStreaming ?? false,
+        gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+        gitlabKey: existing.gitlabKey ?? "",
+        githubToken: answers.githubToken ?? "",
+      };
 
-  await saveCRConfig(nextConfig);
+      await saveCRConfig(nextConfig);
 
-  printDivider();
-  printSuccess(`Configuration saved to ${CR_CONF_PATH}`);
-  printDivider();
+      printDivider();
+      printSuccess(`Configuration saved to ${CR_CONF_PATH}`);
+      printDivider();
+      ui.setResult("Workflow: GitHub Configuration", `Saved to: ${CR_CONF_PATH}`);
+    }
+  );
 }
 
 async function runRbSetup(_args: string[] = []): Promise<void> {
-  const existing = await loadCRConfig();
+  await runSetupTask(
+    "Review Board Configuration",
+    "Configure the OpenAI, Review Board, and optional SVN settings used for review request workflows.",
+    async (ui) => {
+      const existing = await loadCRConfig();
 
-  createSpinner("Loading settings...")
-    .start()
-    .stopAndPersist({
-      symbol: COLORS.cyan + DOT + COLORS.reset,
-      text: "Initialize Review Board configuration",
-    });
+      createSpinner("Loading settings...").start().stop();
 
-  const answers = (await promptWithFrame(
-    [
-      {
-        type: "text",
-        name: "openaiApiUrl",
-        message: "OpenAI API URL",
-        initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
-      },
-      {
-        type: "password",
-        name: "openaiApiKey",
-        message: "OpenAI API Key",
-        initial: existing.openaiApiKey ?? "",
-      },
-      {
-        type: "toggle",
-        name: "useCustomStreaming",
-        message: "Use custom streaming (SSE format)",
-        initial: existing.useCustomStreaming ?? false,
-        active: "yes",
-        inactive: "no",
-      },
-      {
-        type: "text",
-        name: "rbUrl",
-        message: "Review Board URL",
-        initial: existing.rbUrl ?? defaultConfig.rbUrl,
-      },
-      {
-        type: "password",
-        name: "rbToken",
-        message: "Review Board API Token",
-        initial: existing.rbToken ?? "",
-      },
-      {
-        type: "text",
-        name: "svnRepositoryUrl",
-        message: "SVN Repository URL",
-        initial: existing.svnRepositoryUrl ?? "",
-      },
-      {
-        type: "text",
-        name: "svnUsername",
-        message: "SVN Username (optional)",
-        initial: existing.svnUsername ?? "",
-      },
-      {
-        type: "password",
-        name: "svnPassword",
-        message: "SVN Password (optional)",
-        initial: existing.svnPassword ?? "",
-      },
-    ],
-    { onCancel: () => true }
-  )) as ReviewBoardSetupAnswers;
+      const answers = (await promptWithFrame(
+        [
+          {
+            type: "text",
+            name: "openaiApiUrl",
+            message: "OpenAI API URL",
+            initial: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+          },
+          {
+            type: "password",
+            name: "openaiApiKey",
+            message: "OpenAI API Key",
+            initial: existing.openaiApiKey ?? "",
+          },
+          {
+            type: "toggle",
+            name: "useCustomStreaming",
+            message: "Use custom streaming (SSE format)",
+            initial: existing.useCustomStreaming ?? false,
+            active: "yes",
+            inactive: "no",
+          },
+          {
+            type: "text",
+            name: "rbUrl",
+            message: "Review Board URL",
+            initial: existing.rbUrl ?? defaultConfig.rbUrl,
+          },
+          {
+            type: "password",
+            name: "rbToken",
+            message: "Review Board API Token",
+            initial: existing.rbToken ?? "",
+          },
+          {
+            type: "text",
+            name: "svnRepositoryUrl",
+            message: "SVN Repository URL",
+            initial: existing.svnRepositoryUrl ?? "",
+          },
+          {
+            type: "text",
+            name: "svnUsername",
+            message: "SVN Username (optional)",
+            initial: existing.svnUsername ?? "",
+          },
+          {
+            type: "password",
+            name: "svnPassword",
+            message: "SVN Password (optional)",
+            initial: existing.svnPassword ?? "",
+          },
+        ],
+        { onCancel: () => true }
+      )) as ReviewBoardSetupAnswers;
 
-  if (!answers.rbUrl || !answers.openaiApiUrl) {
-    printWarning("Review Board initialization cancelled.");
-    return;
-  }
+      if (!answers.rbUrl || !answers.openaiApiUrl) {
+        printWarning("Review Board initialization cancelled.");
+        ui.setResult("Workflow: Review Board Configuration", "Status: Cancelled.");
+        return;
+      }
 
-  const nextConfig: CRConfig = {
-    ...existing,
-    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-    useCustomStreaming: answers.useCustomStreaming ?? false,
-    gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
-    gitlabKey: existing.gitlabKey ?? "",
-    rbUrl: answers.rbUrl,
-    rbToken: answers.rbToken ?? "",
-    openaiApiUrl: answers.openaiApiUrl,
-    openaiApiKey: answers.openaiApiKey ?? "",
-    svnRepositoryUrl: answers.svnRepositoryUrl,
-    svnUsername: answers.svnUsername,
-    svnPassword: answers.svnPassword,
-  };
+      const nextConfig: CRConfig = {
+        ...existing,
+        openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+        useCustomStreaming: answers.useCustomStreaming ?? false,
+        gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+        gitlabKey: existing.gitlabKey ?? "",
+        rbUrl: answers.rbUrl,
+        rbToken: answers.rbToken ?? "",
+        openaiApiUrl: answers.openaiApiUrl,
+        openaiApiKey: answers.openaiApiKey ?? "",
+        svnRepositoryUrl: answers.svnRepositoryUrl,
+        svnUsername: answers.svnUsername,
+        svnPassword: answers.svnPassword,
+      };
 
-  await saveCRConfig(nextConfig);
+      await saveCRConfig(nextConfig);
 
-  printDivider();
-  printSuccess(`Review Board configuration updated in ${CR_CONF_PATH}`);
-  printDivider();
+      printDivider();
+      printSuccess(`Review Board configuration updated in ${CR_CONF_PATH}`);
+      printDivider();
+      ui.setResult("Workflow: Review Board Configuration", `Saved to: ${CR_CONF_PATH}`);
+    }
+  );
 }

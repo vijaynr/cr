@@ -12,13 +12,13 @@ import { getFlag, hasFlag } from "../cliHelpers.js";
 
 function resolveProvider(args: string[]): CreateReviewProvider {
   const gl = hasFlag(args, "gl");
-  const rb = hasFlag(args, "rb");
+  const reviewboard = hasFlag(args, "reviewboard");
 
-  if (gl && rb) {
-    throw new Error("Pass only one provider flag: use either --gl or --rb.");
+  if (gl && reviewboard) {
+    throw new Error("Pass only one provider flag: use either --gl or --reviewboard.");
   }
 
-  if (rb) {
+  if (reviewboard) {
     return "reviewboard";
   }
 
@@ -39,7 +39,7 @@ export async function runCreateReviewCommand(args: string[]): Promise<void> {
           "--target-branch, -t <name>  Target branch for the GitLab merge request",
           "--mode, -m <mode>           Mode: interactive or ci (default: interactive)",
           "--gl                        Use GitLab merge request creation (default)",
-          "--rb                        Use Review Board review request creation (SVN only)",
+          "--reviewboard               Use Review Board review request creation (SVN only)",
         ],
       },
       {
@@ -47,7 +47,7 @@ export async function runCreateReviewCommand(args: string[]): Promise<void> {
         lines: [
           "cr create-review",
           "cr create-review --gl --target-branch main",
-          "cr create-review --rb --path /path/to/svn/wc",
+          "cr create-review --reviewboard --path /path/to/svn/wc",
           "cr create-review --mode ci --gl --target-branch main",
         ],
       },

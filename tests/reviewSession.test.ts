@@ -7,6 +7,7 @@ const loadCRConfigMock = mock(async () => ({
   gitlabKey: "gitlab-key",
 }));
 const listBundledReviewAgentNamesMock = mock(() => ["general", "security", "clean-code"]);
+const listGitHubPullRequestsMock = mock(async () => []);
 const normalizeReviewAgentNamesMock = mock((agentNames?: string[]) => {
   const values = (agentNames ?? ["general"]).map((name) => name.trim().toLowerCase());
   return Array.from(new Set(values.filter(Boolean)));
@@ -29,10 +30,12 @@ mock.module("@cr/core", () =>
     envOrConfig: (_key: string, value: string | undefined, fallback: string) => value || fallback,
     getCurrentUser: async () => ({ username: "demo" }),
     getOriginRemoteUrl: async () => "https://gitlab.example.com/group/project.git",
+    listGitHubPullRequests: listGitHubPullRequestsMock,
     listMergeRequests: listMergeRequestsMock,
     listReviewRequests: async () => [],
     loadCRConfig: loadCRConfigMock,
     rbRequest: async () => ({ review_requests: [] }),
+    remoteToGitHubRepoPath: () => "owner/repo",
     remoteToProjectPath: () => "group/project",
     listBundledReviewAgentNames: listBundledReviewAgentNamesMock,
     normalizeReviewAgentNames: normalizeReviewAgentNamesMock,
@@ -69,6 +72,7 @@ const { runInteractiveReviewSession } = await import("../packages/workflows/src/
 
 describe("review session agent selection", () => {
   beforeEach(() => {
+    listGitHubPullRequestsMock.mockClear();
     listMergeRequestsMock.mockClear();
     runInteractiveReviewWorkflowMock.mockClear();
   });
@@ -122,6 +126,45 @@ describe("review session agent selection", () => {
       action: "summary",
     });
     expect(listMergeRequestsMock).not.toHaveBeenCalled();
+  });
+
+  it("uses an explicit pull request URL without prompting for selection", async () => {
+    const session = runInteractiveReviewSession({
+      repoPath: ".",
+      repoRoot: ".",
+      mode: "interactive",
+      workflow: "summarize",
+      local: false,
+      state: "opened",
+      provider: "github",
+      url: "https://github.com/owner/repo/pull/42",
+    });
+
+    const result = await session.next();
+    expect(result.done).toBe(true);
+    expect(result.value).toMatchObject({
+      action: "summary",
+    });
+    expect(listGitHubPullRequestsMock).not.toHaveBeenCalled();
+  });
+
+  it("uses an explicit Review Board URL without prompting for selection", async () => {
+    const session = runInteractiveReviewSession({
+      repoPath: ".",
+      repoRoot: ".",
+      mode: "interactive",
+      workflow: "summarize",
+      local: false,
+      state: "opened",
+      provider: "reviewboard",
+      url: "https://reviews.example.com/r/42/",
+    });
+
+    const result = await session.next();
+    expect(result.done).toBe(true);
+    expect(result.value).toMatchObject({
+      action: "summary",
+    });
   });
 
   it("prompts for review agents in interactive review mode and passes them through", async () => {

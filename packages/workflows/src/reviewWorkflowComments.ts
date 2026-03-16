@@ -1,5 +1,11 @@
 import type { ReviewWorkflowResult } from "@cr/core";
-import { createGitLabClient, runWorkflow, type WorkflowMode } from "@cr/core";
+import {
+  addGitHubInlinePullRequestComment,
+  addGitHubPullRequestComment,
+  createGitLabClient,
+  runWorkflow,
+  type WorkflowMode,
+} from "@cr/core";
 
 export type PostReviewCommentResult = {
   summaryNoteId?: string;
@@ -92,6 +98,94 @@ export async function maybePostReviewComment(
     routes: {
       decidePostReview: (state) => (state.shouldPost ? "submitReviewToGitlab" : "end"),
       submitReviewToGitlab: "end",
+    },
+    start: "decidePostReview",
+    end: "end",
+  });
+
+  return finalState.posted;
+}
+
+type PostGitHubReviewGraphState = {
+  result: ReviewWorkflowResult;
+  mode: WorkflowMode;
+  enabled: boolean;
+  githubToken: string;
+  shouldPost: boolean;
+  posted: PostReviewCommentResult | null;
+};
+
+export async function maybePostGitHubReviewComment(
+  result: ReviewWorkflowResult,
+  mode: WorkflowMode,
+  enabled: boolean,
+  githubToken: string
+): Promise<PostReviewCommentResult | null> {
+  const finalState = await runWorkflow<PostGitHubReviewGraphState>({
+    initialState: {
+      result,
+      mode,
+      enabled,
+      githubToken,
+      shouldPost: false,
+      posted: null,
+    },
+    steps: {
+      decidePostReview: async (state) => {
+        if (
+          !state.enabled ||
+          !state.result.repoPath ||
+          !state.result.prNumber
+        ) {
+          return { shouldPost: false, posted: null };
+        }
+        return { shouldPost: state.enabled };
+      },
+      submitReviewToGitHub: async (state) => {
+        if (!state.shouldPost || !state.result.repoPath || !state.result.prNumber) {
+          return { posted: null };
+        }
+
+        const inlineNoteIds: string[] = [];
+        if (state.result.inlineComments.length > 0) {
+          for (const inline of state.result.inlineComments) {
+            const noteId = await addGitHubInlinePullRequestComment(
+              state.githubToken,
+              state.result.repoPath,
+              state.result.prNumber,
+              inline.comment,
+              inline.filePath,
+              inline.line,
+              inline.positionType === "old" ? "LEFT" : "RIGHT"
+            );
+            inlineNoteIds.push(noteId);
+          }
+        }
+
+        const summaryBody =
+          state.result.inlineComments.length > 0
+            ? [
+                "## Overall Review Summary",
+                "",
+                state.result.overallSummary?.trim() || state.result.output,
+                "",
+                "> **AI-Assisted Review:** Treat this as a first-pass analysis and confirm all findings manually.",
+              ].join("\n")
+            : state.result.output;
+
+        const summaryNoteId = await addGitHubPullRequestComment(
+          state.githubToken,
+          state.result.repoPath,
+          state.result.prNumber,
+          summaryBody
+        );
+
+        return { posted: { summaryNoteId, inlineNoteIds } };
+      },
+    },
+    routes: {
+      decidePostReview: (state) => (state.shouldPost ? "submitReviewToGitHub" : "end"),
+      submitReviewToGitHub: "end",
     },
     start: "decidePostReview",
     end: "end",

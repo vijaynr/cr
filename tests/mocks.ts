@@ -111,6 +111,7 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     defaultConfig: {},
     // bootstrap / setup
     initializeCRHome: mock(async () => {}),
+    setupRpi: mock(async () => []),
     setupSpecs: mock(async () => {}),
     repoRootFromModule: mock(() => "/mock/root"),
     CR_ASSETS_DIR: "/mock/.cr",
@@ -198,6 +199,7 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     reviewBoardToRequestId: mock(() => 0),
     // LLM helpers
     generateTextWithLlm: mock(async () => ""),
+    loadGitHubRepositoryGuidelines: mock(async () => undefined),
     loadLocalRepositoryGuidelines: mock(async () => undefined),
     loadGitLabRepositoryGuidelines: mock(async () => undefined),
     loadSvnRepositoryGuidelines: mock(async () => undefined),
@@ -216,6 +218,12 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     createSvnClient: mock(() => ({})),
     createReviewBoardClient: mock(() => ({})),
     createLlmClient: mock(() => ({})),
+    assert: mock((value: unknown, message: string) => {
+      if (!value) {
+        throw new Error(message);
+      }
+      return value;
+    }),
     // workflow utilities
     runWorkflow: mock(async () => ({})),
     runSequentialWorkflow: mock(async () => ({})),
@@ -253,6 +261,7 @@ export function makeWorkflowsMock(
     runInteractiveReviewBoardWorkflow: mock(async function* () {
       return {};
     }),
+    maybePostGitHubReviewComment: mock(async () => null),
     maybePostReviewBoardComment: mock(async () => null),
     runReviewChatWorkflow: mock(async () => ({
       contextLabel: "",

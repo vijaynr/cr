@@ -1,6 +1,7 @@
 import {
   envOrConfig,
   getOriginRemoteUrl,
+  listGitHubPullRequests,
   listBundledReviewAgentNames,
   listMergeRequests,
   loadCRConfig,
@@ -13,9 +14,11 @@ import {
   type ReviewSessionResponse,
   type ReviewSessionResult,
   type ReviewWorkflowInput,
+  reviewBoardToRequestId,
   getCurrentUser as rbGetCurrentUser,
   listReviewRequests as rbListRequests,
   rbRequest,
+  remoteToGitHubRepoPath,
   remoteToProjectPath,
 } from "@cr/core";
 import { runInteractiveReviewBoardWorkflow } from "./reviewBoardWorkflow.js";
@@ -25,6 +28,7 @@ import { runInteractiveReviewWorkflow } from "./reviewWorkflow.js";
 
 type ReviewSessionResponseInput = ReviewSessionResponse | undefined;
 const GITLAB_MR_URL_PATTERN = /\/-\/merge_requests\/(\d+)(?:[/?#]|$)/i;
+const GITHUB_PR_URL_PATTERN = /\/pull\/(\d+)(?:[/?#]|$)/i;
 
 function assertResponseType<T extends ReviewSessionResponse["type"]>(
   response: ReviewSessionResponseInput,
@@ -168,6 +172,49 @@ async function loadGitLabSelectionOptions(
   }));
 }
 
+function getGitHubPullRequestState(
+  inputState: MergeRequestState
+): { state: "open" | "closed" | "all"; requireMerged: boolean } {
+  switch (inputState) {
+    case "opened":
+      return { state: "open", requireMerged: false };
+    case "closed":
+      return { state: "closed", requireMerged: false };
+    case "merged":
+      return { state: "closed", requireMerged: true };
+    case "all":
+    default:
+      return { state: "all", requireMerged: false };
+  }
+}
+
+async function loadGitHubSelectionOptions(
+  input: ReviewWorkflowInput
+): Promise<ReviewSelectionOption[]> {
+  const config = await loadCRConfig();
+  const githubToken = envOrConfig("GITHUB_TOKEN", config.githubToken, "");
+  if (!githubToken) {
+    throw new Error("Missing GitHub configuration. Run `cr init --github` or set GITHUB_TOKEN.");
+  }
+
+  const repoUrl = input.url ?? (await getOriginRemoteUrl(input.repoPath));
+  const repoPath = remoteToGitHubRepoPath(repoUrl);
+  const stateFilter = getGitHubPullRequestState(input.state);
+  const pullRequests = await listGitHubPullRequests(githubToken, repoPath, stateFilter.state);
+  const filteredPullRequests = stateFilter.requireMerged
+    ? pullRequests.filter((pr) => Boolean(pr.merged_at || pr.merged))
+    : pullRequests;
+
+  if (filteredPullRequests.length === 0) {
+    throw new Error("No pull requests found.");
+  }
+
+  return filteredPullRequests.map((pr) => ({
+    title: `#${pr.number} [${pr.state}${pr.merged_at || pr.merged ? ", merged" : ""}] ${pr.title}`,
+    value: pr.number,
+  }));
+}
+
 function getReviewStartMessage(input: ReviewWorkflowInput): string | null {
   if (input.workflow === "summarize") {
     return null;
@@ -175,23 +222,39 @@ function getReviewStartMessage(input: ReviewWorkflowInput): string | null {
   if (input.workflow === "review") {
     return input.provider === "reviewboard"
       ? "Do you want to run the code review for this review request?"
-      : "Do you want to run the code review for this merge request?";
+      : input.provider === "github"
+        ? "Do you want to run the code review for this pull request?"
+        : "Do you want to run the code review for this merge request?";
   }
-  return "Do you want to ask questions about this merge request?";
+  return input.provider === "github"
+    ? "Do you want to ask questions about this pull request?"
+    : "Do you want to ask questions about this merge request?";
 }
 
-function tryParseMergeRequestIidFromUrl(url: string | undefined): number | null {
+function tryParseReviewTargetNumberFromUrl(
+  url: string | undefined,
+  provider: ReviewWorkflowInput["provider"]
+): number | null {
   if (!url) {
     return null;
   }
 
-  const match = url.match(GITLAB_MR_URL_PATTERN);
+  if (provider === "reviewboard") {
+    try {
+      return reviewBoardToRequestId(url);
+    } catch {
+      return null;
+    }
+  }
+
+  const pattern = provider === "github" ? GITHUB_PR_URL_PATTERN : GITLAB_MR_URL_PATTERN;
+  const match = url.match(pattern);
   if (!match) {
     return null;
   }
 
-  const mrIid = Number(match[1]);
-  return Number.isFinite(mrIid) ? mrIid : null;
+  const targetNumber = Number(match[1]);
+  return Number.isFinite(targetNumber) ? targetNumber : null;
 }
 
 export async function* runInteractiveReviewSession(
@@ -199,23 +262,33 @@ export async function* runInteractiveReviewSession(
 ): AsyncGenerator<ReviewSessionEffect, ReviewSessionResult, ReviewSessionResponseInput> {
   const resolvedInput: ReviewWorkflowInput = { ...input };
 
-  if (
-    resolvedInput.provider !== "reviewboard" &&
-    !(typeof resolvedInput.mrIid === "number" && Number.isFinite(resolvedInput.mrIid))
-  ) {
-    const explicitMrIid = tryParseMergeRequestIidFromUrl(resolvedInput.url);
-    if (explicitMrIid !== null) {
-      resolvedInput.mrIid = explicitMrIid;
+  if (!(typeof resolvedInput.mrIid === "number" && Number.isFinite(resolvedInput.mrIid))) {
+    const explicitTarget = tryParseReviewTargetNumberFromUrl(
+      resolvedInput.url,
+      resolvedInput.provider
+    );
+    if (explicitTarget !== null) {
+      if (resolvedInput.provider === "github") {
+        resolvedInput.prNumber = explicitTarget;
+      } else {
+        resolvedInput.mrIid = explicitTarget;
+      }
     }
   }
 
   if (!resolvedInput.local && resolvedInput.mode === "interactive") {
-    if (!(typeof resolvedInput.mrIid === "number" && Number.isFinite(resolvedInput.mrIid))) {
+    const hasSelectedTarget =
+      resolvedInput.provider === "github"
+        ? typeof resolvedInput.prNumber === "number" && Number.isFinite(resolvedInput.prNumber)
+        : typeof resolvedInput.mrIid === "number" && Number.isFinite(resolvedInput.mrIid);
+    if (!hasSelectedTarget) {
       const provider = resolvedInput.provider ?? "gitlab";
       const options =
         provider === "reviewboard"
           ? await loadReviewBoardSelectionOptions(resolvedInput)
-          : await loadGitLabSelectionOptions(resolvedInput);
+          : provider === "github"
+            ? await loadGitHubSelectionOptions(resolvedInput)
+            : await loadGitLabSelectionOptions(resolvedInput);
 
       const selection = assertResponseType(
         yield {
@@ -237,10 +310,16 @@ export async function* runInteractiveReviewSession(
           message:
             provider === "reviewboard"
               ? "Review request selection cancelled."
-              : "Merge request selection cancelled.",
+              : provider === "github"
+                ? "Pull request selection cancelled."
+                : "Merge request selection cancelled.",
         };
       }
-      resolvedInput.mrIid = selection.mrIid;
+      if (provider === "github") {
+        resolvedInput.prNumber = selection.mrIid;
+      } else {
+        resolvedInput.mrIid = selection.mrIid;
+      }
     }
   }
 
