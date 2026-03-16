@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,7 +6,8 @@ export const WEB_APP_SCRIPT_ROUTE = "/web/app.js";
 export const WEB_APP_DASHBOARD_ROUTE = "/api/web/dashboard";
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url));
-const appScriptPath = path.join(packageDir, "app.js");
+const appEntryPath = path.join(packageDir, "app.ts");
+let webAppScriptPromise: Promise<string> | null = null;
 
 export function getWebAppHtml(): string {
   return `<!doctype html>
@@ -41,5 +41,35 @@ export function getWebAppHtml(): string {
 }
 
 export async function readWebAppScript(): Promise<string> {
-  return fs.readFile(appScriptPath, "utf8");
+  if (!webAppScriptPromise) {
+    webAppScriptPromise = bundleWebAppScript();
+  }
+
+  return webAppScriptPromise;
+}
+
+async function bundleWebAppScript(): Promise<string> {
+  if (typeof Bun === "undefined") {
+    throw new Error("CR web bundling requires Bun runtime.");
+  }
+
+  const result = await Bun.build({
+    entrypoints: [appEntryPath],
+    target: "browser",
+    format: "esm",
+    minify: false,
+    splitting: false,
+  });
+
+  if (!result.success) {
+    const buildLog = result.logs.map((log: { message: string }) => log.message).join("\n");
+    throw new Error(`Failed to bundle CR web app.\n${buildLog}`);
+  }
+
+  const output = result.outputs[0];
+  if (!output) {
+    throw new Error("Failed to bundle CR web app: no output generated.");
+  }
+
+  return output.text();
 }
