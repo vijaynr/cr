@@ -12,6 +12,7 @@ export async function runServeCommand(args: string[]): Promise<void> {
       {
         title: "OPTIONS",
         lines: [
+          "--web                 Start the SPA web app for config and review request visibility",
           "--webhook             Start one webhook server for GitLab and Review Board events",
           "--port, -p <number>   Port to listen on (default: 3000)",
           "--ssl-cert <path>     Path to SSL certificate for HTTPS (optional)",
@@ -25,9 +26,13 @@ export async function runServeCommand(args: string[]): Promise<void> {
       {
         title: "EXAMPLES",
         lines: [
+          "cr serve --web",
+          "cr server --web --port 4173",
+          "cr serve --web --webhook",
           "cr serve --webhook",
           "cr serve --webhook --concurrency 5 --timeout 300000",
           "cr serve --webhook --port 8443 --ssl-cert ./cert.crt --ssl-key ./cert.key --ssl-ca ./ca.crt",
+          "Web app:                 http://host:3000/",
           "GitLab webhook URL:      https://host:3000/gitlab",
           "Review Board webhook URL: https://host:3000/reviewboard",
           "Review Board: configure only the review_request_published webhook event.",
@@ -39,6 +44,7 @@ export async function runServeCommand(args: string[]): Promise<void> {
   }
 
   const isWebhook = hasFlag(args, "webhook");
+  const isWeb = hasFlag(args, "web");
   const port = Number(getFlag(args, "port", "3000", "-p"));
   const sslCertPath = getFlag(args, "ssl-cert", "");
   const sslKeyPath = getFlag(args, "ssl-key", "");
@@ -48,14 +54,17 @@ export async function runServeCommand(args: string[]): Promise<void> {
   const queueLimit = getFlag(args, "queue-limit", "");
   const timeoutMs = getFlag(args, "timeout", "");
 
-  if (!isWebhook) {
-    printError("The 'cr serve' command currently requires the --webhook flag.");
+  if (!isWebhook && !isWeb) {
+    printError("The 'cr serve' command requires at least one mode: --web or --webhook.");
     process.exitCode = 1;
     return;
   }
 
   try {
     await startWebhookServer(port, {
+      enableWeb: isWeb,
+      enableWebhook: isWebhook,
+      repoPath: process.cwd(),
       sslCertPath,
       sslKeyPath,
       sslCaPath,

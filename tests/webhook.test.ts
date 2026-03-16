@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { createHmac } from "node:crypto";
+import { createServer } from "node:net";
+import type { AddressInfo } from "node:net";
 import { startWebhookServer } from "../packages/webhook/src/server.js";
 import { makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
 
@@ -36,6 +38,58 @@ const runReviewBoardWorkflowMock = mock(async (input: unknown) => ({
 }));
 
 const maybePostReviewBoardCommentMock = mock(async () => null);
+const loadDashboardDataMock = mock(async () => ({
+  generatedAt: "2025-01-01T00:00:00.000Z",
+  repository: {
+    cwd: "/mock/repo",
+    remoteUrl: "https://gitlab.example.com/group/project.git",
+  },
+  config: {
+    openai: {
+      configured: true,
+      apiUrl: "https://api.example.com/v1",
+      model: "gpt-4o",
+    },
+    gitlab: {
+      configured: true,
+      url: "https://gitlab.example.com",
+    },
+    github: {
+      configured: true,
+      url: "https://github.com",
+    },
+    reviewboard: {
+      configured: true,
+      url: "https://reviews.example.com",
+    },
+    webhook: {
+      sslEnabled: false,
+      concurrency: 1,
+      queueLimit: 50,
+      jobTimeoutMs: 600000,
+    },
+    defaultReviewAgents: ["general", "security"],
+  },
+  providers: {
+    gitlab: {
+      provider: "gitlab",
+      configured: true,
+      repository: "group/project",
+      items: [],
+    },
+    github: {
+      provider: "github",
+      configured: true,
+      repository: "owner/repo",
+      items: [],
+    },
+    reviewboard: {
+      provider: "reviewboard",
+      configured: true,
+      items: [{ provider: "reviewboard", id: 42, title: "Demo review", url: "https://reviews.example.com/r/42/", state: "pending" }],
+    },
+  },
+}));
 
 mock.module("@cr/workflows", () =>
   makeWorkflowsMock({
@@ -59,6 +113,7 @@ mock.module("@cr/core", () =>
       getFileDiffs: async () => [],
       getRawDiff: async () => "",
     }),
+    loadDashboardData: loadDashboardDataMock,
     logger: {
       info: () => {},
       success: () => {},
@@ -84,6 +139,7 @@ afterEach(() => {
   runReviewWorkflowMock.mockClear();
   runReviewBoardWorkflowMock.mockClear();
   maybePostReviewBoardCommentMock.mockClear();
+  loadDashboardDataMock.mockClear();
 });
 
 function buildReviewBoardHeaders(body: string, extraHeaders: Record<string, string> = {}) {
@@ -98,11 +154,38 @@ function buildReviewBoardHeaders(body: string, extraHeaders: Record<string, stri
   };
 }
 
+async function findAvailablePort(): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, () => {
+      const address = probe.address() as AddressInfo | null;
+      const port = address?.port;
+      probe.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        if (!port) {
+          reject(new Error("Could not determine an available port."));
+          return;
+        }
+        resolve(port);
+      });
+    });
+  });
+}
+
+async function startTestServer(options?: Parameters<typeof startWebhookServer>[1]) {
+  const port = await findAvailablePort();
+  const server = await startWebhookServer(port, options);
+  servers.push(server);
+  return { server, port };
+}
+
 describe("Webhook Server", () => {
   it("should respond correctly to a valid GitLab merge request event", async () => {
-    const port = 3001;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const payload = {
       object_kind: "merge_request",
@@ -132,9 +215,7 @@ describe("Webhook Server", () => {
   });
 
   it("should ignore non-merge-request events", async () => {
-    const port = 3002;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const response = await fetch(`http://localhost:${port}/gitlab`, {
       method: "POST",
@@ -150,9 +231,7 @@ describe("Webhook Server", () => {
   });
 
   it("should accept a signed Review Board review_request_published event without requesting inline comments", async () => {
-    const port = 3003;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const body = JSON.stringify({
       event: "review_request_published",
@@ -189,9 +268,7 @@ describe("Webhook Server", () => {
   });
 
   it("should reject Review Board events with an invalid signature", async () => {
-    const port = 3004;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const body = JSON.stringify({
       event: "review_request_published",
@@ -217,9 +294,7 @@ describe("Webhook Server", () => {
   });
 
   it("should reject Review Board events when the signature is missing", async () => {
-    const port = 3005;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const body = JSON.stringify({
       event: "review_request_published",
@@ -244,9 +319,7 @@ describe("Webhook Server", () => {
   });
 
   it("should ignore signed Review Board review_published events to avoid loops", async () => {
-    const port = 3006;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const body = JSON.stringify({
       event: "review_published",
@@ -270,9 +343,7 @@ describe("Webhook Server", () => {
   });
 
   it("should parse signed form-encoded Review Board events without a payload wrapper", async () => {
-    const port = 3007;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const formBody = new URLSearchParams({
       event: "review_request_published",
@@ -294,10 +365,8 @@ describe("Webhook Server", () => {
   });
 
   it("should reject only the workflow whose config is missing", async () => {
-    const port = 3008;
     runtime.rbToken = "";
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const reviewBoardResponse = await fetch(`http://localhost:${port}/reviewboard`, {
       method: "POST",
@@ -334,9 +403,7 @@ describe("Webhook Server", () => {
   });
 
   it("should return 405 for non-POST provider requests", async () => {
-    const port = 3009;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const response = await fetch(`http://localhost:${port}/gitlab`, {
       method: "GET",
@@ -346,9 +413,7 @@ describe("Webhook Server", () => {
   });
 
   it("should return status for the unified server", async () => {
-    const port = 3010;
-    const server = await startWebhookServer(port);
-    servers.push(server);
+    const { port } = await startTestServer();
 
     const response = await fetch(`http://localhost:${port}/status`, {
       method: "GET",
@@ -358,5 +423,32 @@ describe("Webhook Server", () => {
     const json = await response.json();
     expect(json.routes.gitlab).toBe("/gitlab");
     expect(json.routes.reviewboard).toBe("/reviewboard");
+  });
+
+  it("should serve the web dashboard shell and data when web mode is enabled", async () => {
+    const { port } = await startTestServer({ enableWeb: true, enableWebhook: false });
+
+    const [htmlResponse, dataResponse, scriptResponse] = await Promise.all([
+      fetch(`http://localhost:${port}/`, { method: "GET" }),
+      fetch(`http://localhost:${port}/api/web/dashboard`, { method: "GET" }),
+      fetch(`http://localhost:${port}/web/app.js`, { method: "GET" }),
+    ]);
+
+    expect(htmlResponse.status).toBe(200);
+    expect(await htmlResponse.text()).toContain("<cr-dashboard-app>");
+
+    expect(dataResponse.status).toBe(200);
+    expect(await dataResponse.json()).toMatchObject({
+      repository: { cwd: "/mock/repo" },
+      providers: {
+        reviewboard: {
+          items: [{ id: 42, title: "Demo review" }],
+        },
+      },
+    });
+
+    expect(scriptResponse.status).toBe(200);
+    expect(await scriptResponse.text()).toContain('customElements.define("cr-dashboard-app"');
+    expect(loadDashboardDataMock).toHaveBeenCalledTimes(1);
   });
 });

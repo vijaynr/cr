@@ -109,6 +109,23 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     envOrConfig: (_key: string, value: string | undefined, fallback: string) => value ?? fallback,
     CR_CONF_PATH: "/mock/.cr.conf",
     defaultConfig: {},
+    loadDashboardData: mock(async () => ({
+      generatedAt: "2025-01-01T00:00:00.000Z",
+      repository: { cwd: "/mock/repo" },
+      config: {
+        openai: { configured: false },
+        gitlab: { configured: false },
+        github: { configured: false, url: "https://github.com" },
+        reviewboard: { configured: false },
+        webhook: { sslEnabled: false, concurrency: 3, queueLimit: 50, jobTimeoutMs: 600000 },
+        defaultReviewAgents: ["general"],
+      },
+      providers: {
+        gitlab: { provider: "gitlab", configured: false, items: [] },
+        github: { provider: "github", configured: false, items: [] },
+        reviewboard: { provider: "reviewboard", configured: false, items: [] },
+      },
+    })),
     // bootstrap / setup
     initializeCRHome: mock(async () => {}),
     setupRpi: mock(async () => []),

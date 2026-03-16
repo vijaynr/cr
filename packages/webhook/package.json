@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@cr/core": "workspace:*",
+    "@cr/web": "workspace:*",
     "@cr/workflows": "workspace:*"
   }
 }

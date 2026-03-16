@@ -6,7 +6,13 @@ import {
   type ServerResponse,
 } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
-import { envOrConfig, loadWorkflowRuntime, logger } from "@cr/core";
+import { envOrConfig, loadDashboardData, loadWorkflowRuntime, logger } from "@cr/core";
+import {
+  getWebAppHtml,
+  readWebAppScript,
+  WEB_APP_DASHBOARD_ROUTE,
+  WEB_APP_SCRIPT_ROUTE,
+} from "@cr/web";
 import { WorkQueue } from "./workQueue.js";
 
 type GitLabWebhookEvent = {
@@ -151,6 +157,9 @@ function verifyReviewBoardSignature(req: IncomingMessage, body: string, secret: 
 export async function startWebhookServer(
   port = 3000,
   options?: {
+    enableWeb?: boolean;
+    enableWebhook?: boolean;
+    repoPath?: string;
     sslCertPath?: string;
     sslKeyPath?: string;
     sslCaPath?: string;
@@ -160,6 +169,9 @@ export async function startWebhookServer(
   }
 ) {
   const runtime = await loadWorkflowRuntime();
+  const enableWeb = options?.enableWeb ?? false;
+  const enableWebhook = options?.enableWebhook ?? true;
+  const repoPath = options?.repoPath ?? process.cwd();
 
   if (options?.webhookConcurrency) runtime.webhookConcurrency = options.webhookConcurrency;
   if (options?.webhookQueueLimit) runtime.webhookQueueLimit = options.webhookQueueLimit;
@@ -177,11 +189,20 @@ export async function startWebhookServer(
   const sslCertPath = options?.sslCertPath || envOrConfig("SSL_CERT_PATH", runtime.sslCertPath, "");
   const sslKeyPath = options?.sslKeyPath || envOrConfig("SSL_KEY_PATH", runtime.sslKeyPath, "");
   const sslCaPath = options?.sslCaPath || envOrConfig("SSL_CA_PATH", runtime.sslCaPath, "");
+  const webAppHtml = enableWeb ? getWebAppHtml() : "";
+  const webAppScript = enableWeb ? await readWebAppScript() : "";
 
   const workQueue = new WorkQueue(runtime);
 
+  function isWebhookPath(pathname: string): boolean {
+    return pathname === GITLAB_WEBHOOK_PATH || pathname === REVIEW_BOARD_WEBHOOK_PATH;
+  }
+
   function resolveProvider(url: string | undefined): WebhookProvider | null {
     const pathname = new URL(url ?? "/", "http://localhost").pathname;
+    if (!enableWebhook) {
+      return null;
+    }
     if (pathname === GITLAB_WEBHOOK_PATH) {
       return "gitlab";
     }
@@ -212,16 +233,66 @@ export async function startWebhookServer(
         JSON.stringify({
           ...workQueue.getStatus(),
           routes: {
-            gitlab: GITLAB_WEBHOOK_PATH,
-            reviewboard: REVIEW_BOARD_WEBHOOK_PATH,
+            ...(enableWebhook
+              ? {
+                  gitlab: GITLAB_WEBHOOK_PATH,
+                  reviewboard: REVIEW_BOARD_WEBHOOK_PATH,
+                }
+              : {}),
+            ...(enableWeb
+              ? {
+                  web: "/",
+                  dashboard: WEB_APP_DASHBOARD_ROUTE,
+                }
+              : {}),
           },
         })
       );
       return;
     }
 
+    if (enableWeb && pathname === WEB_APP_DASHBOARD_ROUTE && req.method === "GET") {
+      try {
+        const dashboard = await loadDashboardData({ repoPath });
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(JSON.stringify(dashboard));
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            status: "error",
+            message: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
+      return;
+    }
+
+    if (enableWeb && pathname === WEB_APP_SCRIPT_ROUTE && req.method === "GET") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(webAppScript);
+      return;
+    }
+
     const provider = resolveProvider(req.url);
+    if (!provider && isWebhookPath(pathname) && !enableWebhook) {
+      res.statusCode = 404;
+      res.end("Not Found");
+      return;
+    }
     if (!provider) {
+      if (enableWeb && req.method === "GET") {
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Cache-Control", "no-store");
+        res.end(webAppHtml);
+        return;
+      }
       res.statusCode = 404;
       res.end("Not Found");
       return;
@@ -385,11 +456,17 @@ export async function startWebhookServer(
   }
 
   server.listen(port, () => {
-    logger.info("webhook", `Webhook server listening on port ${port} (${protocol})`);
+    logger.info("webhook", `Server listening on port ${port} (${protocol})`);
     console.log(`[WEBHOOK] Server listening on port ${port} (${protocol})`);
     console.log(`[WEBHOOK] Endpoints:`);
-    console.log(`[WEBHOOK]   POST ${protocol}://localhost:${port}${GITLAB_WEBHOOK_PATH}`);
-    console.log(`[WEBHOOK]   POST ${protocol}://localhost:${port}${REVIEW_BOARD_WEBHOOK_PATH}`);
+    if (enableWeb) {
+      console.log(`[WEBHOOK]   GET  ${protocol}://localhost:${port}/`);
+      console.log(`[WEBHOOK]   GET  ${protocol}://localhost:${port}${WEB_APP_DASHBOARD_ROUTE}`);
+    }
+    if (enableWebhook) {
+      console.log(`[WEBHOOK]   POST ${protocol}://localhost:${port}${GITLAB_WEBHOOK_PATH}`);
+      console.log(`[WEBHOOK]   POST ${protocol}://localhost:${port}${REVIEW_BOARD_WEBHOOK_PATH}`);
+    }
     console.log(`[WEBHOOK]   GET  ${protocol}://localhost:${port}${STATUS_PATH}`);
   });
 

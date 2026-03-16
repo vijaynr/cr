@@ -4,6 +4,7 @@ export { assert } from "./assertions.js";
 export { initializeCRHome } from "./bootstrap.js";
 // Configuration exports
 export { envOrConfig, loadCRConfig, readCRConfigContents, saveCRConfig } from "./config.js";
+export { loadDashboardData } from "./dashboard.js";
 export { type FormattedError, formatKnownNetworkError } from "./errors.js";
 // Git exports
 export {

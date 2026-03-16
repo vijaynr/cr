@@ -41,6 +41,14 @@ export type {
   WorkflowPhaseMap,
   WorkflowUiEvent,
 } from "./types/workflows.js";
+export type {
+  DashboardConfigSummary,
+  DashboardData,
+  DashboardProviderData,
+  DashboardProviderName,
+  DashboardRepositorySummary,
+  DashboardReviewRequest,
+} from "./types/web.js";
 // utils
 export * from "./utils/index.js";
 // explicit utils re-exports for Bun's static named export resolution
@@ -87,6 +95,7 @@ export {
   isSvnWorkingCopy,
   listBranches,
   listBundledReviewAgentNames,
+  loadDashboardData,
   listGitHubBranches,
   listGitHubPullRequests,
   listMergeRequests,

@@ -50,6 +50,7 @@ export async function runCommand(args: string[]): Promise<void> {
       }
       return;
     case "serve":
+    case "server":
       {
         const { runServeCommand } = await import("./serveCommand.js");
         await runServeCommand(filteredRest);

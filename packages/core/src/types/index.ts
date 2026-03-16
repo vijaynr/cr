@@ -41,3 +41,11 @@ export type {
   ReviewWorkflowResult,
   WorkflowMode,
 } from "./workflows.js";
+export type {
+  DashboardConfigSummary,
+  DashboardData,
+  DashboardProviderData,
+  DashboardProviderName,
+  DashboardRepositorySummary,
+  DashboardReviewRequest,
+} from "./web.js";
