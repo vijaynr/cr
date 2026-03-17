@@ -32,7 +32,7 @@ Package-specific `AGENTS.md` files exist in `packages/cli`, `packages/core`, `pa
 - `bun run create-review -- [flags]`: Generate or update a GitLab merge request draft or Review Board review request from local changes.
 - `bun run create-mr`: Run create MR workflow.
 - `bun run dev -- config [--edit]`: Print the saved config or open it in `$CR_EDITOR` / `$VISUAL` / `$EDITOR`.
-- `bun run dev -- serve --webhook [flags]`: Start the unified server with webhook endpoints enabled.
+- `bun run dev -- serve [flags]`: Start the unified server for the web app, APIs, and webhook endpoints.
 - `bun run test`: Run the Bun test suite in `tests/`.
 - `bun run typecheck`: Run TypeScript typecheck (primary correctness guardrail).
 - `bun run lint`: Run Biome lint across `packages/` and `tests/`.

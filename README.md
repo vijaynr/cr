@@ -198,7 +198,7 @@ Build the image:
 docker build -t cr-server .
 ```
 
-The image starts the unified server by default via `cr serve --webhook`.
+The image starts the unified server by default via `cr serve`.
 
 Run with Docker Compose:
 
@@ -268,11 +268,13 @@ GITHUB_TOKEN=your-github-token
 OPENAI_API_KEY=your-openai-key
 ```
 
-The container runs `cr serve --webhook`, exposing:
+The container runs `cr serve`, exposing:
 
-- `POST /gitlab` for GitLab webhook events
+- `GET /` and `GET /web` for the Lit web app shell
+- `GET /api/dashboard` for the web app dashboard API
+- `POST /webhook/gitlab` for GitLab webhook events
 - `POST /github` for GitHub webhook events (future enhancement)
-- `POST /reviewboard`
+- `POST /webhook/reviewboard`
 - `GET /status`
 
 ### Local Review Board Test Stack

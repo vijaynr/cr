@@ -1,8 +1,12 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
     "outDir": "dist"
   },
+  "references": [
+    { "path": "../core" },
+    { "path": "../workflows" },
+    { "path": "../tui" }
+  ],
   "include": ["src"]
 }

@@ -21,7 +21,7 @@ export class WorkQueue {
     mrIid: number
   ): string | null {
     if (this.queue.length >= this.runtime.webhookQueueLimit) {
-      logger.error("webhook", "Queue at capacity, rejecting job", {
+      logger.error("server", "Queue at capacity, rejecting job", {
         queueSize: this.queue.length,
         maxSize: this.runtime.webhookQueueLimit,
         provider,
@@ -126,12 +126,12 @@ export class WorkQueue {
 
       job.status = "completed";
       console.log(`[WORKER] Job ${job.id} completed successfully.`);
-      logger.success("webhook", `Job ${job.id} completed`);
+      logger.success("server", `Job ${job.id} completed`);
     } catch (err) {
       job.status = "failed";
       job.error = err instanceof Error ? err.message : String(err);
       console.error(`[WORKER] Job ${job.id} failed:`, job.error);
-      logger.error("webhook", `Job ${job.id} failed`, err);
+      logger.error("server", `Job ${job.id} failed`, err);
     } finally {
       job.completedAt = new Date();
       this.processing.delete(job.id);

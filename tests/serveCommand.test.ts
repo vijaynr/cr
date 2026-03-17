@@ -31,23 +31,25 @@ describe("serveCommand help", () => {
     const examples =
       sections.find((section) => section.title === "EXAMPLES")?.lines.join("\n") ?? "";
 
-    expect(options).toContain("Enable webhook endpoints");
-    expect(options).toContain("--web");
-    expect(examples).toContain("/gitlab");
-    expect(examples).toContain("/reviewboard");
+    expect(options).not.toContain("--web");
+    expect(options).not.toContain("--webhook");
+    expect(examples).toContain("cr serve");
+    expect(examples).toContain("/webhook/gitlab");
+    expect(examples).toContain("/webhook/reviewboard");
+    expect(examples).toContain("http://host:3000/web");
     expect(examples).toContain("http://host:3000/");
     expect(examples).toContain("review_request_published");
     expect(examples).toContain("HMAC secret");
   });
 
-  it("starts the server in web mode without requiring webhooks", async () => {
-    await runServeCommand(["--web", "--port", "4173"]);
+  it("starts the full server stack by default", async () => {
+    await runServeCommand([]);
 
     expect(startServerMock).toHaveBeenCalledTimes(1);
-    expect(startServerMock.mock.calls[0]?.[0]).toBe(4173);
+    expect(startServerMock.mock.calls[0]?.[0]).toBe(3000);
     expect(startServerMock.mock.calls[0]?.[1]).toMatchObject({
       enableWeb: true,
-      enableWebhook: false,
+      enableWebhook: true,
       repoPath: process.cwd(),
     });
   });

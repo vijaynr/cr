@@ -1,10 +1,14 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "composite": true,
     "outDir": "dist",
     "paths": {
       "@cr/core": ["../core/src/index.ts"]
     }
   },
+  "references": [
+    { "path": "../core" }
+  ],
   "include": ["src/**/*"]
 }

@@ -1,9 +1,15 @@
+import { Hono, type Context } from "hono";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const WEB_APP_ROUTE = "/";
+export const WEB_APP_ROOT_ROUTE = "/";
+export const WEB_APP_ALT_ROUTE = "/web";
 export const WEB_APP_SCRIPT_ROUTE = "/web/app.js";
-export const WEB_APP_DASHBOARD_ROUTE = "/api/web/dashboard";
+export const WEB_APP_DASHBOARD_ROUTE = "/api/dashboard";
+
+export type WebRoutesOptions = {
+  loadDashboard: () => Promise<unknown>;
+};
 
 const packageDir = path.dirname(fileURLToPath(import.meta.url));
 const appEntryPath = path.join(packageDir, "app.ts");
@@ -72,4 +78,50 @@ async function bundleWebAppScript(): Promise<string> {
   }
 
   return output.text();
+}
+
+export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> {
+  const app = new Hono();
+  const webAppHtml = getWebAppHtml();
+  const webAppScript = await readWebAppScript();
+
+  app.get(WEB_APP_DASHBOARD_ROUTE, async () => {
+    try {
+      const dashboard = await options.loadDashboard();
+      return Response.json(dashboard, {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      });
+    } catch (error) {
+      return Response.json(
+        {
+          status: "error",
+          message: error instanceof Error ? error.message : String(error),
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+  });
+
+  app.get(WEB_APP_SCRIPT_ROUTE, () => {
+    return new Response(webAppScript, {
+      headers: {
+        "Content-Type": "application/javascript; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  });
+
+  const renderHtml = (c: Context) =>
+    c.html(webAppHtml, 200, {
+      "Cache-Control": "no-store",
+    });
+
+  app.get(WEB_APP_ROOT_ROUTE, renderHtml);
+  app.get(WEB_APP_ALT_ROUTE, renderHtml);
+
+  return app;
 }

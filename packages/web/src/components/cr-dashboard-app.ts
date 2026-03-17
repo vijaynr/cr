@@ -73,7 +73,7 @@ export class CrDashboardApp extends LitElement {
     this.error = "";
 
     try {
-      const response = await fetch("/api/web/dashboard");
+      const response = await fetch("/api/dashboard");
       if (!response.ok) {
         throw new Error(`Dashboard request failed with status ${response.status}`);
       }

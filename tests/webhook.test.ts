@@ -207,7 +207,7 @@ describe("Webhook Server", () => {
       },
     };
 
-    const response = await fetch(`http://localhost:${port}/gitlab`, {
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -225,7 +225,7 @@ describe("Webhook Server", () => {
   it("should ignore non-merge-request events", async () => {
     const { port } = await startTestServer();
 
-    const response = await fetch(`http://localhost:${port}/gitlab`, {
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -251,7 +251,7 @@ describe("Webhook Server", () => {
       },
     });
 
-    const response = await fetch(`http://localhost:${port}/reviewboard`, {
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: buildReviewBoardHeaders(body),
       body,
@@ -288,7 +288,7 @@ describe("Webhook Server", () => {
       },
     });
 
-    const response = await fetch(`http://localhost:${port}/reviewboard`, {
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -314,7 +314,7 @@ describe("Webhook Server", () => {
       },
     });
 
-    const response = await fetch(`http://localhost:${port}/reviewboard`, {
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -339,7 +339,7 @@ describe("Webhook Server", () => {
       },
     });
 
-    const response = await fetch(`http://localhost:${port}/reviewboard`, {
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: buildReviewBoardHeaders(body),
       body,
@@ -359,7 +359,7 @@ describe("Webhook Server", () => {
       "review_request.repository.name": "demo-repo",
     }).toString();
 
-    const response = await fetch(`http://localhost:${port}/reviewboard`, {
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: buildReviewBoardHeaders(formBody, {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -376,7 +376,7 @@ describe("Webhook Server", () => {
     runtime.rbToken = "";
     const { port } = await startTestServer();
 
-    const reviewBoardResponse = await fetch(`http://localhost:${port}/reviewboard`, {
+    const reviewBoardResponse = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
       method: "POST",
       headers: buildReviewBoardHeaders(
         JSON.stringify({
@@ -390,7 +390,7 @@ describe("Webhook Server", () => {
       }),
     });
 
-    const gitlabResponse = await fetch(`http://localhost:${port}/gitlab`, {
+    const gitlabResponse = await fetch(`http://localhost:${port}/webhook/gitlab`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -413,7 +413,7 @@ describe("Webhook Server", () => {
   it("should return 405 for non-POST provider requests", async () => {
     const { port } = await startTestServer();
 
-    const response = await fetch(`http://localhost:${port}/gitlab`, {
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
       method: "GET",
     });
 
@@ -429,21 +429,24 @@ describe("Webhook Server", () => {
 
     expect(response.status).toBe(200);
     const json = await response.json();
-    expect(json.routes.gitlab).toBe("/gitlab");
-    expect(json.routes.reviewboard).toBe("/reviewboard");
+    expect(json.routes.gitlab).toBe("/webhook/gitlab");
+    expect(json.routes.reviewboard).toBe("/webhook/reviewboard");
   });
 
   it("should serve the web dashboard shell and data when web mode is enabled", async () => {
     const { port } = await startTestServer({ enableWeb: true, enableWebhook: false });
 
-    const [htmlResponse, dataResponse, scriptResponse] = await Promise.all([
+    const [htmlResponse, dataResponse, scriptResponse, altHtmlResponse] = await Promise.all([
       fetch(`http://localhost:${port}/`, { method: "GET" }),
-      fetch(`http://localhost:${port}/api/web/dashboard`, { method: "GET" }),
+      fetch(`http://localhost:${port}/api/dashboard`, { method: "GET" }),
       fetch(`http://localhost:${port}/web/app.js`, { method: "GET" }),
+      fetch(`http://localhost:${port}/web`, { method: "GET" }),
     ]);
 
     expect(htmlResponse.status).toBe(200);
     expect(await htmlResponse.text()).toContain("<cr-dashboard-app>");
+    expect(altHtmlResponse.status).toBe(200);
+    expect(await altHtmlResponse.text()).toContain("<cr-dashboard-app>");
 
     expect(dataResponse.status).toBe(200);
     expect(await dataResponse.json()).toMatchObject({

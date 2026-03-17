@@ -254,10 +254,7 @@ Use the same feature name or folder across commands so they reference the same \
         printDivider();
       }
 
-      ui.setResult(
-        "Workflow: SDD Setup",
-        `Target: ${target}\nPath: ${targetPath}`
-      );
+      ui.setResult("Workflow: SDD Setup", `Target: ${target}\nPath: ${targetPath}`);
     }
   );
 }
@@ -310,10 +307,7 @@ Use the same topic name or folder across commands so they reference the same \`.
         printDivider();
       }
 
-      ui.setResult(
-        "Workflow: RPI Setup",
-        `Target: ${target}\nPath: ${targetPath}`
-      );
+      ui.setResult("Workflow: RPI Setup", `Target: ${target}\nPath: ${targetPath}`);
     }
   );
 }
@@ -329,89 +323,89 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
 
       printEmptyLine();
       printInfo(
-        "This sets up one shared server for both providers. Use /gitlab for GitLab and /reviewboard for Review Board."
+        "This sets up one shared server for both providers. Use /webhook/gitlab for GitLab and /webhook/reviewboard for Review Board."
       );
       printWarning(
         "Review Board webhook support is summary-only today. Configure only the review_request_published event and use the same HMAC secret in Review Board and CR."
       );
 
       const prompts: Parameters<typeof promptWithFrame>[0] = [
-    {
-      type: "text",
-      name: "gitlabUrl",
-      message: "GitLab URL",
-      initial: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
-    },
-    {
-      type: "password",
-      name: "gitlabKey",
-      message: "GitLab Access Token (api scope)",
-      initial: existing.gitlabKey ?? "",
-    },
-    {
-      type: "password",
-      name: "gitlabWebhookSecret",
-      message: "GitLab Webhook Secret (X-Gitlab-Token)",
-      initial: existing.gitlabWebhookSecret ?? "",
-    },
-    {
-      type: "text",
-      name: "rbUrl",
-      message: "Review Board URL",
-      initial: existing.rbUrl ?? defaultConfig.rbUrl,
-    },
-    {
-      type: "password",
-      name: "rbToken",
-      message: "Review Board API Token",
-      initial: existing.rbToken ?? "",
-    },
-    {
-      type: "password",
-      name: "rbWebhookSecret",
-      message: "Review Board Webhook Secret (HMAC signing secret)",
-      initial: existing.rbWebhookSecret ?? "",
-    },
-  ];
+        {
+          type: "text",
+          name: "gitlabUrl",
+          message: "GitLab URL",
+          initial: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
+        },
+        {
+          type: "password",
+          name: "gitlabKey",
+          message: "GitLab Access Token (api scope)",
+          initial: existing.gitlabKey ?? "",
+        },
+        {
+          type: "password",
+          name: "gitlabWebhookSecret",
+          message: "GitLab Webhook Secret (X-Gitlab-Token)",
+          initial: existing.gitlabWebhookSecret ?? "",
+        },
+        {
+          type: "text",
+          name: "rbUrl",
+          message: "Review Board URL",
+          initial: existing.rbUrl ?? defaultConfig.rbUrl,
+        },
+        {
+          type: "password",
+          name: "rbToken",
+          message: "Review Board API Token",
+          initial: existing.rbToken ?? "",
+        },
+        {
+          type: "password",
+          name: "rbWebhookSecret",
+          message: "Review Board Webhook Secret (HMAC signing secret)",
+          initial: existing.rbWebhookSecret ?? "",
+        },
+      ];
 
       prompts.push(
-    {
-      type: "text",
-      name: "sslCertPath",
-      message: "SSL Certificate Path (for cr serve)",
-      initial: existing.sslCertPath ?? "",
-    },
-    {
-      type: "text",
-      name: "sslKeyPath",
-      message: "SSL Private Key Path (for cr serve)",
-      initial: existing.sslKeyPath ?? "",
-    },
-    {
-      type: "text",
-      name: "sslCaPath",
-      message: "SSL CA Bundle Path (optional)",
-      initial: existing.sslCaPath ?? "",
-    },
-    {
-      type: "number",
-      name: "webhookConcurrency",
-      message: "Max concurrent review jobs",
-      initial: existing.webhookConcurrency ?? 3,
-    },
-    {
-      type: "number",
-      name: "webhookQueueLimit",
-      message: "Max jobs in queue",
-      initial: existing.webhookQueueLimit ?? 50,
-    },
-    {
-      type: "number",
-      name: "webhookJobTimeoutMs",
-      message: "Review job timeout (ms)",
-      initial: existing.webhookJobTimeoutMs ?? 600000,
-    }
-  );
+        {
+          type: "text",
+          name: "sslCertPath",
+          message: "SSL Certificate Path (for cr serve)",
+          initial: existing.sslCertPath ?? "",
+        },
+        {
+          type: "text",
+          name: "sslKeyPath",
+          message: "SSL Private Key Path (for cr serve)",
+          initial: existing.sslKeyPath ?? "",
+        },
+        {
+          type: "text",
+          name: "sslCaPath",
+          message: "SSL CA Bundle Path (optional)",
+          initial: existing.sslCaPath ?? "",
+        },
+        {
+          type: "number",
+          name: "webhookConcurrency",
+          message: "Max concurrent review jobs",
+          initial: existing.webhookConcurrency ?? 3,
+        },
+        {
+          type: "number",
+          name: "webhookQueueLimit",
+          message: "Max jobs in queue",
+          initial: existing.webhookQueueLimit ?? 50,
+        },
+        {
+          type: "number",
+          name: "webhookJobTimeoutMs",
+          message: "Review job timeout (ms)",
+          initial: existing.webhookJobTimeoutMs ?? 600000,
+        }
+      );
 
       const answers = (await promptWithFrame(prompts, {
         onCancel: () => true,
@@ -424,24 +418,24 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
       }
 
       const nextConfig: CRConfig = {
-    ...existing,
-    openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
-    openaiApiKey: existing.openaiApiKey ?? "",
-    openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-    useCustomStreaming: existing.useCustomStreaming ?? false,
-    gitlabUrl: answers.gitlabUrl || existing.gitlabUrl || defaultConfig.gitlabUrl,
-    gitlabKey: answers.gitlabKey || existing.gitlabKey || "",
-    gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
-    rbUrl: answers.rbUrl || undefined,
-    rbToken: answers.rbToken || undefined,
-    rbWebhookSecret: answers.rbWebhookSecret || undefined,
-    sslCertPath: answers.sslCertPath || undefined,
-    sslKeyPath: answers.sslKeyPath || undefined,
-    sslCaPath: answers.sslCaPath || undefined,
-    webhookConcurrency: answers.webhookConcurrency,
-    webhookQueueLimit: answers.webhookQueueLimit,
-    webhookJobTimeoutMs: answers.webhookJobTimeoutMs,
-  };
+        ...existing,
+        openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
+        openaiApiKey: existing.openaiApiKey ?? "",
+        openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
+        useCustomStreaming: existing.useCustomStreaming ?? false,
+        gitlabUrl: answers.gitlabUrl || existing.gitlabUrl || defaultConfig.gitlabUrl,
+        gitlabKey: answers.gitlabKey || existing.gitlabKey || "",
+        gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
+        rbUrl: answers.rbUrl || undefined,
+        rbToken: answers.rbToken || undefined,
+        rbWebhookSecret: answers.rbWebhookSecret || undefined,
+        sslCertPath: answers.sslCertPath || undefined,
+        sslKeyPath: answers.sslKeyPath || undefined,
+        sslCaPath: answers.sslCaPath || undefined,
+        webhookConcurrency: answers.webhookConcurrency,
+        webhookQueueLimit: answers.webhookQueueLimit,
+        webhookJobTimeoutMs: answers.webhookJobTimeoutMs,
+      };
 
       await saveCRConfig(nextConfig);
 
