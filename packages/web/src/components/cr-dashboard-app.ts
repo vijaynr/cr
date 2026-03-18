@@ -57,10 +57,12 @@ import {
   type ReviewWorkflowResult,
   type TerminalTheme,
 } from "../types.js";
+import { RepositoryContextController } from "../controllers/repository-context-controller.js";
 import "./cr-config-card.js";
 import "./cr-dashboard-header.js";
 import "./cr-diff-viewer.js";
 import "./cr-icon.js";
+import "./cr-repository-selector.js";
 import "./cr-review-list.js";
 import "./cr-stat-card.js";
 
@@ -115,12 +117,6 @@ export class CrDashboardApp extends LitElement {
     provider: { state: true },
     stateFilter: { state: true },
     searchTerm: { state: true },
-    repositoryUrlInput: { state: true },
-    repositoryFormExpanded: { state: true },
-    activeRepositoryPath: { state: true },
-    activeRepositoryUrl: { state: true },
-    localRepositories: { state: true },
-    loadingLocalRepositories: { state: true },
     targets: { state: true },
     selectedTarget: { state: true },
     detailTarget: { state: true },
@@ -171,12 +167,6 @@ export class CrDashboardApp extends LitElement {
   declare provider: ProviderId;
   declare stateFilter: ReviewState;
   declare searchTerm: string;
-  declare repositoryUrlInput: string;
-  declare repositoryFormExpanded: boolean;
-  declare activeRepositoryPath: string;
-  declare activeRepositoryUrl: string;
-  declare localRepositories: string[];
-  declare loadingLocalRepositories: boolean;
   declare targets: ReviewTarget[];
   declare selectedTarget: ReviewTarget | null;
   declare detailTarget: ReviewTarget | null;
@@ -217,21 +207,35 @@ export class CrDashboardApp extends LitElement {
   declare targetsError: string;
   declare detailError: string;
   declare reviewWarnings: string[];
+  private readonly repositoryContext: RepositoryContextController;
 
   constructor() {
     super();
+    this.repositoryContext = new RepositoryContextController(this, {
+      detectProviderFromUrl: (url) => this.detectProviderFromUrl(url),
+      loadLocalRepositories,
+      onSelectionApplied: async (args) => {
+        if (args.detectedProvider) {
+          this.provider = args.detectedProvider;
+        }
+
+        await this.loadInitialData({ preserveProvider: true });
+        this.activeSection = this.provider;
+      },
+      onSelectionCleared: async () => {
+        this.targets = [];
+        this.selectedTarget = null;
+        this.detailTarget = null;
+        this.resetWorkspaceState();
+        await this.loadInitialData({ preserveProvider: true });
+      },
+    });
     this.dashboard = null;
     this.agentOptions = [];
     this.activeSection = "overview";
     this.provider = "gitlab";
     this.stateFilter = "opened";
     this.searchTerm = "";
-    this.repositoryUrlInput = "";
-    this.repositoryFormExpanded = false;
-    this.activeRepositoryPath = "";
-    this.activeRepositoryUrl = "";
-    this.localRepositories = [];
-    this.loadingLocalRepositories = false;
     this.targets = [];
     this.selectedTarget = null;
     this.detailTarget = null;
@@ -271,23 +275,12 @@ export class CrDashboardApp extends LitElement {
     this.targetsError = "";
     this.detailError = "";
     this.reviewWarnings = [];
+    this.testResults = {};
   }
 
   connectedCallback() {
     super.connectedCallback();
-    void this.loadLocalRepositoryOptions();
     void this.loadInitialData();
-  }
-
-  private async loadLocalRepositoryOptions() {
-    this.loadingLocalRepositories = true;
-    try {
-      this.localRepositories = await loadLocalRepositories();
-    } catch {
-      this.localRepositories = [];
-    } finally {
-      this.loadingLocalRepositories = false;
-    }
   }
 
   private async loadInitialData(options: { preserveProvider?: boolean } = {}) {
@@ -328,11 +321,6 @@ export class CrDashboardApp extends LitElement {
       this.loadingDashboard = false;
       this.loadingConfig = false;
     }
-  }
-
-  private async refreshAll() {
-    await this.loadInitialData({ preserveProvider: true });
-    this.setNotice("Workspace refreshed from the latest provider state.", "success");
   }
 
   private async loadTargets() {
@@ -463,7 +451,7 @@ export class CrDashboardApp extends LitElement {
   }
 
   private async handleRunReview() {
-    if (!this.selectedTarget) {
+    if (!this.selectedTarget || !this.canRunRepositoryWorkflows) {
       return;
     }
 
@@ -492,7 +480,7 @@ export class CrDashboardApp extends LitElement {
   }
 
   private async handleRunSummary() {
-    if (!this.selectedTarget) {
+    if (!this.selectedTarget || !this.canRunRepositoryWorkflows) {
       return;
     }
 
@@ -515,7 +503,7 @@ export class CrDashboardApp extends LitElement {
   }
 
   private async ensureChatContext() {
-    if (!this.selectedTarget || this.chatContext) {
+    if (!this.selectedTarget || this.chatContext || !this.canRunRepositoryWorkflows) {
       return;
     }
 
@@ -535,7 +523,7 @@ export class CrDashboardApp extends LitElement {
   }
 
   private async handleAskQuestion() {
-    if (!this.chatContext || !this.chatQuestion.trim()) {
+    if (!this.chatContext || !this.chatQuestion.trim() || !this.canRunRepositoryWorkflows) {
       return;
     }
 
@@ -635,6 +623,26 @@ export class CrDashboardApp extends LitElement {
   private handleLineSelected(event: CustomEvent<SelectedInlineTarget>) {
     this.selectedLine = event.detail;
     this.analysisTab = "comment";
+  }
+
+  private handleRepositoryInput(event: CustomEvent<string>) {
+    this.repositoryContext.setInputValue(event.detail);
+  }
+
+  private handleRepositoryEdit() {
+    this.repositoryContext.beginEditing();
+  }
+
+  private handleRepositoryCancel() {
+    this.repositoryContext.cancelEditing();
+  }
+
+  private async handleRepositoryApply() {
+    await this.repositoryContext.applySelection();
+  }
+
+  private async handleRepositoryClear() {
+    await this.repositoryContext.clearSelection();
   }
 
   private handleConfigField<K extends keyof ConfigDraft>(key: K, value: ConfigDraft[K]) {
@@ -832,21 +840,21 @@ export class CrDashboardApp extends LitElement {
     const defaultAgents =
       config.defaultReviewAgents && config.defaultReviewAgents.length > 0
         ? config.defaultReviewAgents
-        : dashboard?.config.defaultReviewAgents?.length
+        : dashboard?.config?.defaultReviewAgents?.length
           ? dashboard.config.defaultReviewAgents
           : agentOptions.filter((option) => option.selected).map((option) => option.value);
 
     return {
-      openaiApiUrl: config.openaiApiUrl ?? dashboard?.config.openai.apiUrl ?? "",
+      openaiApiUrl: config.openaiApiUrl ?? dashboard?.config?.openai?.apiUrl ?? "",
       openaiApiKey: config.openaiApiKey ?? "",
-      openaiModel: config.openaiModel ?? dashboard?.config.openai.model ?? "",
+      openaiModel: config.openaiModel ?? dashboard?.config?.openai?.model ?? "",
       useCustomStreaming: Boolean(config.useCustomStreaming),
       defaultReviewAgents: defaultAgents.length > 0 ? defaultAgents : ["general"],
-      gitlabUrl: config.gitlabUrl ?? dashboard?.config.gitlab?.url ?? "",
+      gitlabUrl: config.gitlabUrl ?? dashboard?.config?.gitlab?.url ?? "",
       gitlabKey: config.gitlabKey ?? "",
-      githubUrl: config.githubUrl ?? dashboard?.config.github?.url ?? "",
+      githubUrl: config.githubUrl ?? dashboard?.config?.github?.url ?? "",
       githubToken: config.githubToken ?? "",
-      rbUrl: config.rbUrl ?? dashboard?.config.reviewboard?.url ?? "",
+      rbUrl: config.rbUrl ?? dashboard?.config?.reviewboard?.url ?? "",
       rbToken: config.rbToken ?? "",
       gitlabWebhookSecret: config.gitlabWebhookSecret ?? "",
       githubWebhookSecret: config.githubWebhookSecret ?? "",
@@ -855,13 +863,13 @@ export class CrDashboardApp extends LitElement {
       sslKeyPath: config.sslKeyPath ?? "",
       sslCaPath: config.sslCaPath ?? "",
       webhookConcurrency: String(
-        config.webhookConcurrency ?? dashboard?.config.webhook.concurrency ?? 3
+        config.webhookConcurrency ?? dashboard?.config?.webhook?.concurrency ?? 3
       ),
       webhookQueueLimit: String(
-        config.webhookQueueLimit ?? dashboard?.config.webhook.queueLimit ?? 50
+        config.webhookQueueLimit ?? dashboard?.config?.webhook?.queueLimit ?? 50
       ),
       webhookJobTimeoutMs: String(
-        config.webhookJobTimeoutMs ?? dashboard?.config.webhook.jobTimeoutMs ?? 600000
+        config.webhookJobTimeoutMs ?? dashboard?.config?.webhook?.jobTimeoutMs ?? 600000
       ),
       terminalTheme: config.terminalTheme ?? "",
       gitlabEnabled: config.gitlabEnabled !== false,
@@ -905,33 +913,43 @@ export class CrDashboardApp extends LitElement {
   }
 
   private get activeRepositoryContext(): RepositoryContext | undefined {
-    if (this.activeRepositoryPath) {
-      return {
-        mode: "local",
-        repoPath: this.activeRepositoryPath,
-      };
-    }
+    return this.repositoryContext.activeContext;
+  }
 
-    if (this.activeRepositoryUrl) {
-      return {
-        mode: "remote",
-        remoteUrl: this.activeRepositoryUrl,
-      };
-    }
+  private get activeRepositoryPath() {
+    return this.repositoryContext.activeRepositoryPath;
+  }
 
-    return undefined;
+  private get activeRepositoryUrl() {
+    return this.repositoryContext.activeRepositoryUrl;
   }
 
   private get hasRepositorySelection() {
-    return Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
+    return this.repositoryContext.hasSelection;
   }
 
-  private get canRunLocalWorkflows() {
-    return Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
+  private get canRunRepositoryWorkflows() {
+    return this.repositoryContext.canRunRepositoryWorkflows;
   }
 
   private get repositorySelectionMessage() {
-    return "Choose a local checkout or paste a repository URL to load GitLab or GitHub review queues.";
+    return this.repositoryContext.selectionMessage;
+  }
+
+  private get repositoryUrlInput() {
+    return this.repositoryContext.inputValue;
+  }
+
+  private get repositoryFormExpanded() {
+    return this.repositoryContext.formExpanded;
+  }
+
+  private get localRepositories() {
+    return this.repositoryContext.localRepositories;
+  }
+
+  private get loadingLocalRepositories() {
+    return this.repositoryContext.loadingLocalRepositories;
   }
 
   private providerAvailabilityErrorFor(
@@ -966,36 +984,11 @@ export class CrDashboardApp extends LitElement {
     return this.hasRepositorySelection;
   }
 
-  private async applyRepositorySelection() {
-    const input = this.repositoryUrlInput.trim();
-    if (!input) {
-      return;
-    }
-
-    const isUrl = input.startsWith("http://") || input.startsWith("https://");
-    this.activeRepositoryUrl = isUrl ? input : "";
-    this.activeRepositoryPath = isUrl ? "" : input;
-    this.repositoryFormExpanded = false;
-
-    // Auto-detect provider from URL and navigate to it
-    if (isUrl) {
-      const detected = this.detectProviderFromUrl(input);
-      if (detected) {
-        this.provider = detected;
-      }
-    }
-
-    await this.loadInitialData({ preserveProvider: true });
-
-    // Navigate to the provider section so the user sees results immediately
-    this.activeSection = this.provider;
-  }
-
   private detectProviderFromUrl(url: string): ProviderId | null {
     const lower = url.toLowerCase();
 
     // Check against configured GitHub URL (supports GitHub Enterprise)
-    const githubBaseUrl = this.configDraft.githubUrl || this.dashboard?.config.github?.url || "";
+    const githubBaseUrl = this.configDraft.githubUrl || this.dashboard?.config?.github?.url || "";
     if (githubBaseUrl) {
       try {
         const githubHost = new URL(githubBaseUrl).hostname.toLowerCase();
@@ -1013,7 +1006,7 @@ export class CrDashboardApp extends LitElement {
     }
 
     // Check against configured GitLab URL (supports self-hosted GitLab)
-    const gitlabBaseUrl = this.configDraft.gitlabUrl || this.dashboard?.config.gitlab?.url || "";
+    const gitlabBaseUrl = this.configDraft.gitlabUrl || this.dashboard?.config?.gitlab?.url || "";
     if (gitlabBaseUrl) {
       try {
         const gitlabHost = new URL(gitlabBaseUrl).hostname.toLowerCase();
@@ -1031,17 +1024,6 @@ export class CrDashboardApp extends LitElement {
     }
 
     return null;
-  }
-
-  private clearRepositorySelection() {
-    this.activeRepositoryPath = "";
-    this.activeRepositoryUrl = "";
-    this.repositoryUrlInput = "";
-    this.repositoryFormExpanded = false;
-    this.targets = [];
-    this.selectedTarget = null;
-    this.detailTarget = null;
-    this.targetsError = this.repositorySelectionMessage;
   }
 
   render() {
@@ -1132,7 +1114,7 @@ export class CrDashboardApp extends LitElement {
 
             <!-- Repo selector at bottom -->
             <div class="mt-auto flex flex-col gap-2 border-t border-base-300 pt-4">
-              ${this.renderSidebarRepoWidget()}
+              ${this.renderRepositorySelector("sidebar")}
             </div>
           </aside>
         </div>
@@ -1152,51 +1134,22 @@ export class CrDashboardApp extends LitElement {
     `;
   }
 
-  private renderSidebarRepoWidget() {
-    const hasActive = Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
-    const activeLabel = this.activeRepositoryUrl || this.activeRepositoryPath;
-
-    if (hasActive && !this.repositoryFormExpanded) {
-      return html`
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between">
-            <span class="badge badge-success badge-xs gap-1">● connected</span>
-            <button class="btn btn-ghost btn-xs text-error" type="button" @click=${() => this.clearRepositorySelection()}>Clear</button>
-          </div>
-          <div class="font-mono text-xs text-base-content/50 truncate">${activeLabel}</div>
-          <button class="btn btn-ghost btn-xs w-full" type="button" @click=${() => { this.repositoryFormExpanded = true; }}>
-            Change repo
-          </button>
-        </div>
-      `;
-    }
-
+  private renderRepositorySelector(variant: "sidebar" | "inline") {
     return html`
-      <form class="flex flex-col gap-2" @submit=${async (e: Event) => { e.preventDefault(); await this.applyRepositorySelection(); }}>
-        <label class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">Repository</label>
-        <input
-          class="input input-bordered input-xs font-mono w-full"
-          type="text"
-          placeholder="github.com/owner/repo or /path"
-          .value=${this.repositoryUrlInput}
-          list="local-repos-list"
-          @input=${(e: Event) => { this.repositoryUrlInput = (e.target as HTMLInputElement).value; }}
-        />
-        <datalist id="local-repos-list">
-          ${this.localRepositories.map(r => html`<option value=${r}></option>`)}
-        </datalist>
-        <div class="flex gap-1">
-          <button class="btn btn-primary btn-xs flex-1" type="submit" ?disabled=${!this.repositoryUrlInput.trim()}>
-            Connect
-          </button>
-          ${hasActive ? html`<button class="btn btn-ghost btn-xs" type="button" @click=${() => { this.repositoryFormExpanded = false; }}>Cancel</button>` : ""}
-        </div>
-        ${
-          this.localRepositories.length > 0
-            ? html`<span class="text-xs text-base-content/30">${this.localRepositories.length} local repo${this.localRepositories.length === 1 ? "" : "s"} discovered</span>`
-            : ""
-        }
-      </form>
+      <cr-repository-selector
+        variant=${variant}
+        .activeLabel=${this.repositoryContext.activeLabel}
+        .connected=${this.hasRepositorySelection}
+        .expanded=${this.repositoryFormExpanded}
+        .loading=${this.loadingLocalRepositories}
+        .localRepositories=${this.localRepositories}
+        .value=${this.repositoryUrlInput}
+        @repository-input=${this.handleRepositoryInput}
+        @repository-apply=${this.handleRepositoryApply}
+        @repository-clear=${this.handleRepositoryClear}
+        @repository-edit=${this.handleRepositoryEdit}
+        @repository-cancel=${this.handleRepositoryCancel}
+      ></cr-repository-selector>
     `;
   }
 
@@ -1245,45 +1198,6 @@ export class CrDashboardApp extends LitElement {
     }
   }
 
-  private iconForAnalysisTab(tab: AnalysisTab): IconNode {
-    switch (tab) {
-      case "review":
-        return Bot;
-      case "summary":
-        return ScrollText;
-      case "chat":
-        return MessageSquare;
-      case "comment":
-        return MessageSquare;
-    }
-  }
-
-  private renderRepositorySelector() {
-    // The repo selector lives in the sidebar; this shows an inline form on pages that need it
-    const hasActive = Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
-    if (hasActive) return html``;
-    return html`
-      <div class="alert alert-info text-sm flex-wrap gap-3">
-        <span class="flex-1">Connect a repository to load GitLab or GitHub review queues.</span>
-        <label for="cr-drawer" class="btn btn-primary btn-sm lg:hidden">Open sidebar</label>
-        <form class="hidden lg:flex gap-2 items-center" @submit=${async (e: Event) => { e.preventDefault(); await this.applyRepositorySelection(); }}>
-          <input
-            class="input input-bordered input-sm font-mono w-72"
-            type="text"
-            placeholder="github.com/owner/repo or /local/path"
-            .value=${this.repositoryUrlInput}
-            list="local-repos-list-inline"
-            @input=${(e: Event) => { this.repositoryUrlInput = (e.target as HTMLInputElement).value; }}
-          />
-          <datalist id="local-repos-list-inline">
-            ${this.localRepositories.map(r => html`<option value=${r}></option>`)}
-          </datalist>
-          <button class="btn btn-primary btn-sm" type="submit" ?disabled=${!this.repositoryUrlInput.trim()}>Connect</button>
-        </form>
-      </div>
-    `;
-  }
-
   private renderOverviewPage() {
     const configuredProviders = providerOrder.filter(
       (provider) => this.dashboard?.providers?.[provider]?.configured
@@ -1293,8 +1207,8 @@ export class CrDashboardApp extends LitElement {
       0
     );
     const defaultAgents =
-      this.dashboard?.config.defaultReviewAgents.length ?? this.selectedAgents.length ?? 0;
-    const hasActive = Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
+      this.dashboard?.config?.defaultReviewAgents.length ?? this.selectedAgents.length ?? 0;
+    const hasActive = this.hasRepositorySelection;
 
     return html`
       <div class="flex flex-col gap-6">
@@ -1317,7 +1231,7 @@ export class CrDashboardApp extends LitElement {
         </div>
 
         <!-- Repo connect notice -->
-        ${this.renderRepositorySelector()}
+        ${this.renderRepositorySelector("inline")}
 
         ${
           hasActive ? html`
@@ -1365,22 +1279,22 @@ export class CrDashboardApp extends LitElement {
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <cr-config-card
             .label=${"AI runtime"}
-            .value=${this.dashboard?.config.openai.model || "No model configured"}
+            .value=${this.dashboard?.config?.openai?.model || "No model configured"}
             .note=${
-              this.dashboard?.config.openai.configured
-                ? this.dashboard?.config.openai.apiUrl || "OpenAI-compatible endpoint ready"
+              this.dashboard?.config?.openai?.configured
+                ? this.dashboard?.config?.openai?.apiUrl || "OpenAI-compatible endpoint ready"
                 : "Add model endpoint and key in Settings"
             }
           ></cr-config-card>
           <cr-config-card
             .label=${"Default review agents"}
-            .value=${this.dashboard?.config.defaultReviewAgents.join(", ") || "general"}
+            .value=${this.dashboard?.config?.defaultReviewAgents.join(", ") || "general"}
             .note=${"Review profiles enabled for new workflow runs"}
           ></cr-config-card>
           <cr-config-card
             .label=${"Webhook runtime"}
-            .value=${`${this.dashboard?.config.webhook.concurrency ?? 3} workers / ${this.dashboard?.config.webhook.queueLimit ?? 50} queue`}
-            .note=${`Timeout ${this.dashboard?.config.webhook.jobTimeoutMs ?? 600000} ms${this.dashboard?.config.webhook.sslEnabled ? " · SSL enabled" : ""}`}
+            .value=${`${this.dashboard?.config?.webhook?.concurrency ?? 3} workers / ${this.dashboard?.config?.webhook?.queueLimit ?? 50} queue`}
+            .note=${`Timeout ${this.dashboard?.config?.webhook?.jobTimeoutMs ?? 600000} ms${this.dashboard?.config?.webhook?.sslEnabled ? " · SSL enabled" : ""}`}
           ></cr-config-card>
         </div>
       </div>
@@ -1452,7 +1366,7 @@ export class CrDashboardApp extends LitElement {
     return html`
       <div class="flex flex-col gap-4">
         <!-- Repo connect notice (for gitlab/github without repo) -->
-        ${this.renderRepositorySelector()}
+        ${this.renderRepositorySelector("inline")}
 
         ${
           hasRepo || this.provider === "reviewboard"
@@ -1663,9 +1577,9 @@ export class CrDashboardApp extends LitElement {
   }
 
   private renderSettingsPage() {
-    const gitlabConfigured = this.dashboard?.config.gitlab?.configured;
-    const githubConfigured = this.dashboard?.config.github?.configured;
-    const reviewBoardConfigured = this.dashboard?.config.reviewboard?.configured;
+    const gitlabConfigured = this.dashboard?.config?.gitlab?.configured;
+    const githubConfigured = this.dashboard?.config?.github?.configured;
+    const reviewBoardConfigured = this.dashboard?.config?.reviewboard?.configured;
 
     return html`
       <div class="flex flex-col gap-6 pb-24">
@@ -1679,9 +1593,9 @@ export class CrDashboardApp extends LitElement {
         <div class="stats stats-horizontal shadow w-full bg-base-200 border border-base-300 overflow-x-auto">
           <cr-stat-card
             .eyebrow=${"AI runtime"}
-            .value=${this.dashboard?.config.openai.model || "Not configured"}
-            .note=${this.dashboard?.config.openai.configured ? "Model endpoint ready" : "Add API settings to enable AI"}
-            .tone=${this.dashboard?.config.openai.configured ? "success" : "accent"}
+            .value=${this.dashboard?.config?.openai?.model || "Not configured"}
+            .note=${this.dashboard?.config?.openai?.configured ? "Model endpoint ready" : "Add API settings to enable AI"}
+            .tone=${this.dashboard?.config?.openai?.configured ? "success" : "accent"}
             .icon=${BrainCircuit}
           ></cr-stat-card>
           <cr-stat-card
@@ -1706,8 +1620,8 @@ export class CrDashboardApp extends LitElement {
                 <cr-icon .icon=${BrainCircuit} .size=${16}></cr-icon>
                 AI and defaults
               </h3>
-              <div class="badge ${this.dashboard?.config.openai.configured ? "badge-success" : "badge-error"} badge-sm">
-                ${this.dashboard?.config.openai.configured ? "ready" : "needs setup"}
+              <div class="badge ${this.dashboard?.config?.openai?.configured ? "badge-success" : "badge-error"} badge-sm">
+                ${this.dashboard?.config?.openai?.configured ? "ready" : "needs setup"}
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1733,16 +1647,16 @@ export class CrDashboardApp extends LitElement {
               <button
                 class="btn btn-outline btn-xs gap-1.5"
                 type="button"
-                ?disabled=${this.testResults["openai"]?.testing}
+                ?disabled=${this.testResults.openai?.testing}
                 @click=${() => this.handleTestConnection("openai")}
               >
-                ${this.testResults["openai"]?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
+                ${this.testResults.openai?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
                 Test connection
               </button>
             </div>
-            ${this.testResults["openai"] && !this.testResults["openai"].testing ? html`
-              <div class="alert ${this.testResults["openai"].ok ? "alert-success" : "alert-error"} py-2 text-sm">
-                ${this.testResults["openai"].ok ? "✓" : "✗"} ${this.testResults["openai"].message}
+            ${this.testResults.openai && !this.testResults.openai.testing ? html`
+              <div class="alert ${this.testResults.openai.ok ? "alert-success" : "alert-error"} py-2 text-sm">
+                ${this.testResults.openai.ok ? "✓" : "✗"} ${this.testResults.openai.message}
               </div>` : ""}
             <div class="form-control gap-1">
               <label class="label py-0 cursor-pointer justify-start gap-3">
@@ -1807,16 +1721,16 @@ export class CrDashboardApp extends LitElement {
               <button
                 class="btn btn-outline btn-xs gap-1.5"
                 type="button"
-                ?disabled=${this.testResults["gitlab"]?.testing}
+                ?disabled=${this.testResults.gitlab?.testing}
                 @click=${() => this.handleTestConnection("gitlab")}
               >
-                ${this.testResults["gitlab"]?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
+                ${this.testResults.gitlab?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
                 Test connection
               </button>
             </div>
-            ${this.testResults["gitlab"] && !this.testResults["gitlab"].testing ? html`
-              <div class="alert ${this.testResults["gitlab"].ok ? "alert-success" : "alert-error"} py-2 text-sm">
-                ${this.testResults["gitlab"].ok ? "✓" : "✗"} ${this.testResults["gitlab"].message}
+            ${this.testResults.gitlab && !this.testResults.gitlab.testing ? html`
+              <div class="alert ${this.testResults.gitlab.ok ? "alert-success" : "alert-error"} py-2 text-sm">
+                ${this.testResults.gitlab.ok ? "✓" : "✗"} ${this.testResults.gitlab.message}
               </div>` : ""}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               ${this.renderConfigInput({ label: "GitLab URL", note: "Base URL for merge request and inline comment APIs.", value: this.configDraft.gitlabUrl, onInput: (v) => this.handleConfigField("gitlabUrl", v) })}
@@ -1838,16 +1752,16 @@ export class CrDashboardApp extends LitElement {
               <button
                 class="btn btn-outline btn-xs gap-1.5"
                 type="button"
-                ?disabled=${this.testResults["github"]?.testing}
+                ?disabled=${this.testResults.github?.testing}
                 @click=${() => this.handleTestConnection("github")}
               >
-                ${this.testResults["github"]?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
+                ${this.testResults.github?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
                 Test connection
               </button>
             </div>
-            ${this.testResults["github"] && !this.testResults["github"].testing ? html`
-              <div class="alert ${this.testResults["github"].ok ? "alert-success" : "alert-error"} py-2 text-sm">
-                ${this.testResults["github"].ok ? "✓" : "✗"} ${this.testResults["github"].message}
+            ${this.testResults.github && !this.testResults.github.testing ? html`
+              <div class="alert ${this.testResults.github.ok ? "alert-success" : "alert-error"} py-2 text-sm">
+                ${this.testResults.github.ok ? "✓" : "✗"} ${this.testResults.github.message}
               </div>` : ""}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               ${this.renderConfigInput({ label: "GitHub URL", note: "Leave blank for github.com. Set to your GitHub Enterprise Server base URL.", value: this.configDraft.githubUrl, onInput: (v) => this.handleConfigField("githubUrl", v) })}
@@ -1869,16 +1783,16 @@ export class CrDashboardApp extends LitElement {
               <button
                 class="btn btn-outline btn-xs gap-1.5"
                 type="button"
-                ?disabled=${this.testResults["reviewboard"]?.testing}
+                ?disabled=${this.testResults.reviewboard?.testing}
                 @click=${() => this.handleTestConnection("reviewboard")}
               >
-                ${this.testResults["reviewboard"]?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
+                ${this.testResults.reviewboard?.testing ? html`<span class="loading loading-spinner loading-xs"></span>` : ""}
                 Test connection
               </button>
             </div>
-            ${this.testResults["reviewboard"] && !this.testResults["reviewboard"].testing ? html`
-              <div class="alert ${this.testResults["reviewboard"].ok ? "alert-success" : "alert-error"} py-2 text-sm">
-                ${this.testResults["reviewboard"].ok ? "✓" : "✗"} ${this.testResults["reviewboard"].message}
+            ${this.testResults.reviewboard && !this.testResults.reviewboard.testing ? html`
+              <div class="alert ${this.testResults.reviewboard.ok ? "alert-success" : "alert-error"} py-2 text-sm">
+                ${this.testResults.reviewboard.ok ? "✓" : "✗"} ${this.testResults.reviewboard.message}
               </div>` : ""}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               ${this.renderConfigInput({ label: "Review Board URL", note: "Base URL for review request and diff APIs.", value: this.configDraft.rbUrl, onInput: (v) => this.handleConfigField("rbUrl", v) })}
@@ -1895,8 +1809,8 @@ export class CrDashboardApp extends LitElement {
                 <cr-icon .icon=${Webhook} .size=${16}></cr-icon>
                 Webhooks &amp; queueing
               </h3>
-              <div class="badge ${this.dashboard?.config.webhook.sslEnabled ? "badge-success" : "badge-ghost"} badge-sm">
-                ${this.dashboard?.config.webhook.sslEnabled ? "SSL enabled" : "HTTP only"}
+              <div class="badge ${this.dashboard?.config?.webhook?.sslEnabled ? "badge-success" : "badge-ghost"} badge-sm">
+                ${this.dashboard?.config?.webhook?.sslEnabled ? "SSL enabled" : "HTTP only"}
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2027,8 +1941,8 @@ export class CrDashboardApp extends LitElement {
 
   private renderReviewPanel() {
     return html`
-      ${!this.canRunLocalWorkflows ? html`
-        <div class="alert alert-warning text-xs">AI review requires a local checkout. Switch the repo source to a local path to enable this workflow.</div>
+      ${!this.canRunRepositoryWorkflows ? html`
+        <div class="alert alert-warning text-xs">AI review requires a connected repository source before the workflow can run.</div>
       ` : ""}
 
       <div class="card bg-base-300 border border-base-100/10">
@@ -2079,7 +1993,7 @@ export class CrDashboardApp extends LitElement {
             <button
               class="btn btn-primary btn-sm flex-1 gap-1.5"
               type="button"
-              ?disabled=${!this.canRunLocalWorkflows || this.runningReview || this.selectedAgents.length === 0}
+              ?disabled=${!this.canRunRepositoryWorkflows || this.runningReview || this.selectedAgents.length === 0}
               @click=${async () => this.handleRunReview()}
             >
               ${this.runningReview ? html`<span class="loading loading-spinner loading-xs"></span>` : html`<cr-icon .icon=${Bot} .size=${14}></cr-icon>`}
@@ -2145,8 +2059,8 @@ export class CrDashboardApp extends LitElement {
 
   private renderSummaryPanel() {
     return html`
-      ${!this.canRunLocalWorkflows ? html`
-        <div class="alert alert-warning text-xs">Summary generation needs a local checkout to load repository context.</div>
+      ${!this.canRunRepositoryWorkflows ? html`
+        <div class="alert alert-warning text-xs">Summary generation needs a connected repository source.</div>
       ` : ""}
       <div class="card bg-base-300 border border-base-100/10">
         <div class="card-body gap-3">
@@ -2154,7 +2068,7 @@ export class CrDashboardApp extends LitElement {
           <button
             class="btn btn-primary btn-sm gap-1.5"
             type="button"
-            ?disabled=${!this.canRunLocalWorkflows || this.runningSummary}
+            ?disabled=${!this.canRunRepositoryWorkflows || this.runningSummary}
             @click=${async () => this.handleRunSummary()}
           >
             ${this.runningSummary ? html`<span class="loading loading-spinner loading-xs"></span>` : html`<cr-icon .icon=${ScrollText} .size=${14}></cr-icon>`}
@@ -2176,8 +2090,8 @@ export class CrDashboardApp extends LitElement {
 
   private renderChatPanel() {
     return html`
-      ${!this.canRunLocalWorkflows ? html`
-        <div class="alert alert-warning text-xs">Review chat is available only with a local checkout selected.</div>
+      ${!this.canRunRepositoryWorkflows ? html`
+        <div class="alert alert-warning text-xs">Review chat is available after you connect a repository source.</div>
       ` : ""}
 
       ${this.chatContext ? html`
@@ -2194,7 +2108,7 @@ export class CrDashboardApp extends LitElement {
             <button
               class="btn btn-primary btn-sm gap-1.5"
               type="button"
-              ?disabled=${!this.canRunLocalWorkflows || this.loadingChat}
+              ?disabled=${!this.canRunRepositoryWorkflows || this.loadingChat}
               @click=${async () => this.ensureChatContext()}
             >
               ${this.loadingChat ? html`<span class="loading loading-spinner loading-xs"></span>` : html`<cr-icon .icon=${MessageSquare} .size=${14}></cr-icon>`}
@@ -2227,7 +2141,7 @@ export class CrDashboardApp extends LitElement {
           <button
             class="btn btn-primary btn-sm gap-1.5"
             type="button"
-            ?disabled=${!this.canRunLocalWorkflows || this.loadingChat || !this.chatContext || !this.chatQuestion.trim()}
+            ?disabled=${!this.canRunRepositoryWorkflows || this.loadingChat || !this.chatContext || !this.chatQuestion.trim()}
             @click=${async () => this.handleAskQuestion()}
           >
             ${this.loadingChat ? html`<span class="loading loading-spinner loading-xs"></span>` : html`<cr-icon .icon=${MessageSquare} .size=${14}></cr-icon>`}

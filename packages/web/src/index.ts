@@ -36,7 +36,7 @@ export function getWebAppHtml(): string {
     <style>
       body { margin: 0; }
       cr-dashboard-app { display: block; min-height: 100vh; }
-      cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header { display: contents; }
+      cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header, cr-repository-selector { display: contents; }
     </style>
   </head>
   <body>
@@ -47,11 +47,15 @@ export function getWebAppHtml(): string {
 }
 
 export async function readWebAppScript(): Promise<string> {
-  if (!webAppScriptPromise) {
-    webAppScriptPromise = bundleWebAppScript();
+  if (isBundledRuntime()) {
+    if (!webAppScriptPromise) {
+      webAppScriptPromise = bundleWebAppScript();
+    }
+    return webAppScriptPromise;
   }
-
-  return webAppScriptPromise;
+  
+  // In development, always re-bundle to pick up changes
+  return bundleWebAppScript();
 }
 
 async function bundleWebAppScript(): Promise<string> {
@@ -88,7 +92,6 @@ async function bundleWebAppScript(): Promise<string> {
 export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> {
   const app = new Hono();
   const webAppHtml = getWebAppHtml();
-  const webAppScript = await readWebAppScript();
 
   app.get(WEB_APP_DASHBOARD_ROUTE, async (c) => {
     try {
@@ -115,12 +118,11 @@ export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> 
     }
   });
 
-  app.get(WEB_APP_SCRIPT_ROUTE, () => {
-    return new Response(webAppScript, {
-      headers: {
-        "Content-Type": "application/javascript; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+  app.get(WEB_APP_SCRIPT_ROUTE, async (c) => {
+    const script = await readWebAppScript();
+    return c.body(script, 200, {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
     });
   });
 
