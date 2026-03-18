@@ -1,5 +1,4 @@
-import { LitElement, css, html } from "lit";
-import { dashboardThemeStyles } from "../styles.js";
+import { LitElement, html } from "lit";
 import type { DashboardRequest, ProviderId } from "../types.js";
 
 function getRequestPrefix(provider: ProviderId, id: DashboardRequest["id"]): string {
@@ -12,44 +11,7 @@ export class CrRequestItem extends LitElement {
     item: { attribute: false },
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .request {
-        display: grid;
-        gap: 10px;
-        padding: 16px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        background: var(--surface);
-      }
-
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-
-      a:hover {
-        text-decoration: underline;
-      }
-
-      .request-title {
-        font-size: 1.02rem;
-        font-weight: 600;
-        line-height: 1.3;
-      }
-
-      .request-meta {
-        display: grid;
-        gap: 4px;
-        font-size: 0.92rem;
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare provider: ProviderId;
   declare item: DashboardRequest;
@@ -66,30 +28,22 @@ export class CrRequestItem extends LitElement {
 
   render() {
     return html`
-      <article class="request">
-        <a href=${this.item.url} target="_blank" rel="noreferrer">
-          <div class="request-title">${getRequestPrefix(this.provider, this.item.id)} ${this.item.title}</div>
-        </a>
-        <div class="request-meta">
-          ${
-            this.item.state
-              ? html`<div>State: ${this.item.state}${this.item.draft ? " • draft" : ""}</div>`
-              : ""
-          }
-          ${this.item.author ? html`<div>Author: ${this.item.author}</div>` : ""}
-          ${
-            this.item.sourceBranch || this.item.targetBranch
-              ? html`<div>
-                Branches:
-                ${this.item.sourceBranch || "?"}
-                ${this.item.targetBranch ? html` → ${this.item.targetBranch}` : ""}
-              </div>`
-              : ""
-          }
-          ${this.item.repository ? html`<div>Repository: ${this.item.repository}</div>` : ""}
-          ${this.item.updatedAt ? html`<div>Updated: ${this.item.updatedAt}</div>` : ""}
+      <a href=${this.item.url} target="_blank" rel="noreferrer" class="block no-underline">
+        <div class="card card-compact bg-base-300 hover:bg-base-200 border border-base-100/10 hover:border-primary/30 transition-all cursor-pointer">
+          <div class="card-body gap-2">
+            <div class="font-semibold text-sm leading-snug">
+              <span class="text-primary font-mono text-xs mr-1">${getRequestPrefix(this.provider, this.item.id)}</span>
+              ${this.item.title}
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs text-base-content/50">
+              ${this.item.state ? html`<span class="badge badge-ghost badge-xs">${this.item.state}${this.item.draft ? " · draft" : ""}</span>` : ""}
+              ${this.item.author ? html`<span>${this.item.author}</span>` : ""}
+              ${this.item.sourceBranch ? html`<span class="font-mono">${this.item.sourceBranch}${this.item.targetBranch ? ` → ${this.item.targetBranch}` : ""}</span>` : ""}
+              ${this.item.updatedAt ? html`<span>${this.item.updatedAt}</span>` : ""}
+            </div>
+          </div>
         </div>
-      </article>
+      </a>
     `;
   }
 }

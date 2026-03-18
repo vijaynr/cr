@@ -1,5 +1,4 @@
-import { LitElement, css, html } from "lit";
-import { dashboardThemeStyles } from "../styles.js";
+import { LitElement, html } from "lit";
 import type { ProviderDashboard, ProviderId } from "../types.js";
 import "./cr-request-item.js";
 
@@ -9,51 +8,7 @@ export class CrProviderCard extends LitElement {
     data: { attribute: false },
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .provider {
-        padding: 18px;
-      }
-
-      .provider-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: start;
-        margin-bottom: 16px;
-      }
-
-      .status {
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: 0.82rem;
-        background: var(--accent-soft);
-        color: var(--accent);
-        white-space: nowrap;
-      }
-
-      .status.off {
-        background: rgba(138, 59, 47, 0.1);
-        color: var(--danger);
-      }
-
-      .request-list {
-        display: grid;
-        gap: 12px;
-      }
-
-      @media (max-width: 700px) {
-        .provider-head {
-          display: grid;
-        }
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare provider: ProviderId;
   declare data: ProviderDashboard | null;
@@ -69,38 +24,30 @@ export class CrProviderCard extends LitElement {
       return html``;
     }
 
-    const statusLabel = this.data.configured ? "configured" : "missing config";
+    const { configured, repository, error, items } = this.data;
 
     return html`
-      <section class="provider">
-        <div class="provider-head">
-          <div>
-            <div class="eyebrow">${this.provider}</div>
-            <h2>${this.provider}</h2>
-            ${this.data.repository ? html`<p class="provider-meta">${this.data.repository}</p>` : ""}
+      <div class="card bg-base-200 border border-base-300 shadow-sm">
+        <div class="card-body gap-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="text-xs font-bold uppercase tracking-widest text-base-content/40 mb-1">${this.provider}</div>
+              <h2 class="card-title text-lg capitalize">${this.provider}</h2>
+              ${repository ? html`<div class="text-xs text-base-content/50 font-mono mt-0.5">${repository}</div>` : ""}
+            </div>
+            <div class="badge ${configured ? "badge-success" : "badge-error"} badge-sm gap-1">
+              ${configured ? "✓ configured" : "✗ missing config"}
+            </div>
           </div>
-          <div class=${`status ${this.data.configured ? "" : "off"}`.trim()}>${statusLabel}</div>
+          ${error ? html`<div class="alert alert-error text-xs py-2">${error}</div>` : ""}
+          ${!error && items.length === 0 ? html`<p class="text-sm text-base-content/40 italic">No open review requests.</p>` : ""}
+          ${items.length > 0 ? html`
+            <div class="flex flex-col gap-2">
+              ${items.map(item => html`<cr-request-item .provider=${this.provider} .item=${item}></cr-request-item>`)}
+            </div>
+          ` : ""}
         </div>
-
-        ${this.data.error ? html`<div class="error">${this.data.error}</div>` : ""}
-        ${
-          !this.data.error && this.data.items.length === 0
-            ? html`<div class="empty">No open review requests found.</div>`
-            : ""
-        }
-        ${
-          this.data.items.length > 0
-            ? html`
-              <div class="request-list">
-                ${this.data.items.map(
-                  (item) =>
-                    html`<cr-request-item .provider=${this.provider} .item=${item}></cr-request-item>`
-                )}
-              </div>
-            `
-            : ""
-        }
-      </section>
+      </div>
     `;
   }
 }

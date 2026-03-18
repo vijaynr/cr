@@ -1,5 +1,4 @@
-import { LitElement, css, html } from "lit";
-import { dashboardThemeStyles } from "../styles.js";
+import { LitElement, html } from "lit";
 import type { ProviderId, ReviewTarget } from "../types.js";
 
 export class CrReviewList extends LitElement {
@@ -12,78 +11,7 @@ export class CrReviewList extends LitElement {
     configured: { type: Boolean },
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .stack {
-        display: grid;
-        gap: 12px;
-      }
-
-      .card {
-        display: grid;
-        gap: 12px;
-        padding: 16px;
-        border-radius: 10px;
-        border: 1px solid var(--line);
-        background: var(--surface);
-        cursor: pointer;
-        transition:
-          transform 140ms ease,
-          border-color 140ms ease,
-          background 140ms ease,
-          box-shadow 140ms ease;
-      }
-
-      .card:hover {
-        transform: translateY(-2px);
-        border-color: var(--line-strong);
-        background: white;
-        box-shadow: var(--shadow-sm);
-      }
-
-      .card[data-active="true"] {
-        border-color: rgba(59, 130, 246, 0.36);
-        background: rgba(59, 130, 246, 0.1);
-        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
-      }
-
-      .top,
-      .meta {
-        display: flex;
-        align-items: start;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .meta {
-        color: var(--ink-soft);
-        font-size: 0.88rem;
-      }
-
-      h3 {
-        font-size: 1rem;
-        line-height: 1.28;
-      }
-
-      .empty {
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px dashed var(--line);
-        color: var(--ink-soft);
-        background: rgba(255, 255, 255, 0.58);
-      }
-
-      .title-block {
-        display: grid;
-        gap: 8px;
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare provider: ProviderId;
   declare targets: ReviewTarget[];
@@ -112,67 +40,62 @@ export class CrReviewList extends LitElement {
     );
   }
 
-  private toneForState(state: string | undefined) {
-    if (!state) {
-      return "default";
-    }
-    if (state.includes("open") || state.includes("pending")) {
-      return "success";
-    }
-    if (state.includes("merge") || state.includes("submitted")) {
-      return "accent";
-    }
-    return "danger";
+  private stateBadgeClass(state: string | undefined) {
+    if (!state) return "badge-ghost";
+    if (state.includes("open") || state.includes("pending")) return "badge-success";
+    if (state.includes("merge") || state.includes("submitted")) return "badge-primary";
+    return "badge-error";
   }
 
   render() {
     if (!this.configured) {
-      return html`<div class="empty">This provider is not configured yet. Update CR config before loading its review queue.</div>`;
+      return html`<div class="alert alert-warning text-sm">This provider is not configured yet. Update CR config before loading its review queue.</div>`;
     }
 
     if (this.loading) {
-      return html`<div class="empty">Loading review queue…</div>`;
+      return html`
+        <div class="flex items-center gap-2 p-4 text-base-content/50 text-sm">
+          <span class="loading loading-spinner loading-xs"></span>
+          Loading review queue…
+        </div>
+      `;
     }
 
     if (this.error) {
-      return html`<div class="empty">${this.error}</div>`;
+      return html`<div class="alert alert-warning text-sm">${this.error}</div>`;
     }
 
     if (this.targets.length === 0) {
-      return html`<div class="empty">No review requests match the current filters.</div>`;
+      return html`<div class="text-sm text-base-content/40 italic p-2">No review requests match the current filters.</div>`;
     }
 
     return html`
-      <div class="stack">
+      <div class="flex flex-col gap-2">
         ${this.targets.map(
           (target) => html`
-            <article
-              class="card"
-              data-active=${String(target.id === this.selectedId)}
+            <div
+              class="card card-compact bg-base-300 border cursor-pointer transition-all
+                ${target.id === this.selectedId
+                  ? "border-primary/50 bg-primary/10"
+                  : "border-base-100/10 hover:border-primary/40 hover:bg-base-200"}"
               @click=${() => this.emitSelect(target)}
             >
-              <div class="top">
-                <div class="title-block">
-                  <div class="eyebrow">${this.provider}</div>
-                  <h3>${this.requestPrefix(target)} ${target.title}</h3>
+              <div class="card-body gap-1.5">
+                <div class="flex items-start justify-between gap-2">
+                  <h3 class="font-semibold text-sm leading-snug">
+                    <span class="text-primary font-mono text-xs mr-1">${this.requestPrefix(target)}</span>
+                    ${target.title}
+                  </h3>
+                  ${target.state ? html`<span class="badge badge-xs ${this.stateBadgeClass(target.state)} shrink-0">${target.state}</span>` : ""}
                 </div>
-                ${
-                  target.state
-                    ? html`<div class="badge" data-tone=${this.toneForState(target.state)}>${target.state}</div>`
-                    : ""
-                }
+                <div class="flex flex-wrap gap-2 text-xs text-base-content/50">
+                  <span>${target.author || "Unknown author"}</span>
+                  ${target.updatedAt ? html`<span>· ${target.updatedAt}</span>` : ""}
+                  ${target.sourceBranch ? html`<span class="font-mono">${target.sourceBranch}${target.targetBranch ? ` → ${target.targetBranch}` : ""}</span>` : ""}
+                  ${target.draft ? html`<span class="badge badge-ghost badge-xs">draft</span>` : ""}
+                </div>
               </div>
-
-              <div class="meta">
-                <span>${target.author || "Unknown author"}</span>
-                ${target.updatedAt ? html`<span>${target.updatedAt}</span>` : ""}
-              </div>
-
-              <div class="meta">
-                <span>${target.sourceBranch || "?"}${target.targetBranch ? html` → ${target.targetBranch}` : ""}</span>
-                ${target.draft ? html`<span>Draft</span>` : ""}
-              </div>
-            </article>
+            </div>
           `
         )}
       </div>

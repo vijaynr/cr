@@ -1,7 +1,6 @@
-import { LitElement, css, html } from "lit";
+import { LitElement, html } from "lit";
 import { FileDiff, MessageSquareMore } from "lucide";
 import { parseUnifiedDiff } from "../diff.js";
-import { dashboardThemeStyles } from "../styles.js";
 import type { ParsedDiffLine, ReviewDiffFile } from "../types.js";
 import "./cr-icon.js";
 
@@ -15,170 +14,7 @@ export class CrDiffViewer extends LitElement {
     error: {},
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-        min-height: 0;
-      }
-
-      .shell {
-        display: grid;
-        grid-template-columns: 240px minmax(0, 1fr);
-        min-height: 0;
-        border-radius: 12px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        background: var(--surface);
-        box-shadow: var(--shadow-sm);
-      }
-
-      .files {
-        display: grid;
-        align-content: start;
-        gap: 8px;
-        padding: 18px;
-        background: var(--panel-muted);
-        border-right: 1px solid var(--line);
-        overflow: auto;
-      }
-
-      .file {
-        display: grid;
-        gap: 6px;
-        width: 100%;
-        padding: 12px;
-        border-radius: 8px;
-        border: 1px solid transparent;
-        background: transparent;
-        text-align: left;
-        color: var(--ink);
-        cursor: pointer;
-        transition:
-          background 140ms ease,
-          border-color 140ms ease,
-          transform 140ms ease;
-      }
-
-      .file-head,
-      .comment {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .file:hover {
-        transform: translateY(-1px);
-        border-color: var(--line);
-        background: rgba(255, 255, 255, 0.56);
-      }
-
-      .file[data-active="true"] {
-        border-color: rgba(59, 130, 246, 0.3);
-        background: rgba(59, 130, 246, 0.12);
-      }
-
-      .viewer {
-        display: grid;
-        min-height: 0;
-      }
-
-      .empty,
-      .error {
-        padding: 18px;
-        color: var(--ink-soft);
-      }
-
-      .error {
-        color: var(--danger);
-      }
-
-      .code {
-        display: grid;
-        align-content: start;
-        overflow: auto;
-        background: #0d141d;
-      }
-
-      .line {
-        display: grid;
-        grid-template-columns: 56px 56px 1fr auto;
-        gap: 12px;
-        align-items: start;
-        padding: 0 16px;
-        border-bottom: 1px solid rgba(79, 61, 40, 0.08);
-        color: var(--ink);
-        font-size: 0.88rem;
-        line-height: 1.6;
-      }
-
-      .line[data-kind="add"] {
-        background: rgba(44, 106, 83, 0.08);
-      }
-
-      .line[data-kind="remove"] {
-        background: rgba(154, 65, 50, 0.08);
-      }
-
-      .line[data-kind="header"] {
-        background: rgba(148, 163, 184, 0.08);
-        color: var(--ink-soft);
-      }
-
-      .line[data-active="true"] {
-        outline: 1px solid rgba(59, 130, 246, 0.42);
-        outline-offset: -1px;
-      }
-
-      .numbers {
-        padding: 8px 0;
-        color: var(--ink-faint);
-        text-align: right;
-      }
-
-      pre {
-        margin: 0;
-        padding: 8px 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-
-      .comment {
-        margin: 6px 0;
-        min-height: 28px;
-        padding: 0 10px;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        background: transparent;
-        color: var(--ink-soft);
-        cursor: pointer;
-        transition:
-          background 140ms ease,
-          border-color 140ms ease,
-          color 140ms ease;
-      }
-
-      .comment:hover {
-        border-color: var(--line);
-        background: rgba(255, 255, 255, 0.72);
-      }
-
-      @media (max-width: 980px) {
-        .shell {
-          grid-template-columns: 1fr;
-        }
-
-        .files {
-          grid-auto-flow: column;
-          grid-auto-columns: minmax(220px, 1fr);
-          overflow: auto;
-          border-right: none;
-          border-bottom: 1px solid var(--line);
-        }
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare files: ReviewDiffFile[];
   declare selectedFileId: string;
@@ -238,69 +74,75 @@ export class CrDiffViewer extends LitElement {
     const parsedLines = parseUnifiedDiff(this.selectedPatch);
 
     return html`
-      <section class="shell">
-        <div class="files">
+      <style>
+        .diff-line[data-kind="add"] { background: rgba(34,197,94,0.1); }
+        .diff-line[data-kind="remove"] { background: rgba(239,68,68,0.1); }
+        .diff-line[data-kind="header"] { background: rgba(148,163,184,0.07); color: #94a3b8; }
+        .diff-line[data-active="true"] { outline: 2px solid rgba(99,102,241,0.5); outline-offset: -1px; }
+      </style>
+      <div class="grid min-h-0 rounded-xl overflow-hidden border border-base-300 bg-base-100"
+           style="grid-template-columns: 240px minmax(0, 1fr)">
+        <!-- file list sidebar -->
+        <div class="bg-base-200 border-r border-base-300 p-3 flex flex-col gap-1 overflow-auto">
           ${this.files.map(
             (file) => html`
               <button
-                class="file"
-                data-active=${String(file.id === this.selectedFileId)}
+                class="btn btn-ghost btn-xs justify-start gap-2 font-mono text-left ${file.id === this.selectedFileId ? "btn-active" : ""}"
                 type="button"
                 @click=${() => this.chooseFile(file)}
               >
-                <strong class="file-head">
-                  <cr-icon .icon=${FileDiff} .size=${16}></cr-icon>
-                  ${file.path}
-                </strong>
-                <span class="subtle">${file.status || "modified"}</span>
+                <cr-icon .icon=${FileDiff} .size=${14}></cr-icon>
+                <span class="truncate">${file.path}</span>
               </button>
             `
           )}
         </div>
 
-        <div class="viewer">
+        <!-- diff viewer -->
+        <div class="overflow-auto bg-[#0d141d] font-mono text-xs">
           ${
             this.loading
-              ? html`<div class="empty">Loading diff…</div>`
+              ? html`<div class="p-4 text-base-content/50">Loading diff…</div>`
               : this.error
-                ? html`<div class="error">${this.error}</div>`
+                ? html`<div class="p-4 text-error">${this.error}</div>`
                 : !selectedFile
-                  ? html`<div class="empty">Pick a file to inspect its patch.</div>`
+                  ? html`<div class="p-4 text-base-content/50">Pick a file to inspect its patch.</div>`
                   : parsedLines.length === 0
-                    ? html`<div class="empty">No textual patch is available for this file.</div>`
-                    : html`
-                      <div class="code">
-                        ${parsedLines.map(
-                          (line) => html`
-                            <div
-                              class="line mono"
-                              data-kind=${line.kind}
-                              data-active=${String(
-                                selectedFile &&
-                                  this.selectedLineKey === this.lineKey(selectedFile, line)
-                              )}
-                            >
-                              <div class="numbers">${line.oldLineNumber ?? ""}</div>
-                              <div class="numbers">${line.newLineNumber ?? ""}</div>
-                              <pre>${line.text}</pre>
-                              ${
-                                line.commentable
-                                  ? html`
-                                    <button class="comment" type="button" @click=${() => this.chooseLine(selectedFile, line)}>
-                                      <cr-icon .icon=${MessageSquareMore} .size=${14}></cr-icon>
-                                      Comment
-                                    </button>
-                                  `
-                                  : html`<div></div>`
-                              }
-                            </div>
-                          `
-                        )}
-                      </div>
-                    `
+                    ? html`<div class="p-4 text-base-content/50">No textual patch is available for this file.</div>`
+                    : parsedLines.map(
+                        (line) => html`
+                          <div
+                            class="diff-line grid gap-3 px-4 border-b border-base-100/5 leading-relaxed"
+                            style="grid-template-columns: 3.5rem 3.5rem 1fr auto"
+                            data-kind=${line.kind}
+                            data-active=${String(
+                              selectedFile &&
+                                this.selectedLineKey === this.lineKey(selectedFile, line)
+                            )}
+                          >
+                            <span class="text-right text-base-content/30 py-1.5">${line.oldLineNumber ?? ""}</span>
+                            <span class="text-right text-base-content/30 py-1.5">${line.newLineNumber ?? ""}</span>
+                            <pre class="py-1.5 whitespace-pre-wrap break-words m-0">${line.text}</pre>
+                            ${
+                              line.commentable
+                                ? html`
+                                  <button
+                                    class="btn btn-ghost btn-xs gap-1 my-0.5"
+                                    type="button"
+                                    @click=${() => this.chooseLine(selectedFile, line)}
+                                  >
+                                    <cr-icon .icon=${MessageSquareMore} .size=${12}></cr-icon>
+                                    Comment
+                                  </button>
+                                `
+                                : html`<span></span>`
+                            }
+                          </div>
+                        `
+                      )
           }
         </div>
-      </section>
+      </div>
     `;
   }
 

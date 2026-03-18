@@ -19,7 +19,7 @@ function isBundledRuntime(): boolean {
 
 export function getWebAppHtml(): string {
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dim">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -28,23 +28,15 @@ export function getWebAppHtml(): string {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      :root {
-        color: #e6edf6;
-        background: #0c1117;
-        font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        background:
-          radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26rem),
-          linear-gradient(180deg, #0b1016 0%, #0d131c 100%);
-      }
+      body { margin: 0; }
+      cr-dashboard-app { display: block; min-height: 100vh; }
+      cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header { display: contents; }
     </style>
   </head>
   <body>

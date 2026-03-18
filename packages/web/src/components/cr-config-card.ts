@@ -1,5 +1,4 @@
-import { LitElement, css, html } from "lit";
-import { dashboardThemeStyles } from "../styles.js";
+import { LitElement, html } from "lit";
 
 export class CrConfigCard extends LitElement {
   static properties = {
@@ -8,30 +7,7 @@ export class CrConfigCard extends LitElement {
     note: {},
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .panel {
-        display: grid;
-        gap: 12px;
-        min-height: 100%;
-        padding: 18px;
-        border-radius: var(--radius-md);
-      }
-
-      h3 {
-        font-size: 1.4rem;
-      }
-
-      p {
-        margin: 0;
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare label: string;
   declare value: string;
@@ -46,11 +22,13 @@ export class CrConfigCard extends LitElement {
 
   render() {
     return html`
-      <section class="panel">
-        <div class="eyebrow">${this.label}</div>
-        <h3>${this.value || "Not configured"}</h3>
-        ${this.note ? html`<p class="muted">${this.note}</p>` : ""}
-      </section>
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body gap-2">
+          <div class="text-xs font-bold uppercase tracking-widest text-base-content/40">${this.label}</div>
+          <h3 class="text-lg font-bold">${this.value || "Not configured"}</h3>
+          ${this.note ? html`<p class="text-sm text-base-content/50">${this.note}</p>` : ""}
+        </div>
+      </div>
     `;
   }
 }

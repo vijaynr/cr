@@ -1,6 +1,5 @@
-import { LitElement, css, html } from "lit";
+import { LitElement, html } from "lit";
 import type { IconNode } from "lucide";
-import { dashboardThemeStyles } from "../styles.js";
 import "./cr-icon.js";
 
 type StatTone = "default" | "accent" | "success";
@@ -14,45 +13,7 @@ export class CrStatCard extends LitElement {
     icon: { attribute: false },
   };
 
-  static styles = [
-    dashboardThemeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .card {
-        display: grid;
-        gap: 12px;
-        min-height: 100%;
-        padding: 18px;
-        border-radius: var(--radius-md);
-        border-left: 3px solid transparent;
-      }
-
-      .card[data-tone="accent"] {
-        border-left-color: var(--accent);
-      }
-
-      .card[data-tone="success"] {
-        border-left-color: var(--success);
-      }
-
-      strong {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        font-size: clamp(1.8rem, 3vw, 2.6rem);
-        font-weight: 700;
-        line-height: 1;
-        letter-spacing: -0.04em;
-      }
-
-      p {
-        margin: 0;
-      }
-    `,
-  ];
+  override createRenderRoot() { return this; }
 
   declare eyebrow: string;
   declare value: string;
@@ -69,16 +30,22 @@ export class CrStatCard extends LitElement {
     this.icon = null;
   }
 
+  private get toneClass() {
+    if (this.tone === "accent") return "border-l-4 border-primary";
+    if (this.tone === "success") return "border-l-4 border-success";
+    return "border-l-4 border-transparent";
+  }
+
   render() {
     return html`
-      <section class="card panel" data-tone=${this.tone}>
-        <span class="eyebrow">${this.eyebrow}</span>
-        <strong>
-          ${this.icon ? html`<cr-icon .icon=${this.icon} .size=${18}></cr-icon>` : ""}
+      <div class="stat bg-base-200 rounded-xl ${this.toneClass}">
+        <div class="stat-title text-base-content/60">${this.eyebrow}</div>
+        <div class="stat-value text-3xl font-bold tracking-tight flex items-center gap-2">
+          ${this.icon ? html`<cr-icon .icon=${this.icon} .size=${22}></cr-icon>` : ""}
           ${this.value}
-        </strong>
-        <p class="muted">${this.note}</p>
-      </section>
+        </div>
+        <div class="stat-desc text-base-content/50">${this.note}</div>
+      </div>
     `;
   }
 }
