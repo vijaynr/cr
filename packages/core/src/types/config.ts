@@ -6,6 +6,7 @@ export type CRConfig = {
   defaultReviewAgents?: string[];
   gitlabUrl: string;
   gitlabKey: string;
+  githubUrl?: string;
   githubToken?: string;
   svnRepositoryUrl?: string;
   svnUsername?: string;

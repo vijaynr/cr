@@ -1,4 +1,4 @@
-export { createGitHubClient, GitHubClient, isGitHubRemote, remoteToRepoPath } from "./client.js";
+export { createGitHubClient, GitHubClient, isGitHubRemote, looksLikeConfiguredGitHub, remoteToRepoPath } from "./client.js";
 export type { RequestOptions } from "./http-client.js";
 export { GitHubApiError, GitHubHttpClient } from "./http-client.js";
 export type {

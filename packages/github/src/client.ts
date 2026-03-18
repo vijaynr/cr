@@ -80,6 +80,31 @@ export function isGitHubRemote(remoteUrl: string): boolean {
   );
 }
 
+/**
+ * Returns true if the remote URL points to a GitHub instance — either github.com
+ * or a GitHub Enterprise Server at the given configured base URL.
+ */
+export function looksLikeConfiguredGitHub(remoteUrl: string, githubUrl: string): boolean {
+  if (isGitHubRemote(remoteUrl)) {
+    return true;
+  }
+
+  if (!githubUrl) {
+    return false;
+  }
+
+  try {
+    const configuredHost = new URL(githubUrl).hostname.toLowerCase();
+    const remoteHost = remoteUrl.toLowerCase();
+    return (
+      remoteHost.includes(configuredHost) ||
+      remoteUrl.startsWith(`git@${configuredHost}:`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // GitHubClient
 // ---------------------------------------------------------------------------
@@ -87,8 +112,8 @@ export function isGitHubRemote(remoteUrl: string): boolean {
 export class GitHubClient {
   private readonly http: GitHubHttpClient;
 
-  constructor(token: string) {
-    this.http = new GitHubHttpClient(token);
+  constructor(token: string, baseUrl?: string) {
+    this.http = new GitHubHttpClient(token, baseUrl);
   }
 
   // -------------------------------------------------------------------------

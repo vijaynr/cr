@@ -6,10 +6,10 @@
 import { GitHubClient } from "@cr/github";
 
 export type { GitHubInlineComment } from "@cr/github";
-export { isGitHubRemote } from "@cr/github";
+export { isGitHubRemote, looksLikeConfiguredGitHub } from "@cr/github";
 
-function client(token: string): GitHubClient {
-  return new GitHubClient(token);
+function client(token: string, baseUrl?: string): GitHubClient {
+  return new GitHubClient(token, baseUrl);
 }
 
 /** @deprecated Use remoteToRepoPath from @cr/github instead */
@@ -34,9 +34,10 @@ export function githubBranchExists(
 export function listGitHubPullRequests(
   token: string,
   repoPath: string,
-  state: "open" | "closed" | "all" = "open"
+  state: "open" | "closed" | "all" = "open",
+  baseUrl?: string
 ) {
-  return client(token).listPullRequests(repoPath, state);
+  return client(token, baseUrl).listPullRequests(repoPath, state);
 }
 
 export function findOpenGitHubPullRequestByHead(

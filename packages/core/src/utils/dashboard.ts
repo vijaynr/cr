@@ -1,7 +1,7 @@
 import type { DashboardData, DashboardProviderData } from "../types/web.js";
 import { envOrConfig, loadCRConfig } from "./config.js";
 import { getOriginRemoteUrl } from "./git.js";
-import { isGitHubRemote, listGitHubPullRequests, remoteToGitHubRepoPath } from "./github.js";
+import { isGitHubRemote, listGitHubPullRequests, looksLikeConfiguredGitHub, remoteToGitHubRepoPath } from "./github.js";
 import { listMergeRequests, remoteToProjectPath } from "./gitlab.js";
 import {
   getCurrentUser as rbGetCurrentUser,
@@ -115,9 +115,10 @@ async function loadGitLabDashboardProvider(args: {
 
 async function loadGitHubDashboardProvider(args: {
   remoteUrl?: string;
+  githubUrl: string;
   githubToken: string;
 }): Promise<DashboardProviderData> {
-  const { githubToken, remoteUrl } = args;
+  const { githubToken, githubUrl, remoteUrl } = args;
   if (!githubToken) {
     return {
       provider: "github",
@@ -136,7 +137,7 @@ async function loadGitHubDashboardProvider(args: {
     };
   }
 
-  if (!isGitHubRemote(remoteUrl)) {
+  if (!looksLikeConfiguredGitHub(remoteUrl, githubUrl)) {
     return {
       provider: "github",
       configured: true,
@@ -145,9 +146,14 @@ async function loadGitHubDashboardProvider(args: {
     };
   }
 
+  // Derive GHE API base URL: GitHub Enterprise Server exposes its REST API at /api/v3
+  const apiBaseUrl = githubUrl && !isGitHubRemote(remoteUrl)
+    ? `${githubUrl.replace(/\/+$/, "")}/api/v3`
+    : undefined;
+
   try {
     const repo = remoteToGitHubRepoPath(remoteUrl);
-    const pullRequests = await listGitHubPullRequests(githubToken, repo, "open");
+    const pullRequests = await listGitHubPullRequests(githubToken, repo, "open", apiBaseUrl);
 
     return {
       provider: "github",
@@ -254,6 +260,7 @@ export async function loadDashboardData(
 
   const gitlabUrl = envOrConfig("GITLAB_URL", config.gitlabUrl, "");
   const gitlabKey = envOrConfig("GITLAB_KEY", config.gitlabKey, "");
+  const githubUrl = envOrConfig("GITHUB_URL", config.githubUrl, "");
   const githubToken = envOrConfig("GITHUB_TOKEN", config.githubToken, "");
   const rbUrl = envOrConfig("RB_URL", config.rbUrl, "");
   const rbToken = envOrConfig("RB_TOKEN", config.rbToken, "");
@@ -283,6 +290,7 @@ export async function loadDashboardData(
     }),
     loadGitHubDashboardProvider({
       remoteUrl: repository.remoteUrl,
+      githubUrl,
       githubToken,
     }),
     loadReviewBoardDashboardProvider({
@@ -306,7 +314,7 @@ export async function loadDashboardData(
       },
       github: {
         configured: Boolean(githubToken),
-        url: "https://github.com",
+        url: githubUrl || "https://github.com",
       },
       reviewboard: {
         configured: Boolean(rbUrl && rbToken),

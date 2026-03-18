@@ -181,6 +181,7 @@ export type CRConfigRecord = {
   defaultReviewAgents?: string[];
   gitlabUrl?: string;
   gitlabKey?: string;
+  githubUrl?: string;
   githubToken?: string;
   rbUrl?: string;
   rbToken?: string;

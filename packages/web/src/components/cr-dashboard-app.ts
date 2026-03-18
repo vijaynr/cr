@@ -82,6 +82,7 @@ type ConfigDraft = {
   defaultReviewAgents: string[];
   gitlabUrl: string;
   gitlabKey: string;
+  githubUrl: string;
   githubToken: string;
   rbUrl: string;
   rbToken: string;
@@ -661,6 +662,7 @@ export class CrDashboardApp extends LitElement {
             : ["general"],
         gitlabUrl: this.configDraft.gitlabUrl.trim(),
         gitlabKey: this.configDraft.gitlabKey.trim(),
+        githubUrl: this.optionalString(this.configDraft.githubUrl),
         githubToken: this.optionalString(this.configDraft.githubToken),
         rbUrl: this.optionalString(this.configDraft.rbUrl),
         rbToken: this.optionalString(this.configDraft.rbToken),
@@ -748,6 +750,7 @@ export class CrDashboardApp extends LitElement {
       defaultReviewAgents: ["general"],
       gitlabUrl: "",
       gitlabKey: "",
+      githubUrl: "",
       githubToken: "",
       rbUrl: "",
       rbToken: "",
@@ -801,6 +804,7 @@ export class CrDashboardApp extends LitElement {
       defaultReviewAgents: defaultAgents.length > 0 ? defaultAgents : ["general"],
       gitlabUrl: config.gitlabUrl ?? dashboard?.config.gitlab?.url ?? "",
       gitlabKey: config.gitlabKey ?? "",
+      githubUrl: config.githubUrl ?? dashboard?.config.github?.url ?? "",
       githubToken: config.githubToken ?? "",
       rbUrl: config.rbUrl ?? dashboard?.config.reviewboard?.url ?? "",
       rbToken: config.rbToken ?? "",
@@ -946,10 +950,26 @@ export class CrDashboardApp extends LitElement {
 
   private detectProviderFromUrl(url: string): ProviderId | null {
     const lower = url.toLowerCase();
+
+    // Check against configured GitHub URL (supports GitHub Enterprise)
+    const githubBaseUrl = this.configDraft.githubUrl || this.dashboard?.config.github?.url || "";
+    if (githubBaseUrl) {
+      try {
+        const githubHost = new URL(githubBaseUrl).hostname.toLowerCase();
+        const inputHost = new URL(url).hostname.toLowerCase();
+        if (inputHost === githubHost) {
+          return "github";
+        }
+      } catch {
+        // fall through
+      }
+    }
+
     if (lower.includes("github.com")) {
       return "github";
     }
 
+    // Check against configured GitLab URL (supports self-hosted GitLab)
     const gitlabBaseUrl = this.configDraft.gitlabUrl || this.dashboard?.config.gitlab?.url || "";
     if (gitlabBaseUrl) {
       try {
@@ -1719,6 +1739,7 @@ export class CrDashboardApp extends LitElement {
             </div>
             <div class="divider my-0 text-xs">GitHub</div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${this.renderConfigInput({ label: "GitHub URL", note: "Leave blank for github.com. Set to your GitHub Enterprise Server base URL (e.g. https://github.mycompany.com).", value: this.configDraft.githubUrl, onInput: (v) => this.handleConfigField("githubUrl", v) })}
               ${this.renderConfigInput({ label: "GitHub token", note: "PAT to list pull requests and post review comments.", value: this.configDraft.githubToken, type: "password", onInput: (v) => this.handleConfigField("githubToken", v) })}
             </div>
             <div class="divider my-0 text-xs">Review Board</div>
