@@ -45,7 +45,6 @@ import {
   type DashboardSection,
   type ProviderId,
   type RepositoryContext,
-  type RepositorySourceMode,
   type ReviewAgentOption,
   type ReviewChatContext,
   type ReviewChatHistoryEntry,
@@ -110,9 +109,8 @@ export class CrDashboardApp extends LitElement {
     provider: { state: true },
     stateFilter: { state: true },
     searchTerm: { state: true },
-    repositoryMode: { state: true },
-    repositoryPathInput: { state: true },
     repositoryUrlInput: { state: true },
+    repositoryFormExpanded: { state: true },
     activeRepositoryPath: { state: true },
     activeRepositoryUrl: { state: true },
     localRepositories: { state: true },
@@ -637,9 +635,8 @@ export class CrDashboardApp extends LitElement {
   declare provider: ProviderId;
   declare stateFilter: ReviewState;
   declare searchTerm: string;
-  declare repositoryMode: RepositorySourceMode;
-  declare repositoryPathInput: string;
   declare repositoryUrlInput: string;
+  declare repositoryFormExpanded: boolean;
   declare activeRepositoryPath: string;
   declare activeRepositoryUrl: string;
   declare localRepositories: string[];
@@ -692,9 +689,8 @@ export class CrDashboardApp extends LitElement {
     this.provider = "gitlab";
     this.stateFilter = "opened";
     this.searchTerm = "";
-    this.repositoryMode = "local";
-    this.repositoryPathInput = "";
     this.repositoryUrlInput = "";
+    this.repositoryFormExpanded = false;
     this.activeRepositoryPath = "";
     this.activeRepositoryUrl = "";
     this.localRepositories = [];
@@ -1395,11 +1391,65 @@ export class CrDashboardApp extends LitElement {
   }
 
   private async applyRepositorySelection() {
-    this.activeRepositoryPath =
-      this.repositoryMode === "local" ? this.repositoryPathInput.trim() : "";
-    this.activeRepositoryUrl =
-      this.repositoryMode === "remote" ? this.repositoryUrlInput.trim() : "";
+    const input = this.repositoryUrlInput.trim();
+    if (!input) {
+      return;
+    }
+
+    const isUrl = input.startsWith("http://") || input.startsWith("https://");
+    this.activeRepositoryUrl = isUrl ? input : "";
+    this.activeRepositoryPath = isUrl ? "" : input;
+    this.repositoryFormExpanded = false;
+
+    // Auto-detect provider from URL and navigate to it
+    if (isUrl) {
+      const detected = this.detectProviderFromUrl(input);
+      if (detected) {
+        this.provider = detected;
+      }
+    }
+
     await this.loadInitialData({ preserveProvider: true });
+
+    // Navigate to the provider section so the user sees results immediately
+    this.activeSection = this.provider;
+  }
+
+  private detectProviderFromUrl(url: string): ProviderId | null {
+    const lower = url.toLowerCase();
+    if (lower.includes("github.com")) {
+      return "github";
+    }
+
+    const gitlabBaseUrl = this.configDraft.gitlabUrl || this.dashboard?.config.gitlab?.url || "";
+    if (gitlabBaseUrl) {
+      try {
+        const gitlabHost = new URL(gitlabBaseUrl).hostname.toLowerCase();
+        const inputHost = new URL(url).hostname.toLowerCase();
+        if (inputHost === gitlabHost) {
+          return "gitlab";
+        }
+      } catch {
+        // fall through to string matching
+      }
+    }
+
+    if (lower.includes("gitlab")) {
+      return "gitlab";
+    }
+
+    return null;
+  }
+
+  private clearRepositorySelection() {
+    this.activeRepositoryPath = "";
+    this.activeRepositoryUrl = "";
+    this.repositoryUrlInput = "";
+    this.repositoryFormExpanded = false;
+    this.targets = [];
+    this.selectedTarget = null;
+    this.detailTarget = null;
+    this.targetsError = this.repositorySelectionMessage;
   }
 
   render() {
@@ -1534,111 +1584,127 @@ export class CrDashboardApp extends LitElement {
   }
 
   private renderRepositorySelector() {
+    const hasActive = Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
+    const activeLabel = this.activeRepositoryUrl || this.activeRepositoryPath;
+    const showForm = !hasActive || this.repositoryFormExpanded;
+
     return html`
       <section class="context-panel">
-        <form
-          class="context-form panel"
-          @submit=${async (event: Event) => {
-            event.preventDefault();
-            await this.applyRepositorySelection();
-          }}
-        >
-          <div class="section-head">
-            <div>
-              <div class="eyebrow">Repository context</div>
-              <h3>Select a repo source</h3>
-            </div>
-            <div class="context-status">
-              ${
-                this.activeRepositoryPath
-                  ? html`<div class="badge" data-tone="success">local checkout active</div>`
-                  : ""
-              }
-              ${
-                this.activeRepositoryUrl
-                  ? html`<div class="badge" data-tone="accent">remote URL active</div>`
-                  : ""
-              }
-            </div>
-          </div>
-
-          <div class="segmented">
-            ${(["local", "remote"] as RepositorySourceMode[]).map(
-              (mode) => html`
-                <button
-                  type="button"
-                  data-active=${String(this.repositoryMode === mode)}
-                  @click=${() => {
-                    this.repositoryMode = mode;
-                  }}
-                >
-                  ${mode === "local" ? "Use local checkout" : "Use repository URL"}
-                </button>
-              `
-            )}
-          </div>
-
-          <div class="context-fields">
-            ${
-              this.repositoryMode === "local"
-                ? html`
-                  <label class="field-block">
-                    <span>Local repository path</span>
-                    <div class="field-note">Choose a checked out repo to unlock queue browsing and AI workflows.</div>
-                    <select
-                      class="field"
-                      .value=${this.repositoryPathInput}
-                      @change=${(event: Event) => {
-                        this.repositoryPathInput = (event.target as HTMLSelectElement).value;
+        ${
+          hasActive && !this.repositoryFormExpanded
+            ? html`
+              <div class="context-form panel">
+                <div class="section-head">
+                  <div>
+                    <div class="eyebrow">Repository context</div>
+                    <div class="context-status">
+                      <div class="badge" data-tone=${this.activeRepositoryUrl ? "accent" : "success"}>
+                        ${this.activeRepositoryUrl ? "remote URL" : "local checkout"}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button
+                      class="button"
+                      data-tone="ghost"
+                      type="button"
+                      @click=${() => {
+                        this.repositoryFormExpanded = true;
                       }}
                     >
-                      <option value="">Select a local repository</option>
-                      ${
-                        this.localRepositories.length === 0
-                          ? html`<option value="">${this.loadingLocalRepositories ? "Scanning local repositories…" : "No repositories discovered nearby"}</option>`
-                          : this.localRepositories.map(
-                              (repo) => html`<option value=${repo}>${repo}</option>`
-                            )
-                      }
-                    </select>
-                  </label>
+                      Change
+                    </button>
+                    <button
+                      class="button"
+                      data-tone="ghost"
+                      type="button"
+                      @click=${() => this.clearRepositorySelection()}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div class="notice" data-tone="success">${activeLabel}</div>
+              </div>
+            `
+            : html`
+              <form
+                class="context-form panel"
+                @submit=${async (event: Event) => {
+                  event.preventDefault();
+                  await this.applyRepositorySelection();
+                }}
+              >
+                <div class="section-head">
+                  <div>
+                    <div class="eyebrow">Repository context</div>
+                    <h3>Connect a repository</h3>
+                  </div>
+                  ${
+                    hasActive
+                      ? html`
+                        <button
+                          class="button"
+                          data-tone="ghost"
+                          type="button"
+                          @click=${() => {
+                            this.repositoryFormExpanded = false;
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      `
+                      : ""
+                  }
+                </div>
 
-                  ${this.renderConfigInput({
-                    label: "Or enter a local path",
-                    note: "Use this when the checkout is outside the discovered list.",
-                    value: this.repositoryPathInput,
-                    onInput: (value) => {
-                      this.repositoryPathInput = value;
-                    },
-                  })}
-                `
-                : this.renderConfigInput({
-                    label: "Repository URL",
-                    note: "Paste the GitHub or GitLab repository URL to browse review data without a local checkout.",
-                    value: this.repositoryUrlInput,
-                    type: "url",
-                    onInput: (value) => {
-                      this.repositoryUrlInput = value;
-                    },
-                  })
-            }
-          </div>
+                <label class="field-block">
+                  <span>Repository URL or local path</span>
+                  <div class="field-note">
+                    Paste a GitHub or GitLab URL — the provider is detected automatically.
+                    Or enter a local checkout path to enable AI workflows.
+                  </div>
+                  <input
+                    class="field"
+                    type="text"
+                    placeholder="https://github.com/owner/repo  or  /path/to/local/checkout"
+                    .value=${this.repositoryUrlInput}
+                    list="local-repos-list"
+                    @input=${(event: Event) => {
+                      this.repositoryUrlInput = (event.target as HTMLInputElement).value;
+                    }}
+                  />
+                  ${
+                    this.localRepositories.length > 0
+                      ? html`
+                        <datalist id="local-repos-list">
+                          ${this.localRepositories.map(
+                            (repo) => html`<option value=${repo}></option>`
+                          )}
+                        </datalist>
+                      `
+                      : ""
+                  }
+                </label>
 
-          <div class="actions">
-            <button
-              class="button"
-              data-tone="primary"
-              type="submit"
-              ?disabled=${
-                this.repositoryMode === "local"
-                  ? !this.repositoryPathInput.trim()
-                  : !this.repositoryUrlInput.trim()
-              }
-            >
-              Apply repository source
-            </button>
-          </div>
-        </form>
+                <div class="actions">
+                  <button
+                    class="button"
+                    data-tone="primary"
+                    type="submit"
+                    ?disabled=${!this.repositoryUrlInput.trim()}
+                  >
+                    Load review queue
+                  </button>
+                  ${
+                    !this.loadingLocalRepositories && this.localRepositories.length > 0
+                      ? html`<span class="field-note">${this.localRepositories.length} local repo${this.localRepositories.length === 1 ? "" : "s"} discovered nearby</span>`
+                      : ""
+                  }
+                </div>
+              </form>
+            `
+        }
       </section>
     `;
   }
@@ -1653,11 +1719,10 @@ export class CrDashboardApp extends LitElement {
     );
     const defaultAgents =
       this.dashboard?.config.defaultReviewAgents.length ?? this.selectedAgents.length ?? 0;
+    const hasActive = Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
 
     return html`
       <section class="overview-shell">
-        ${this.renderRepositorySelector()}
-
         <section class="overview-lead">
           <section class="feature-panel panel hero-copy">
             <div class="eyebrow">Workspace overview</div>
@@ -1678,18 +1743,36 @@ export class CrDashboardApp extends LitElement {
           </section>
 
           <section class="hero-aside">
-            <div class="notice" data-tone="success">
+            ${
+              hasActive
+                ? html`
+                  <div class="notice" data-tone="success">
+                    <strong>Repository connected.</strong>
+                    ${this.activeRepositoryUrl || this.activeRepositoryPath}
+                    <br/><br/>
+                    <button class="button" data-tone="primary" type="button" @click=${() => this.handleSectionChange(this.provider)}>
+                      Open ${providerLabels[this.provider]} workspace
+                    </button>
+                  </div>
+                `
+                : html`
+                  <div class="notice" data-tone="accent">
+                    <strong>No repository connected.</strong>
+                    Paste a GitHub or GitLab URL below to load your review queue, or pick a provider tab and connect there.
+                  </div>
+                `
+            }
+            <div class="notice">
               ${
                 configuredProviders === providerOrder.length
                   ? "All providers are configured. You can move straight into triage and review."
                   : `${providerOrder.length - configuredProviders} provider connection${providerOrder.length - configuredProviders === 1 ? "" : "s"} still need attention.`
               }
             </div>
-            <div class="notice">
-              Default review agents currently start with ${defaultAgents || 1} profile${defaultAgents === 1 ? "" : "s"} enabled.
-            </div>
           </section>
         </section>
+
+        ${this.renderRepositorySelector()}
 
         <div class="summary-grid">
           <cr-stat-card
@@ -1784,6 +1867,7 @@ export class CrDashboardApp extends LitElement {
   private renderProviderPage() {
     const label = providerLabels[this.provider];
     const detail = this.detailTarget;
+    const hasRepo = this.hasRepositorySelection;
     const providerError = this.providerAvailabilityError;
 
     if (!this.configured) {
@@ -1814,74 +1898,46 @@ export class CrDashboardApp extends LitElement {
       <section class="provider-shell">
         ${this.renderRepositorySelector()}
 
-        <div class="summary-grid">
-          <cr-stat-card
-            .eyebrow=${`${label} queue`}
-            .value=${String(this.targets.length)}
-            .note=${`${this.stateFilter} requests currently loaded`}
-            .tone=${this.targets.length > 0 ? "accent" : "default"}
-            .icon=${FolderSearch}
-          ></cr-stat-card>
-          <cr-stat-card
-            .eyebrow=${"Selected agents"}
-            .value=${String(this.selectedAgents.length || 1)}
-            .note=${"Profiles ready for the next review run"}
-            .icon=${BrainCircuit}
-          ></cr-stat-card>
-          <cr-stat-card
-            .eyebrow=${"Diff workspace"}
-            .value=${String(detail ? this.diffFiles.length : 0)}
-            .note=${detail ? detail.title : "Choose a request to inspect"}
-            .tone=${detail ? "success" : "default"}
-            .icon=${FileDiff}
-          ></cr-stat-card>
-        </div>
-
-        <section class="provider-hero panel">
-          <div class="provider-hero-copy">
-            <div class="section-head">
-              <div>
-                <div class="eyebrow">${label}</div>
-                <h2>${label} review workspace</h2>
+        ${
+          hasRepo || this.provider === "reviewboard"
+            ? html`
+              <div class="summary-grid">
+                <cr-stat-card
+                  .eyebrow=${`${label} queue`}
+                  .value=${String(this.targets.length)}
+                  .note=${`${this.stateFilter} requests currently loaded`}
+                  .tone=${this.targets.length > 0 ? "accent" : "default"}
+                  .icon=${FolderSearch}
+                ></cr-stat-card>
+                <cr-stat-card
+                  .eyebrow=${"Selected agents"}
+                  .value=${String(this.selectedAgents.length || 1)}
+                  .note=${"Profiles ready for the next review run"}
+                  .icon=${BrainCircuit}
+                ></cr-stat-card>
+                <cr-stat-card
+                  .eyebrow=${"Diff workspace"}
+                  .value=${String(detail ? this.diffFiles.length : 0)}
+                  .note=${detail ? detail.title : "Choose a request to inspect"}
+                  .tone=${detail ? "success" : "default"}
+                  .icon=${FileDiff}
+                ></cr-stat-card>
               </div>
-              <div class="actions">
-                <div class="badge" data-tone="success">configured</div>
-                <button class="button" data-tone="ghost" type="button" @click=${() => this.handleSectionChange("settings")}>
-                  <cr-icon .icon=${Settings2} .size=${16}></cr-icon>
-                  Edit settings
-                </button>
-              </div>
-            </div>
-            <p class="muted">
-              Workflows for ${label} stay isolated here, while provider credentials and defaults live in Settings.
-            </p>
-            ${providerError ? html`<div class="notice" data-tone="warning">${providerError}</div>` : ""}
-          </div>
 
-          <div class="provider-toolbar">
-            <div class="notice">
-              Active state filter: <strong>${this.stateFilter}</strong>. Search narrows by id, title, author, and branch names.
-            </div>
-            ${
-              detail
-                ? html`
-                  <div class="notice" data-tone="success">
-                    Inspecting ${detail.provider === "gitlab" ? `!${detail.id}` : `#${detail.id}`} with ${this.diffFiles.length} file${this.diffFiles.length === 1 ? "" : "s"} loaded.
-                  </div>
-                `
-                : html`<div class="notice">Select a request from the queue to load its diff, commits, and action rail.</div>`
-            }
-          </div>
-        </section>
+              ${
+                providerError
+                  ? html`<div class="notice" data-tone="warning">${providerError}</div>`
+                  : ""
+              }
 
-        <div class="layout">
-          <section class="rail">
-            <div class="rail-panel panel">
-              <div class="section-head">
-                <div>
-                  <div class="eyebrow">${label}</div>
-                  <h2>Review queue</h2>
-                </div>
+              <div class="layout">
+                <section class="rail">
+                  <div class="rail-panel panel">
+                    <div class="section-head">
+                      <div>
+                        <div class="eyebrow">${label}</div>
+                        <h2>Review queue</h2>
+                      </div>
                 <div class="badge" data-tone="accent">${this.stateFilter}</div>
               </div>
 
@@ -2060,7 +2116,10 @@ export class CrDashboardApp extends LitElement {
               </div>
             </div>
           </aside>
-        </div>
+              </div>
+            `
+            : ""
+        }
       </section>
     `;
   }
