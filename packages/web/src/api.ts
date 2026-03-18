@@ -2,6 +2,7 @@ import type {
   CRConfigRecord,
   DashboardData,
   ProviderId,
+  RepositoryContext,
   ReviewAgentOption,
   ReviewChatContext,
   ReviewChatHistoryEntry,
@@ -216,8 +217,30 @@ function providerListState(provider: ProviderId, state: ReviewState): string {
   return state;
 }
 
-export async function loadDashboard(): Promise<DashboardData> {
-  return fetchJson<DashboardData>("/api/dashboard");
+function queryWithRepositoryContext(path: string, context?: RepositoryContext): string {
+  if (!context) {
+    return path;
+  }
+
+  const params = new URLSearchParams();
+  if (context.repoPath) {
+    params.set("repoPath", context.repoPath);
+  }
+  if (context.remoteUrl) {
+    params.set("remoteUrl", context.remoteUrl);
+  }
+
+  const query = params.toString();
+  return query ? `${path}${path.includes("?") ? "&" : "?"}${query}` : path;
+}
+
+export async function loadDashboard(context?: RepositoryContext): Promise<DashboardData> {
+  return fetchJson<DashboardData>(queryWithRepositoryContext("/api/dashboard", context));
+}
+
+export async function loadLocalRepositories(): Promise<string[]> {
+  const data = await fetchJson<{ repositories: string[] }>("/api/repositories/local");
+  return data.repositories;
 }
 
 export async function loadConfig(): Promise<CRConfigRecord> {
@@ -238,62 +261,84 @@ export async function loadReviewAgents(): Promise<ReviewAgentOption[]> {
 
 export async function loadReviewTargets(
   provider: ProviderId,
-  state: ReviewState
+  state: ReviewState,
+  context?: RepositoryContext
 ): Promise<ReviewTarget[]> {
   if (provider === "gitlab") {
     const data = await fetchJson<unknown[]>(
-      `/api/gitlab/merge-requests?state=${encodeURIComponent(providerListState(provider, state))}`
+      queryWithRepositoryContext(
+        `/api/gitlab/merge-requests?state=${encodeURIComponent(providerListState(provider, state))}`,
+        context
+      )
     );
     return data.map((item) => normalizeReviewTarget(provider, item));
   }
 
   if (provider === "github") {
     const data = await fetchJson<unknown[]>(
-      `/api/github/pull-requests?state=${encodeURIComponent(providerListState(provider, state))}`
+      queryWithRepositoryContext(
+        `/api/github/pull-requests?state=${encodeURIComponent(providerListState(provider, state))}`,
+        context
+      )
     );
     return data.map((item) => normalizeReviewTarget(provider, item));
   }
 
   const data = await fetchJson<unknown[]>(
-    `/api/reviewboard/review-requests?status=${encodeURIComponent(providerListState(provider, state))}`
+    queryWithRepositoryContext(
+      `/api/reviewboard/review-requests?status=${encodeURIComponent(providerListState(provider, state))}`,
+      context
+    )
   );
   return data.map((item) => normalizeReviewTarget(provider, item));
 }
 
 export async function loadReviewDetail(
   provider: ProviderId,
-  targetId: number
+  targetId: number,
+  context?: RepositoryContext
 ): Promise<ReviewTarget> {
   if (provider === "gitlab") {
-    const data = await fetchJson(`/api/gitlab/merge-requests/${targetId}`);
+    const data = await fetchJson(
+      queryWithRepositoryContext(`/api/gitlab/merge-requests/${targetId}`, context)
+    );
     return normalizeReviewTarget(provider, data);
   }
 
   if (provider === "github") {
-    const data = await fetchJson(`/api/github/pull-requests/${targetId}`);
+    const data = await fetchJson(
+      queryWithRepositoryContext(`/api/github/pull-requests/${targetId}`, context)
+    );
     return normalizeReviewTarget(provider, data);
   }
 
-  const data = await fetchJson(`/api/reviewboard/review-requests/${targetId}`);
+  const data = await fetchJson(
+    queryWithRepositoryContext(`/api/reviewboard/review-requests/${targetId}`, context)
+  );
   return normalizeReviewTarget(provider, data);
 }
 
 export async function loadReviewDiffs(
   provider: ProviderId,
-  targetId: number
+  targetId: number,
+  context?: RepositoryContext
 ): Promise<ReviewDiffFile[]> {
   if (provider === "gitlab") {
-    const data = await fetchJson<unknown[]>(`/api/gitlab/merge-requests/${targetId}/diffs`);
+    const data = await fetchJson<unknown[]>(
+      queryWithRepositoryContext(`/api/gitlab/merge-requests/${targetId}/diffs`, context)
+    );
     return data.map((item) => normalizeDiffFile(provider, item));
   }
 
   if (provider === "github") {
-    const data = await fetchJson<unknown[]>(`/api/github/pull-requests/${targetId}/diffs`);
+    const data = await fetchJson<unknown[]>(
+      queryWithRepositoryContext(`/api/github/pull-requests/${targetId}/diffs`, context)
+    );
     return data.map((item) => normalizeDiffFile(provider, item));
   }
 
   const data = await fetchJson<{ diffSet: { id: number } | null; files: unknown[] }>(
-    `/api/reviewboard/review-requests/${targetId}/diffs`
+    queryWithRepositoryContext(`/api/reviewboard/review-requests/${targetId}/diffs`, context)
   );
   const diffSetId = data.diffSet?.id;
   return data.files.map((item) => normalizeDiffFile(provider, item, diffSetId));
@@ -312,15 +357,20 @@ export async function loadReviewBoardFilePatch(
 
 export async function loadReviewCommits(
   provider: ProviderId,
-  targetId: number
+  targetId: number,
+  context?: RepositoryContext
 ): Promise<ReviewCommit[]> {
   if (provider === "gitlab") {
-    const data = await fetchJson<unknown[]>(`/api/gitlab/merge-requests/${targetId}/commits`);
+    const data = await fetchJson<unknown[]>(
+      queryWithRepositoryContext(`/api/gitlab/merge-requests/${targetId}/commits`, context)
+    );
     return data.map(normalizeCommit);
   }
 
   if (provider === "github") {
-    const data = await fetchJson<unknown[]>(`/api/github/pull-requests/${targetId}/commits`);
+    const data = await fetchJson<unknown[]>(
+      queryWithRepositoryContext(`/api/github/pull-requests/${targetId}/commits`, context)
+    );
     return data.map(normalizeCommit);
   }
 
@@ -333,6 +383,7 @@ export async function runReview(args: {
   agentNames: string[];
   inlineComments: boolean;
   userFeedback?: string;
+  repoPath?: string;
 }): Promise<ReviewRunResponse> {
   return fetchJson<ReviewRunResponse>("/api/review/run", {
     method: "POST",
@@ -343,6 +394,7 @@ export async function runReview(args: {
 export async function runSummary(args: {
   provider: ProviderId;
   targetId: number;
+  repoPath?: string;
 }): Promise<ReviewSummaryResponse> {
   return fetchJson<ReviewSummaryResponse>("/api/review/summarize", {
     method: "POST",
@@ -353,6 +405,7 @@ export async function runSummary(args: {
 export async function loadChatContext(args: {
   provider: ProviderId;
   targetId: number;
+  repoPath?: string;
 }): Promise<ReviewChatContext> {
   const data = await fetchJson<{ context: ReviewChatContext }>("/api/review/chat/context", {
     method: "POST",
@@ -389,11 +442,16 @@ export async function postSummaryComment(args: {
   provider: ProviderId;
   targetId: number;
   body: string;
+  repositoryContext?: RepositoryContext;
 }): Promise<void> {
   if (args.provider === "gitlab") {
     await fetchJson(`/api/gitlab/merge-requests/${args.targetId}/comments`, {
       method: "POST",
-      body: JSON.stringify({ body: args.body }),
+      body: JSON.stringify({
+        body: args.body,
+        repoPath: args.repositoryContext?.repoPath,
+        url: args.repositoryContext?.remoteUrl,
+      }),
     });
     return;
   }
@@ -401,7 +459,11 @@ export async function postSummaryComment(args: {
   if (args.provider === "github") {
     await fetchJson(`/api/github/pull-requests/${args.targetId}/comments`, {
       method: "POST",
-      body: JSON.stringify({ body: args.body }),
+      body: JSON.stringify({
+        body: args.body,
+        repoPath: args.repositoryContext?.repoPath,
+        remoteUrl: args.repositoryContext?.remoteUrl,
+      }),
     });
     return;
   }
@@ -428,11 +490,16 @@ export async function postInlineComment(args: {
   line: number;
   positionType: "new" | "old";
   body: string;
+  repositoryContext?: RepositoryContext;
 }): Promise<void> {
   if (args.provider === "gitlab") {
     await fetchJson(`/api/gitlab/merge-requests/${args.targetId}/inline-comments`, {
       method: "POST",
-      body: JSON.stringify(args),
+      body: JSON.stringify({
+        ...args,
+        repoPath: args.repositoryContext?.repoPath,
+        url: args.repositoryContext?.remoteUrl,
+      }),
     });
     return;
   }
@@ -441,7 +508,8 @@ export async function postInlineComment(args: {
     await fetchJson(`/api/github/pull-requests/${args.targetId}/inline-comments`, {
       method: "POST",
       body: JSON.stringify({
-        repoPath: undefined,
+        repoPath: args.repositoryContext?.repoPath,
+        remoteUrl: args.repositoryContext?.remoteUrl,
         body: args.body,
         filePath: args.filePath,
         line: args.line,

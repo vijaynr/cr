@@ -24,8 +24,9 @@ export type DashboardConfigSummary = {
 };
 
 export type DashboardRepositorySummary = {
-  cwd: string;
+  cwd?: string;
   remoteUrl?: string;
+  source?: "local" | "remote" | "none";
 };
 
 export type DashboardReviewRequest = {

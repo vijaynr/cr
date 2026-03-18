@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import {
   addDiffComment,
   addGitHubInlinePullRequestComment,
@@ -74,7 +76,8 @@ const REVIEW_AGENT_DESCRIPTIONS: Record<string, string> = {
   security: "Focuses on auth, secrets, permissions, validation, and exploit risks.",
   "clean-code": "Looks for readability, maintainability, duplication, and refactor opportunities.",
   performance: "Checks hot paths, query patterns, rendering churn, and likely runtime regressions.",
-  "test-quality": "Looks for missing coverage, weak assertions, flaky tests, and untested edge cases.",
+  "test-quality":
+    "Looks for missing coverage, weak assertions, flaky tests, and untested edge cases.",
 };
 
 function getBaseConfig(existing: Partial<CRConfig>): CRConfig {
@@ -103,32 +106,6 @@ function getBaseConfig(existing: Partial<CRConfig>): CRConfig {
     webhookJobTimeoutMs: existing.webhookJobTimeoutMs,
     terminalTheme: existing.terminalTheme,
   };
-}
-
-async function resolveGitLabProjectPath(repoPath: string, explicit?: string): Promise<string> {
-  if (explicit) {
-    return explicit;
-  }
-
-  const remoteUrl = await getOriginRemoteUrl(repoPath);
-  if (!remoteUrl) {
-    throw new Error("Could not infer GitLab project path from the current repository.");
-  }
-
-  return remoteToProjectPath(remoteUrl);
-}
-
-async function resolveGitHubRepoPath(repoPath: string, explicit?: string): Promise<string> {
-  if (explicit) {
-    return explicit;
-  }
-
-  const remoteUrl = await getOriginRemoteUrl(repoPath);
-  if (!remoteUrl) {
-    throw new Error("Could not infer GitHub repository path from the current repository.");
-  }
-
-  return remoteToGitHubRepoPath(remoteUrl);
 }
 
 async function requireGitLabConfig() {
@@ -201,7 +178,9 @@ function buildReviewWarnings(body: ReviewWorkflowBody): string[] {
   const selectedAgents = normalizeReviewAgentNames(body.agentNames);
 
   if (body.provider === "reviewboard" && body.inlineComments) {
-    warnings.push("Review Board supports summary comments only; inline comments will not be posted.");
+    warnings.push(
+      "Review Board supports summary comments only; inline comments will not be posted."
+    );
   }
 
   if (body.inlineComments && selectedAgents.length > 1) {
@@ -224,7 +203,7 @@ function createWorkflowInput(
   const selectedAgents = normalizeReviewAgentNames(body.agentNames);
 
   return {
-    repoPath: context.repoPath,
+    repoPath: body.repoPath || context.repoPath,
     repoRoot,
     mode: "interactive" as const,
     workflow,
@@ -242,6 +221,97 @@ function createWorkflowInput(
   };
 }
 
+async function discoverLocalGitRepositories(baseRepoPath: string): Promise<string[]> {
+  const root = path.resolve(path.dirname(baseRepoPath));
+  const seen = new Set<string>();
+  const repos: string[] = [];
+
+  async function walk(currentPath: string, depth: number) {
+    if (depth > 2 || repos.length >= 50 || seen.has(currentPath)) {
+      return;
+    }
+
+    seen.add(currentPath);
+
+    try {
+      const entries = await readdir(currentPath, { withFileTypes: true });
+      if (entries.some((entry) => entry.isDirectory() && entry.name === ".git")) {
+        repos.push(currentPath);
+        return;
+      }
+
+      for (const entry of entries) {
+        if (!entry.isDirectory()) {
+          continue;
+        }
+        if (entry.name.startsWith(".") || entry.name === "node_modules") {
+          continue;
+        }
+        await walk(path.join(currentPath, entry.name), depth + 1);
+        if (repos.length >= 50) {
+          return;
+        }
+      }
+    } catch {
+      return;
+    }
+  }
+
+  await walk(root, 0);
+
+  if (!repos.includes(baseRepoPath)) {
+    repos.unshift(path.resolve(baseRepoPath));
+  }
+
+  return repos;
+}
+
+async function resolveGitLabProjectPath(args: {
+  defaultRepoPath: string;
+  repoPath?: string;
+  explicitProjectPath?: string;
+  remoteUrl?: string;
+}): Promise<string> {
+  if (args.explicitProjectPath) {
+    return args.explicitProjectPath;
+  }
+
+  if (args.remoteUrl) {
+    return remoteToProjectPath(args.remoteUrl);
+  }
+
+  const repoPath = args.repoPath || args.defaultRepoPath;
+  const remoteUrl = await getOriginRemoteUrl(repoPath);
+  if (!remoteUrl) {
+    throw new Error("Could not infer GitLab project path from the selected repository.");
+  }
+
+  return remoteToProjectPath(remoteUrl);
+}
+
+async function resolveGitHubRepoPath(args: {
+  defaultRepoPath: string;
+  repoPath?: string;
+  explicitRepoPath?: string;
+  remoteUrl?: string;
+}): Promise<string> {
+  if (args.explicitRepoPath) {
+    return args.explicitRepoPath;
+  }
+
+  if (args.remoteUrl) {
+    return remoteToGitHubRepoPath(args.remoteUrl);
+  }
+
+  const repoPath = args.repoPath || args.defaultRepoPath;
+  const remoteUrl = await getOriginRemoteUrl(repoPath);
+  if (!remoteUrl) {
+    throw new Error("Could not infer GitHub repository path from the selected repository.");
+  }
+
+  return remoteToGitHubRepoPath(remoteUrl);
+}
+
 const operations = [
   {
     group: "config",
@@ -254,7 +324,11 @@ const operations = [
     group: "review",
     operations: [
       { method: "GET", path: "/api/review/agents", description: "List available review agents." },
-      { method: "POST", path: "/api/review/run", description: "Run AI review for a selected target." },
+      {
+        method: "POST",
+        path: "/api/review/run",
+        description: "Run AI review for a selected target.",
+      },
       {
         method: "POST",
         path: "/api/review/summarize",
@@ -412,6 +486,17 @@ export function createApiRoutes(context: ServerContext): Hono {
     })
   );
 
+  app.get(`${API_PREFIX}/repositories/local`, async (c) => {
+    try {
+      const repositories = await discoverLocalGitRepositories(context.repoPath);
+      return c.json({
+        repositories,
+      });
+    } catch (error) {
+      return serverError(error instanceof Error ? error.message : String(error));
+    }
+  });
+
   app.get(`${API_PREFIX}/config`, async (c) => {
     const config = await loadCRConfig();
     return c.json(config);
@@ -465,7 +550,9 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.post(`${API_PREFIX}/review/summarize`, async (c) => {
     try {
       const body = (await c.req.json()) as ReviewWorkflowBody;
-      const result = await runReviewSummarizeWorkflow(createWorkflowInput(context, body, "summarize"));
+      const result = await runReviewSummarizeWorkflow(
+        createWorkflowInput(context, body, "summarize")
+      );
       return c.json({ result });
     } catch (error) {
       return serverError(error instanceof Error ? error.message : String(error));
@@ -543,10 +630,12 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/gitlab/merge-requests`, async (c) => {
     try {
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(
-        context.repoPath,
-        c.req.query("projectPath") ?? undefined
-      );
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        explicitProjectPath: c.req.query("projectPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const state = (c.req.query("state") as "opened" | "closed" | "merged" | "all") || "opened";
       return c.json(await listMergeRequests(baseUrl, token, projectPath, state));
     } catch (error) {
@@ -557,10 +646,12 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/gitlab/merge-requests/:iid`, async (c) => {
     try {
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(
-        context.repoPath,
-        c.req.query("projectPath") ?? undefined
-      );
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        explicitProjectPath: c.req.query("projectPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const iid = parseInteger(c.req.param("iid"), "merge request iid");
       return c.json(await getMergeRequest(baseUrl, token, projectPath, iid));
     } catch (error) {
@@ -571,10 +662,12 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/gitlab/merge-requests/:iid/diffs`, async (c) => {
     try {
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(
-        context.repoPath,
-        c.req.query("projectPath") ?? undefined
-      );
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        explicitProjectPath: c.req.query("projectPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const iid = parseInteger(c.req.param("iid"), "merge request iid");
       return c.json(await getMergeRequestChanges(baseUrl, token, projectPath, iid));
     } catch (error) {
@@ -585,10 +678,12 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/gitlab/merge-requests/:iid/commits`, async (c) => {
     try {
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(
-        context.repoPath,
-        c.req.query("projectPath") ?? undefined
-      );
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        explicitProjectPath: c.req.query("projectPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const iid = parseInteger(c.req.param("iid"), "merge request iid");
       return c.json(await getMergeRequestCommits(baseUrl, token, projectPath, iid));
     } catch (error) {
@@ -598,12 +693,22 @@ export function createApiRoutes(context: ServerContext): Hono {
 
   app.post(`${API_PREFIX}/gitlab/merge-requests/:iid/comments`, async (c) => {
     try {
-      const body = (await c.req.json()) as { projectPath?: string; body?: string };
+      const body = (await c.req.json()) as {
+        repoPath?: string;
+        projectPath?: string;
+        url?: string;
+        body?: string;
+      };
       if (!body.body) {
         return badRequest("Missing comment body.");
       }
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(context.repoPath, body.projectPath);
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        explicitProjectPath: body.projectPath,
+        remoteUrl: body.url,
+      });
       const iid = parseInteger(c.req.param("iid"), "merge request iid");
       const url = await addMergeRequestComment(baseUrl, token, projectPath, iid, body.body);
       return c.json({ url });
@@ -615,7 +720,9 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.post(`${API_PREFIX}/gitlab/merge-requests/:iid/inline-comments`, async (c) => {
     try {
       const body = (await c.req.json()) as {
+        repoPath?: string;
         projectPath?: string;
+        url?: string;
         body?: string;
         filePath?: string;
         line?: number;
@@ -625,7 +732,12 @@ export function createApiRoutes(context: ServerContext): Hono {
         return badRequest("Missing inline comment body, filePath, or line.");
       }
       const { baseUrl, token } = await requireGitLabConfig();
-      const projectPath = await resolveGitLabProjectPath(context.repoPath, body.projectPath);
+      const projectPath = await resolveGitLabProjectPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        explicitProjectPath: body.projectPath,
+        remoteUrl: body.url,
+      });
       const iid = parseInteger(c.req.param("iid"), "merge request iid");
       const url = await addInlineMergeRequestComment(
         baseUrl,
@@ -646,25 +758,24 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/github/pull-requests`, async (c) => {
     try {
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(
-        context.repoPath,
-        c.req.query("repoPath") ?? undefined
-      );
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const requestedState =
         (c.req.query("state") as "open" | "closed" | "merged" | "all") || "open";
       const state = requestedState === "merged" ? "closed" : requestedState;
       const pullRequests = await listGitHubPullRequests(token, repoPath, state);
       return c.json(
         requestedState === "merged"
-          ? pullRequests.filter(
-              (pr) => {
-                if (typeof pr !== "object" || pr === null) {
-                  return false;
-                }
-                const review = pr as { merged_at?: unknown; merged?: unknown };
-                return Boolean(review.merged_at) || Boolean(review.merged);
+          ? pullRequests.filter((pr) => {
+              if (typeof pr !== "object" || pr === null) {
+                return false;
               }
-            )
+              const review = pr as { merged_at?: unknown; merged?: unknown };
+              return Boolean(review.merged_at) || Boolean(review.merged);
+            })
           : pullRequests
       );
     } catch (error) {
@@ -675,10 +786,11 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/github/pull-requests/:number`, async (c) => {
     try {
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(
-        context.repoPath,
-        c.req.query("repoPath") ?? undefined
-      );
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const prNumber = parseInteger(c.req.param("number"), "pull request number");
       return c.json(await getGitHubPullRequest(token, repoPath, prNumber));
     } catch (error) {
@@ -689,10 +801,11 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/github/pull-requests/:number/diffs`, async (c) => {
     try {
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(
-        context.repoPath,
-        c.req.query("repoPath") ?? undefined
-      );
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const prNumber = parseInteger(c.req.param("number"), "pull request number");
       return c.json(await getGitHubPullRequestFiles(token, repoPath, prNumber));
     } catch (error) {
@@ -703,10 +816,11 @@ export function createApiRoutes(context: ServerContext): Hono {
   app.get(`${API_PREFIX}/github/pull-requests/:number/commits`, async (c) => {
     try {
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(
-        context.repoPath,
-        c.req.query("repoPath") ?? undefined
-      );
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
       const prNumber = parseInteger(c.req.param("number"), "pull request number");
       return c.json(await getGitHubPullRequestCommits(token, repoPath, prNumber));
     } catch (error) {
@@ -716,12 +830,16 @@ export function createApiRoutes(context: ServerContext): Hono {
 
   app.post(`${API_PREFIX}/github/pull-requests/:number/comments`, async (c) => {
     try {
-      const body = (await c.req.json()) as { repoPath?: string; body?: string };
+      const body = (await c.req.json()) as { repoPath?: string; remoteUrl?: string; body?: string };
       if (!body.body) {
         return badRequest("Missing comment body.");
       }
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(context.repoPath, body.repoPath);
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        remoteUrl: body.remoteUrl,
+      });
       const prNumber = parseInteger(c.req.param("number"), "pull request number");
       const url = await addGitHubPullRequestComment(token, repoPath, prNumber, body.body);
       return c.json({ url });
@@ -734,6 +852,7 @@ export function createApiRoutes(context: ServerContext): Hono {
     try {
       const body = (await c.req.json()) as {
         repoPath?: string;
+        remoteUrl?: string;
         body?: string;
         filePath?: string;
         line?: number;
@@ -743,7 +862,11 @@ export function createApiRoutes(context: ServerContext): Hono {
         return badRequest("Missing inline comment body, filePath, or line.");
       }
       const { token } = await requireGitHubConfig();
-      const repoPath = await resolveGitHubRepoPath(context.repoPath, body.repoPath);
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        remoteUrl: body.remoteUrl,
+      });
       const prNumber = parseInteger(c.req.param("number"), "pull request number");
       const url = await addGitHubInlinePullRequestComment(
         token,

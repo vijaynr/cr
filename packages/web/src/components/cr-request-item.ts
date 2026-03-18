@@ -20,8 +20,12 @@ export class CrRequestItem extends LitElement {
       }
 
       .request {
-        padding: 14px;
-        background: rgba(255, 255, 255, 0.68);
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--surface);
       }
 
       a {
@@ -37,7 +41,6 @@ export class CrRequestItem extends LitElement {
         font-size: 1.02rem;
         font-weight: 600;
         line-height: 1.3;
-        margin-bottom: 8px;
       }
 
       .request-meta {

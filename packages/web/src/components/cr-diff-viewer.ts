@@ -1,7 +1,9 @@
 import { LitElement, css, html } from "lit";
+import { FileDiff, MessageSquareMore } from "lucide";
 import { parseUnifiedDiff } from "../diff.js";
 import { dashboardThemeStyles } from "../styles.js";
 import type { ParsedDiffLine, ReviewDiffFile } from "../types.js";
+import "./cr-icon.js";
 
 export class CrDiffViewer extends LitElement {
   static properties = {
@@ -25,10 +27,11 @@ export class CrDiffViewer extends LitElement {
         display: grid;
         grid-template-columns: 240px minmax(0, 1fr);
         min-height: 0;
-        border-radius: 24px;
+        border-radius: 12px;
         overflow: hidden;
         border: 1px solid var(--line);
         background: var(--surface);
+        box-shadow: var(--shadow-sm);
       }
 
       .files {
@@ -46,17 +49,34 @@ export class CrDiffViewer extends LitElement {
         gap: 6px;
         width: 100%;
         padding: 12px;
-        border-radius: 14px;
+        border-radius: 8px;
         border: 1px solid transparent;
         background: transparent;
         text-align: left;
         color: var(--ink);
         cursor: pointer;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          transform 140ms ease;
+      }
+
+      .file-head,
+      .comment {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .file:hover {
+        transform: translateY(-1px);
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.56);
       }
 
       .file[data-active="true"] {
-        border-color: rgba(217, 118, 18, 0.22);
-        background: rgba(255, 247, 237, 0.95);
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(59, 130, 246, 0.12);
       }
 
       .viewer {
@@ -78,9 +98,7 @@ export class CrDiffViewer extends LitElement {
         display: grid;
         align-content: start;
         overflow: auto;
-        background:
-          linear-gradient(180deg, rgba(246, 241, 232, 0.55), rgba(255, 255, 255, 0.92)),
-          white;
+        background: #0d141d;
       }
 
       .line {
@@ -89,7 +107,7 @@ export class CrDiffViewer extends LitElement {
         gap: 12px;
         align-items: start;
         padding: 0 16px;
-        border-bottom: 1px solid rgba(215, 205, 191, 0.45);
+        border-bottom: 1px solid rgba(79, 61, 40, 0.08);
         color: var(--ink);
         font-size: 0.88rem;
         line-height: 1.6;
@@ -104,12 +122,12 @@ export class CrDiffViewer extends LitElement {
       }
 
       .line[data-kind="header"] {
-        background: rgba(231, 232, 229, 0.75);
+        background: rgba(148, 163, 184, 0.08);
         color: var(--ink-soft);
       }
 
       .line[data-active="true"] {
-        outline: 1px solid rgba(217, 118, 18, 0.35);
+        outline: 1px solid rgba(59, 130, 246, 0.42);
         outline-offset: -1px;
       }
 
@@ -135,6 +153,10 @@ export class CrDiffViewer extends LitElement {
         background: transparent;
         color: var(--ink-soft);
         cursor: pointer;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          color 140ms ease;
       }
 
       .comment:hover {
@@ -190,8 +212,7 @@ export class CrDiffViewer extends LitElement {
       return;
     }
 
-    const targetLine =
-      line.positionType === "old" ? line.oldLineNumber : line.newLineNumber;
+    const targetLine = line.positionType === "old" ? line.oldLineNumber : line.newLineNumber;
     if (!targetLine) {
       return;
     }
@@ -212,7 +233,8 @@ export class CrDiffViewer extends LitElement {
   }
 
   render() {
-    const selectedFile = this.files.find((file) => file.id === this.selectedFileId) ?? this.files[0];
+    const selectedFile =
+      this.files.find((file) => file.id === this.selectedFileId) ?? this.files[0];
     const parsedLines = parseUnifiedDiff(this.selectedPatch);
 
     return html`
@@ -226,7 +248,10 @@ export class CrDiffViewer extends LitElement {
                 type="button"
                 @click=${() => this.chooseFile(file)}
               >
-                <strong>${file.path}</strong>
+                <strong class="file-head">
+                  <cr-icon .icon=${FileDiff} .size=${16}></cr-icon>
+                  ${file.path}
+                </strong>
                 <span class="subtle">${file.status || "modified"}</span>
               </button>
             `
@@ -234,15 +259,16 @@ export class CrDiffViewer extends LitElement {
         </div>
 
         <div class="viewer">
-          ${this.loading
-            ? html`<div class="empty">Loading diff…</div>`
-            : this.error
-              ? html`<div class="error">${this.error}</div>`
-              : !selectedFile
-                ? html`<div class="empty">Pick a file to inspect its patch.</div>`
-                : parsedLines.length === 0
-                  ? html`<div class="empty">No textual patch is available for this file.</div>`
-                  : html`
+          ${
+            this.loading
+              ? html`<div class="empty">Loading diff…</div>`
+              : this.error
+                ? html`<div class="error">${this.error}</div>`
+                : !selectedFile
+                  ? html`<div class="empty">Pick a file to inspect its patch.</div>`
+                  : parsedLines.length === 0
+                    ? html`<div class="empty">No textual patch is available for this file.</div>`
+                    : html`
                       <div class="code">
                         ${parsedLines.map(
                           (line) => html`
@@ -250,24 +276,29 @@ export class CrDiffViewer extends LitElement {
                               class="line mono"
                               data-kind=${line.kind}
                               data-active=${String(
-                                selectedFile && this.selectedLineKey === this.lineKey(selectedFile, line)
+                                selectedFile &&
+                                  this.selectedLineKey === this.lineKey(selectedFile, line)
                               )}
                             >
                               <div class="numbers">${line.oldLineNumber ?? ""}</div>
                               <div class="numbers">${line.newLineNumber ?? ""}</div>
                               <pre>${line.text}</pre>
-                              ${line.commentable
-                                ? html`
+                              ${
+                                line.commentable
+                                  ? html`
                                     <button class="comment" type="button" @click=${() => this.chooseLine(selectedFile, line)}>
+                                      <cr-icon .icon=${MessageSquareMore} .size=${14}></cr-icon>
                                       Comment
                                     </button>
                                   `
-                                : html`<div></div>`}
+                                  : html`<div></div>`
+                              }
                             </div>
                           `
                         )}
                       </div>
-                    `}
+                    `
+          }
         </div>
       </section>
     `;

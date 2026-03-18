@@ -2,6 +2,13 @@ export type ProviderId = "gitlab" | "github" | "reviewboard";
 export type ReviewState = "opened" | "closed" | "merged" | "all";
 export type DashboardSection = "overview" | ProviderId | "settings";
 export type TerminalTheme = "auto" | "dark" | "light";
+export type RepositorySourceMode = "local" | "remote";
+
+export type RepositoryContext = {
+  mode: RepositorySourceMode;
+  repoPath?: string;
+  remoteUrl?: string;
+};
 
 export type DashboardRequest = {
   id: number | string;
@@ -26,8 +33,9 @@ export type ProviderDashboard = {
 export type DashboardData = {
   generatedAt?: string;
   repository: {
-    cwd: string;
+    cwd?: string;
     remoteUrl?: string;
+    source?: "local" | "remote" | "none";
   };
   config: {
     openai: {

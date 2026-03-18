@@ -16,7 +16,19 @@ export class CrConfigCard extends LitElement {
       }
 
       .panel {
+        display: grid;
+        gap: 12px;
+        min-height: 100%;
         padding: 18px;
+        border-radius: var(--radius-md);
+      }
+
+      h3 {
+        font-size: 1.4rem;
+      }
+
+      p {
+        margin: 0;
       }
     `,
   ];

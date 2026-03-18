@@ -7,7 +7,7 @@ export const WEB_APP_SCRIPT_ROUTE = "/web/app.js";
 export const WEB_APP_DASHBOARD_ROUTE = "/api/dashboard";
 
 export type WebRoutesOptions = {
-  loadDashboard: () => Promise<unknown>;
+  loadDashboard: (args?: { repoPath?: string; remoteUrl?: string }) => Promise<unknown>;
 };
 
 const appEntryUrl = new URL("./app.ts", import.meta.url);
@@ -24,7 +24,7 @@ export function getWebAppHtml(): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CR Review Command Center</title>
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="dark" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -33,18 +33,17 @@ export function getWebAppHtml(): string {
     />
     <style>
       :root {
-        color: #201a16;
-        background: #f4ede2;
-        font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+        color: #e6edf6;
+        background: #0c1117;
+        font-family: "Space Grotesk", "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
       }
 
       body {
         margin: 0;
         min-height: 100vh;
         background:
-          radial-gradient(circle at top left, rgba(217, 118, 18, 0.1), transparent 28rem),
-          radial-gradient(circle at top right, rgba(44, 106, 83, 0.08), transparent 26rem),
-          linear-gradient(180deg, #f7f1e7 0%, #efe5d5 100%);
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26rem),
+          linear-gradient(180deg, #0b1016 0%, #0d131c 100%);
       }
     </style>
   </head>
@@ -99,9 +98,13 @@ export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> 
   const webAppHtml = getWebAppHtml();
   const webAppScript = await readWebAppScript();
 
-  app.get(WEB_APP_DASHBOARD_ROUTE, async () => {
+  app.get(WEB_APP_DASHBOARD_ROUTE, async (c) => {
     try {
-      const dashboard = await options.loadDashboard();
+      const url = new URL(c.req.url);
+      const dashboard = await options.loadDashboard({
+        repoPath: url.searchParams.get("repoPath") ?? undefined,
+        remoteUrl: url.searchParams.get("remoteUrl") ?? undefined,
+      });
       return Response.json(dashboard, {
         headers: {
           "Cache-Control": "no-store",

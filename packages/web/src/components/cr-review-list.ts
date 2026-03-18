@@ -26,27 +26,30 @@ export class CrReviewList extends LitElement {
 
       .card {
         display: grid;
-        gap: 10px;
-        padding: 14px 16px;
-        border-radius: 16px;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 10px;
         border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.78);
+        background: var(--surface);
         cursor: pointer;
         transition:
           transform 140ms ease,
           border-color 140ms ease,
-          background 140ms ease;
+          background 140ms ease,
+          box-shadow 140ms ease;
       }
 
       .card:hover {
-        transform: translateY(-1px);
+        transform: translateY(-2px);
         border-color: var(--line-strong);
         background: white;
+        box-shadow: var(--shadow-sm);
       }
 
       .card[data-active="true"] {
-        border-color: rgba(217, 118, 18, 0.24);
-        background: rgba(255, 247, 237, 0.95);
+        border-color: rgba(59, 130, 246, 0.36);
+        background: rgba(59, 130, 246, 0.1);
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.12);
       }
 
       .top,
@@ -68,11 +71,16 @@ export class CrReviewList extends LitElement {
       }
 
       .empty {
-        padding: 18px;
-        border-radius: 16px;
+        padding: 20px;
+        border-radius: 10px;
         border: 1px dashed var(--line);
         color: var(--ink-soft);
-        background: rgba(255, 255, 255, 0.55);
+        background: rgba(255, 255, 255, 0.58);
+      }
+
+      .title-block {
+        display: grid;
+        gap: 8px;
       }
     `,
   ];
@@ -144,13 +152,15 @@ export class CrReviewList extends LitElement {
               @click=${() => this.emitSelect(target)}
             >
               <div class="top">
-                <div>
+                <div class="title-block">
                   <div class="eyebrow">${this.provider}</div>
                   <h3>${this.requestPrefix(target)} ${target.title}</h3>
                 </div>
-                ${target.state
-                  ? html`<div class="badge" data-tone=${this.toneForState(target.state)}>${target.state}</div>`
-                  : ""}
+                ${
+                  target.state
+                    ? html`<div class="badge" data-tone=${this.toneForState(target.state)}>${target.state}</div>`
+                    : ""
+                }
               </div>
 
               <div class="meta">

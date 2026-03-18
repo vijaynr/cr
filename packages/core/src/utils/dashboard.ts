@@ -25,12 +25,28 @@ function looksLikeConfiguredGitLab(remoteUrl: string, gitlabUrl: string): boolea
   }
 }
 
-async function loadRepositorySummary(repoPath: string): Promise<DashboardData["repository"]> {
+async function loadRepositorySummary(args: {
+  repoPath?: string;
+  remoteUrl?: string;
+}): Promise<DashboardData["repository"]> {
+  if (args.remoteUrl) {
+    return {
+      remoteUrl: args.remoteUrl,
+      source: "remote",
+    };
+  }
+
+  if (!args.repoPath) {
+    return {
+      source: "none",
+    };
+  }
+
   try {
-    const remoteUrl = await getOriginRemoteUrl(repoPath);
-    return { cwd: repoPath, remoteUrl };
+    const remoteUrl = await getOriginRemoteUrl(args.repoPath);
+    return { cwd: args.repoPath, remoteUrl, source: "local" };
   } catch {
-    return { cwd: repoPath };
+    return { cwd: args.repoPath, source: "local" };
   }
 }
 
@@ -230,10 +246,11 @@ async function loadReviewBoardDashboardProvider(args: {
   }
 }
 
-export async function loadDashboardData(args: { repoPath?: string } = {}): Promise<DashboardData> {
-  const repoPath = args.repoPath ?? process.cwd();
+export async function loadDashboardData(
+  args: { repoPath?: string; remoteUrl?: string } = {}
+): Promise<DashboardData> {
   const config = await loadCRConfig();
-  const repository = await loadRepositorySummary(repoPath);
+  const repository = await loadRepositorySummary(args);
 
   const gitlabUrl = envOrConfig("GITLAB_URL", config.gitlabUrl, "");
   const gitlabKey = envOrConfig("GITLAB_KEY", config.gitlabKey, "");

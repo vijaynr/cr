@@ -1,9 +1,27 @@
 import { LitElement, css, html } from "lit";
 import {
+  Bot,
+  BrainCircuit,
+  FileDiff,
+  FolderSearch,
+  GitBranch,
+  LayoutDashboard,
+  MessageSquare,
+  ScrollText,
+  Search,
+  Settings2,
+  ShieldCheck,
+  Waypoints,
+  Webhook,
+  Workflow,
+  type IconNode,
+} from "lucide";
+import {
   answerChatQuestion,
   loadChatContext,
   loadConfig,
   loadDashboard,
+  loadLocalRepositories,
   loadReviewAgents,
   loadReviewBoardFilePatch,
   loadReviewCommits,
@@ -26,6 +44,8 @@ import {
   type DashboardData,
   type DashboardSection,
   type ProviderId,
+  type RepositoryContext,
+  type RepositorySourceMode,
   type ReviewAgentOption,
   type ReviewChatContext,
   type ReviewChatHistoryEntry,
@@ -39,7 +59,9 @@ import {
 import "./cr-config-card.js";
 import "./cr-dashboard-header.js";
 import "./cr-diff-viewer.js";
+import "./cr-icon.js";
 import "./cr-review-list.js";
+import "./cr-stat-card.js";
 
 type NoticeTone = "success" | "warning" | "error";
 type WorkspaceTab = "overview" | "diff" | "commits";
@@ -88,6 +110,13 @@ export class CrDashboardApp extends LitElement {
     provider: { state: true },
     stateFilter: { state: true },
     searchTerm: { state: true },
+    repositoryMode: { state: true },
+    repositoryPathInput: { state: true },
+    repositoryUrlInput: { state: true },
+    activeRepositoryPath: { state: true },
+    activeRepositoryUrl: { state: true },
+    localRepositories: { state: true },
+    loadingLocalRepositories: { state: true },
     targets: { state: true },
     selectedTarget: { state: true },
     detailTarget: { state: true },
@@ -136,32 +165,93 @@ export class CrDashboardApp extends LitElement {
         display: block;
         min-height: 100vh;
         background:
-          radial-gradient(circle at top left, rgba(217, 118, 18, 0.1), transparent 26rem),
-          radial-gradient(circle at top right, rgba(44, 106, 83, 0.08), transparent 24rem),
-          linear-gradient(180deg, #f7f1e7 0%, #efe5d5 100%);
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26rem),
+          linear-gradient(180deg, #0b1016 0%, #0d131c 100%);
       }
 
       main {
         display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
         gap: 24px;
-        max-width: 1600px;
+        max-width: 1720px;
         margin: 0 auto;
-        padding: 28px;
+        padding: 24px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 24px;
+        display: grid;
+        align-content: start;
+        gap: 18px;
+        min-height: calc(100vh - 48px);
+        padding: 20px;
+        border-radius: 14px;
+      }
+
+      .sidebar-brand,
+      .sidebar-section {
+        display: grid;
+        gap: 10px;
+      }
+
+      .sidebar-brand h2,
+      .sidebar-section h3 {
+        font-size: 1rem;
+      }
+
+      .sidebar-meta {
+        display: grid;
+        gap: 8px;
+      }
+
+      .context-panel,
+      .context-form,
+      .context-fields {
+        display: grid;
+        gap: 14px;
+      }
+
+      .context-form {
+        padding: 18px;
+        border-radius: 12px;
+      }
+
+      .context-status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .field-block select.field {
+        appearance: none;
+      }
+
+      .content {
+        display: grid;
+        gap: 20px;
       }
 
       .section-nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        padding: 12px;
-        border-radius: 22px;
+        display: grid;
+        gap: 8px;
+        padding: 0;
+        border-radius: 0;
+        position: static;
+        background: transparent;
+        border: none;
+        box-shadow: none;
       }
 
       .nav-button {
-        min-height: 42px;
-        padding: 0 16px;
-        border-radius: 999px;
-        border: 1px solid transparent;
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 12px;
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
         background: transparent;
         color: var(--ink-soft);
         cursor: pointer;
@@ -172,14 +262,14 @@ export class CrDashboardApp extends LitElement {
       }
 
       .nav-button:hover {
-        border-color: var(--line);
-        background: rgba(255, 255, 255, 0.65);
+        background: rgba(148, 163, 184, 0.06);
       }
 
       .nav-button[data-active="true"] {
         border-color: var(--accent-strong);
-        background: var(--accent);
+        background: rgba(59, 130, 246, 0.16);
         color: white;
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.18);
       }
 
       .page-stack,
@@ -187,7 +277,7 @@ export class CrDashboardApp extends LitElement {
       .provider-shell,
       .settings-shell {
         display: grid;
-        gap: 20px;
+        gap: 22px;
       }
 
       .summary-grid,
@@ -196,7 +286,7 @@ export class CrDashboardApp extends LitElement {
       .settings-grid,
       .field-grid {
         display: grid;
-        gap: 14px;
+        gap: 16px;
       }
 
       .summary-grid {
@@ -216,35 +306,33 @@ export class CrDashboardApp extends LitElement {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .metric,
       .provider-card,
       .feature-panel,
       .settings-panel,
       .provider-hero {
         display: grid;
-        gap: 10px;
+        gap: 12px;
         padding: 18px;
-        border-radius: 22px;
+        border-radius: var(--radius-md);
       }
 
-      .metric strong,
       .provider-card strong {
         font-size: 1.4rem;
       }
 
       .provider-card .actions {
-        margin-top: 8px;
+        margin-top: 10px;
       }
 
       .feature-panel {
-        padding: 22px;
+        padding: 24px;
       }
 
       .layout {
         display: grid;
         grid-template-columns: 340px minmax(0, 1fr) 360px;
-        gap: 20px;
-        min-height: calc(100vh - 220px);
+        gap: 22px;
+        min-height: calc(100vh - 180px);
       }
 
       .rail,
@@ -260,10 +348,10 @@ export class CrDashboardApp extends LitElement {
       .detail-panel,
       .analysis-panel {
         display: grid;
-        gap: 16px;
+        gap: 18px;
         min-height: 0;
         padding: 18px;
-        border-radius: 24px;
+        border-radius: var(--radius-md);
       }
 
       .rail-panel {
@@ -284,7 +372,7 @@ export class CrDashboardApp extends LitElement {
       .chat-thread,
       .settings-stack {
         display: grid;
-        gap: 12px;
+        gap: 14px;
       }
 
       .segmented,
@@ -298,18 +386,28 @@ export class CrDashboardApp extends LitElement {
       }
 
       .segmented button {
-        min-height: 34px;
-        padding: 0 12px;
-        border-radius: 999px;
+        min-height: 38px;
+        padding: 0 14px;
+        border-radius: 8px;
         border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.75);
+        background: rgba(148, 163, 184, 0.06);
         color: var(--ink-soft);
         cursor: pointer;
+        transition:
+          background 140ms ease,
+          border-color 140ms ease,
+          color 140ms ease,
+          transform 140ms ease;
+      }
+
+      .segmented button:hover {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
       }
 
       .segmented button[data-active="true"] {
         border-color: var(--accent-strong);
-        background: var(--accent);
+        background: rgba(59, 130, 246, 0.18);
         color: white;
       }
 
@@ -324,6 +422,23 @@ export class CrDashboardApp extends LitElement {
 
       .search {
         width: 100%;
+      }
+
+      .search-shell {
+        position: relative;
+      }
+
+      .search-shell cr-icon {
+        position: absolute;
+        top: 50%;
+        left: 14px;
+        transform: translateY(-50%);
+        color: var(--ink-faint);
+        pointer-events: none;
+      }
+
+      .search-shell .field {
+        padding-left: 42px;
       }
 
       .detail-header,
@@ -346,7 +461,7 @@ export class CrDashboardApp extends LitElement {
       .analysis-scroll {
         min-height: 0;
         overflow: auto;
-        padding-right: 2px;
+        padding-right: 4px;
       }
 
       .card,
@@ -354,15 +469,16 @@ export class CrDashboardApp extends LitElement {
       .inline-item,
       .chat-turn,
       .commit {
-        padding: 16px;
-        border-radius: 18px;
+        padding: 18px;
+        border-radius: var(--radius-sm);
         border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.82);
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
       }
 
       .agent-card[data-active="true"] {
-        border-color: rgba(217, 118, 18, 0.24);
-        background: rgba(255, 247, 237, 0.95);
+        border-color: rgba(59, 130, 246, 0.3);
+        background: rgba(59, 130, 246, 0.08);
       }
 
       .agent-card label {
@@ -372,7 +488,7 @@ export class CrDashboardApp extends LitElement {
       }
 
       .chat-turn[data-role="assistant"] {
-        background: rgba(255, 247, 237, 0.8);
+        background: rgba(59, 130, 246, 0.08);
       }
 
       .field-block span {
@@ -387,7 +503,7 @@ export class CrDashboardApp extends LitElement {
       .settings-panel h3,
       .provider-hero h2,
       .provider-card h3 {
-        font-size: 1.15rem;
+        font-size: 1.2rem;
       }
 
       .provider-card p,
@@ -395,11 +511,65 @@ export class CrDashboardApp extends LitElement {
         margin: 0;
       }
 
+      .notice strong {
+        color: var(--ink);
+      }
+
+      .overview-lead {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+        gap: 16px;
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: 14px;
+      }
+
+      .hero-copy h2 {
+        font-size: clamp(1.6rem, 3vw, 2.2rem);
+        max-width: 20ch;
+      }
+
+      .hero-aside {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .hero-aside .notice {
+        min-height: 100%;
+      }
+
+      .provider-hero {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+      }
+
+      .provider-hero-copy {
+        display: grid;
+        gap: 14px;
+      }
+
+      .provider-hero p {
+        max-width: 70ch;
+      }
+
+      .provider-toolbar {
+        display: grid;
+        gap: 14px;
+      }
+
+      .workspace-frame {
+        display: grid;
+        gap: 18px;
+      }
+
       .empty-state {
         padding: 24px;
         border: 1px dashed var(--line);
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.62);
+        border-radius: var(--radius-sm);
+        background: rgba(148, 163, 184, 0.05);
       }
 
       .mobile-only {
@@ -407,6 +577,15 @@ export class CrDashboardApp extends LitElement {
       }
 
       @media (max-width: 1240px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+          min-height: auto;
+        }
+
         .layout {
           grid-template-columns: 320px minmax(0, 1fr);
         }
@@ -415,6 +594,7 @@ export class CrDashboardApp extends LitElement {
           grid-column: 1 / -1;
         }
 
+        .overview-lead,
         .overview-grid,
         .provider-grid,
         .settings-grid {
@@ -429,6 +609,14 @@ export class CrDashboardApp extends LitElement {
 
         .summary-grid,
         .field-grid.two-column {
+          grid-template-columns: 1fr;
+        }
+
+        .section-nav {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .provider-hero {
           grid-template-columns: 1fr;
         }
 
@@ -449,6 +637,13 @@ export class CrDashboardApp extends LitElement {
   declare provider: ProviderId;
   declare stateFilter: ReviewState;
   declare searchTerm: string;
+  declare repositoryMode: RepositorySourceMode;
+  declare repositoryPathInput: string;
+  declare repositoryUrlInput: string;
+  declare activeRepositoryPath: string;
+  declare activeRepositoryUrl: string;
+  declare localRepositories: string[];
+  declare loadingLocalRepositories: boolean;
   declare targets: ReviewTarget[];
   declare selectedTarget: ReviewTarget | null;
   declare detailTarget: ReviewTarget | null;
@@ -497,6 +692,13 @@ export class CrDashboardApp extends LitElement {
     this.provider = "gitlab";
     this.stateFilter = "opened";
     this.searchTerm = "";
+    this.repositoryMode = "local";
+    this.repositoryPathInput = "";
+    this.repositoryUrlInput = "";
+    this.activeRepositoryPath = "";
+    this.activeRepositoryUrl = "";
+    this.localRepositories = [];
+    this.loadingLocalRepositories = false;
     this.targets = [];
     this.selectedTarget = null;
     this.detailTarget = null;
@@ -540,7 +742,19 @@ export class CrDashboardApp extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    void this.loadLocalRepositoryOptions();
     void this.loadInitialData();
+  }
+
+  private async loadLocalRepositoryOptions() {
+    this.loadingLocalRepositories = true;
+    try {
+      this.localRepositories = await loadLocalRepositories();
+    } catch {
+      this.localRepositories = [];
+    } finally {
+      this.loadingLocalRepositories = false;
+    }
   }
 
   private async loadInitialData(options: { preserveProvider?: boolean } = {}) {
@@ -550,7 +764,7 @@ export class CrDashboardApp extends LitElement {
 
     try {
       const [dashboard, agentOptions, config] = await Promise.all([
-        loadDashboard(),
+        loadDashboard(this.activeRepositoryContext),
         loadReviewAgents(),
         loadConfig(),
       ]);
@@ -569,7 +783,12 @@ export class CrDashboardApp extends LitElement {
           this.provider;
       }
 
-      await this.loadTargets();
+      if (this.canLoadProviderQueue(this.provider)) {
+        await this.loadTargets();
+      } else {
+        this.targets = [];
+        this.targetsError = this.repositorySelectionMessage;
+      }
     } catch (error) {
       this.targetsError = this.toMessage(error);
     } finally {
@@ -599,7 +818,11 @@ export class CrDashboardApp extends LitElement {
     }
 
     try {
-      const targets = await loadReviewTargets(this.provider, this.stateFilter);
+      const targets = await loadReviewTargets(
+        this.provider,
+        this.stateFilter,
+        this.activeRepositoryContext
+      );
       this.targets = targets;
       const nextTarget = targets[0] ?? null;
       this.selectedTarget = nextTarget;
@@ -631,9 +854,9 @@ export class CrDashboardApp extends LitElement {
 
     try {
       const [detail, diffFiles, commits] = await Promise.all([
-        loadReviewDetail(target.provider, target.id),
-        loadReviewDiffs(target.provider, target.id),
-        loadReviewCommits(target.provider, target.id),
+        loadReviewDetail(target.provider, target.id, this.activeRepositoryContext),
+        loadReviewDiffs(target.provider, target.id, this.activeRepositoryContext),
+        loadReviewCommits(target.provider, target.id, this.activeRepositoryContext),
       ]);
       this.detailTarget = { ...target, ...detail };
       this.diffFiles = diffFiles;
@@ -718,6 +941,7 @@ export class CrDashboardApp extends LitElement {
       const response = await runReview({
         provider: this.selectedTarget.provider,
         targetId: this.selectedTarget.id,
+        repoPath: this.activeRepositoryPath || undefined,
         agentNames: this.selectedAgents,
         inlineComments: this.inlineCommentsEnabled,
         userFeedback: this.feedbackDraft.trim() || undefined,
@@ -744,6 +968,7 @@ export class CrDashboardApp extends LitElement {
       const response = await runSummary({
         provider: this.selectedTarget.provider,
         targetId: this.selectedTarget.id,
+        repoPath: this.activeRepositoryPath || undefined,
       });
       this.summaryResult = response.result;
       this.setNotice("Summary generated for the active review target.", "success");
@@ -764,6 +989,7 @@ export class CrDashboardApp extends LitElement {
       this.chatContext = await loadChatContext({
         provider: this.selectedTarget.provider,
         targetId: this.selectedTarget.id,
+        repoPath: this.activeRepositoryPath || undefined,
       });
     } catch (error) {
       this.setNotice(this.toMessage(error), "error");
@@ -826,6 +1052,7 @@ export class CrDashboardApp extends LitElement {
         provider: this.selectedTarget.provider,
         targetId: this.selectedTarget.id,
         body: this.summaryDraft.trim(),
+        repositoryContext: this.activeRepositoryContext,
       });
       this.summaryDraft = "";
       this.setNotice("Summary comment posted to the provider.", "success");
@@ -850,6 +1077,7 @@ export class CrDashboardApp extends LitElement {
         line: this.selectedLine.line,
         positionType: this.selectedLine.positionType,
         body: this.inlineDraft.trim(),
+        repositoryContext: this.activeRepositoryContext,
       });
       this.inlineDraft = "";
       this.setNotice("Inline comment posted.", "success");
@@ -1104,10 +1332,44 @@ export class CrDashboardApp extends LitElement {
     return JSON.stringify(this.configDraft) !== JSON.stringify(this.configBaseline);
   }
 
+  private get activeRepositoryContext(): RepositoryContext | undefined {
+    if (this.activeRepositoryPath) {
+      return {
+        mode: "local",
+        repoPath: this.activeRepositoryPath,
+      };
+    }
+
+    if (this.activeRepositoryUrl) {
+      return {
+        mode: "remote",
+        remoteUrl: this.activeRepositoryUrl,
+      };
+    }
+
+    return undefined;
+  }
+
+  private get hasRepositorySelection() {
+    return Boolean(this.activeRepositoryPath || this.activeRepositoryUrl);
+  }
+
+  private get canRunLocalWorkflows() {
+    return Boolean(this.activeRepositoryPath);
+  }
+
+  private get repositorySelectionMessage() {
+    return "Choose a local checkout or paste a repository URL to load GitLab or GitHub review queues.";
+  }
+
   private providerAvailabilityErrorFor(
     provider: ProviderId,
     dashboard: DashboardData | null = this.dashboard
   ) {
+    if ((provider === "gitlab" || provider === "github") && !this.hasRepositorySelection) {
+      return this.repositorySelectionMessage;
+    }
+
     const providerData = dashboard?.providers?.[provider];
     if (!providerData?.configured) {
       return `${providerLabels[provider]} is not configured yet.`;
@@ -1124,49 +1386,101 @@ export class CrDashboardApp extends LitElement {
     return !this.providerAvailabilityErrorFor(provider, dashboard);
   }
 
+  private canLoadProviderQueue(provider: ProviderId) {
+    if (provider === "reviewboard") {
+      return true;
+    }
+
+    return this.hasRepositorySelection;
+  }
+
+  private async applyRepositorySelection() {
+    this.activeRepositoryPath =
+      this.repositoryMode === "local" ? this.repositoryPathInput.trim() : "";
+    this.activeRepositoryUrl =
+      this.repositoryMode === "remote" ? this.repositoryUrlInput.trim() : "";
+    await this.loadInitialData({ preserveProvider: true });
+  }
+
   render() {
     const repositoryLabel =
       this.dashboard?.repository.remoteUrl?.replace(/\.git$/, "") ??
       this.dashboard?.repository.cwd ??
       "";
+    const totalQueue = providerOrder.reduce(
+      (count, provider) => count + (this.dashboard?.providers?.[provider]?.items.length ?? 0),
+      0
+    );
 
     return html`
       <main>
-        <cr-dashboard-header
-          .generatedAt=${this.dashboard?.generatedAt || ""}
-          .loading=${this.loadingDashboard || this.loadingTargets || this.loadingConfig}
-          .repositoryLabel=${repositoryLabel}
-          .repositoryPath=${this.dashboard?.repository.cwd || ""}
-          .remoteUrl=${this.dashboard?.repository.remoteUrl || ""}
-          @refresh=${() => this.refreshAll()}
-        ></cr-dashboard-header>
+        <aside class="sidebar panel">
+          <section class="sidebar-brand">
+            <div class="eyebrow">CR platform</div>
+            <h2>Review operations</h2>
+            <p class="muted">Centralize provider queues, automation defaults, and publishing controls.</p>
+          </section>
 
-        <nav class="section-nav panel" aria-label="Dashboard navigation">
-          ${this.renderNavButton("overview", "Overview")}
-          ${providerOrder.map((provider) => this.renderNavButton(provider, providerLabels[provider]))}
-          ${this.renderNavButton("settings", "Settings")}
-        </nav>
+          <section class="sidebar-section">
+            <h3>Navigation</h3>
+            <nav class="section-nav" aria-label="Dashboard navigation">
+              ${this.renderNavButton("overview", "Overview", LayoutDashboard)}
+              ${providerOrder.map((provider) =>
+                this.renderNavButton(provider, providerLabels[provider])
+              )}
+              ${this.renderNavButton("settings", "Settings", Settings2)}
+            </nav>
+          </section>
 
-        ${
-          this.noticeMessage
-            ? html`<div class="notice" data-tone=${this.noticeTone}>${this.noticeMessage}</div>`
-            : ""
-        }
+          <section class="sidebar-section">
+            <h3>Workspace status</h3>
+            <div class="sidebar-meta">
+              <div class="badge"><cr-icon .icon=${Workflow} .size=${14}></cr-icon>${totalQueue} open items</div>
+              <div class="badge"><cr-icon .icon=${BrainCircuit} .size=${14}></cr-icon>${this.selectedAgents.length || 1} active agents</div>
+              ${
+                repositoryLabel
+                  ? html`<div class="badge"><cr-icon .icon=${GitBranch} .size=${14}></cr-icon>${repositoryLabel}</div>`
+                  : html`<div class="badge"><cr-icon .icon=${FolderSearch} .size=${14}></cr-icon>Select repo source</div>`
+              }
+            </div>
+          </section>
+        </aside>
 
-        <div class="page-stack">
+        <section class="content">
+          <cr-dashboard-header
+            .generatedAt=${this.dashboard?.generatedAt || ""}
+            .loading=${this.loadingDashboard || this.loadingTargets || this.loadingConfig}
+            .repositoryLabel=${repositoryLabel}
+            .repositoryPath=${this.dashboard?.repository.cwd || ""}
+            .remoteUrl=${this.dashboard?.repository.remoteUrl || ""}
+            @refresh=${() => this.refreshAll()}
+          ></cr-dashboard-header>
+
           ${
-            this.activeSection === "overview"
-              ? this.renderOverviewPage()
-              : this.activeSection === "settings"
-                ? this.renderSettingsPage()
-                : this.renderProviderPage()
+            this.noticeMessage
+              ? html`<div class="notice" data-tone=${this.noticeTone}>${this.noticeMessage}</div>`
+              : ""
           }
-        </div>
+
+          <div class="page-stack">
+            ${
+              this.activeSection === "overview"
+                ? this.renderOverviewPage()
+                : this.activeSection === "settings"
+                  ? this.renderSettingsPage()
+                  : this.renderProviderPage()
+            }
+          </div>
+        </section>
       </main>
     `;
   }
 
-  private renderNavButton(section: DashboardSection, label: string) {
+  private renderNavButton(
+    section: DashboardSection,
+    label: string,
+    icon: IconNode = this.iconForSection(section)
+  ) {
     return html`
       <button
         class="nav-button"
@@ -1174,8 +1488,158 @@ export class CrDashboardApp extends LitElement {
         data-active=${String(this.activeSection === section)}
         @click=${() => this.handleSectionChange(section)}
       >
+        <cr-icon .icon=${icon} .size=${16}></cr-icon>
         ${label}
       </button>
+    `;
+  }
+
+  private iconForSection(section: DashboardSection): IconNode {
+    switch (section) {
+      case "overview":
+        return LayoutDashboard;
+      case "gitlab":
+        return Workflow;
+      case "github":
+        return GitBranch;
+      case "reviewboard":
+        return ShieldCheck;
+      case "settings":
+        return Settings2;
+    }
+  }
+
+  private iconForWorkspaceTab(tab: WorkspaceTab): IconNode {
+    switch (tab) {
+      case "overview":
+        return LayoutDashboard;
+      case "diff":
+        return FileDiff;
+      case "commits":
+        return GitBranch;
+    }
+  }
+
+  private iconForAnalysisTab(tab: AnalysisTab): IconNode {
+    switch (tab) {
+      case "review":
+        return Bot;
+      case "summary":
+        return ScrollText;
+      case "chat":
+        return MessageSquare;
+      case "comment":
+        return MessageSquare;
+    }
+  }
+
+  private renderRepositorySelector() {
+    return html`
+      <section class="context-panel">
+        <form
+          class="context-form panel"
+          @submit=${async (event: Event) => {
+            event.preventDefault();
+            await this.applyRepositorySelection();
+          }}
+        >
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Repository context</div>
+              <h3>Select a repo source</h3>
+            </div>
+            <div class="context-status">
+              ${
+                this.activeRepositoryPath
+                  ? html`<div class="badge" data-tone="success">local checkout active</div>`
+                  : ""
+              }
+              ${
+                this.activeRepositoryUrl
+                  ? html`<div class="badge" data-tone="accent">remote URL active</div>`
+                  : ""
+              }
+            </div>
+          </div>
+
+          <div class="segmented">
+            ${(["local", "remote"] as RepositorySourceMode[]).map(
+              (mode) => html`
+                <button
+                  type="button"
+                  data-active=${String(this.repositoryMode === mode)}
+                  @click=${() => {
+                    this.repositoryMode = mode;
+                  }}
+                >
+                  ${mode === "local" ? "Use local checkout" : "Use repository URL"}
+                </button>
+              `
+            )}
+          </div>
+
+          <div class="context-fields">
+            ${
+              this.repositoryMode === "local"
+                ? html`
+                  <label class="field-block">
+                    <span>Local repository path</span>
+                    <div class="field-note">Choose a checked out repo to unlock queue browsing and AI workflows.</div>
+                    <select
+                      class="field"
+                      .value=${this.repositoryPathInput}
+                      @change=${(event: Event) => {
+                        this.repositoryPathInput = (event.target as HTMLSelectElement).value;
+                      }}
+                    >
+                      <option value="">Select a local repository</option>
+                      ${
+                        this.localRepositories.length === 0
+                          ? html`<option value="">${this.loadingLocalRepositories ? "Scanning local repositories…" : "No repositories discovered nearby"}</option>`
+                          : this.localRepositories.map(
+                              (repo) => html`<option value=${repo}>${repo}</option>`
+                            )
+                      }
+                    </select>
+                  </label>
+
+                  ${this.renderConfigInput({
+                    label: "Or enter a local path",
+                    note: "Use this when the checkout is outside the discovered list.",
+                    value: this.repositoryPathInput,
+                    onInput: (value) => {
+                      this.repositoryPathInput = value;
+                    },
+                  })}
+                `
+                : this.renderConfigInput({
+                    label: "Repository URL",
+                    note: "Paste the GitHub or GitLab repository URL to browse review data without a local checkout.",
+                    value: this.repositoryUrlInput,
+                    type: "url",
+                    onInput: (value) => {
+                      this.repositoryUrlInput = value;
+                    },
+                  })
+            }
+          </div>
+
+          <div class="actions">
+            <button
+              class="button"
+              data-tone="primary"
+              type="submit"
+              ?disabled=${
+                this.repositoryMode === "local"
+                  ? !this.repositoryPathInput.trim()
+                  : !this.repositoryUrlInput.trim()
+              }
+            >
+              Apply repository source
+            </button>
+          </div>
+        </form>
+      </section>
     `;
   }
 
@@ -1192,22 +1656,62 @@ export class CrDashboardApp extends LitElement {
 
     return html`
       <section class="overview-shell">
+        ${this.renderRepositorySelector()}
+
+        <section class="overview-lead">
+          <section class="feature-panel panel hero-copy">
+            <div class="eyebrow">Workspace overview</div>
+            <h2>See queue health, provider readiness, and review capacity before diving into a request.</h2>
+            <p class="muted">
+              The dashboard keeps provider triage, AI defaults, and webhook capacity visible so the active review workspace can stay focused.
+            </p>
+            <div class="actions">
+              <button class="button" data-tone="primary" type="button" @click=${() => this.handleSectionChange(this.provider)}>
+                <cr-icon .icon=${FolderSearch} .size=${16}></cr-icon>
+                Open active workspace
+              </button>
+              <button class="button" type="button" @click=${() => this.handleSectionChange("settings")}>
+                <cr-icon .icon=${Settings2} .size=${16}></cr-icon>
+                Adjust settings
+              </button>
+            </div>
+          </section>
+
+          <section class="hero-aside">
+            <div class="notice" data-tone="success">
+              ${
+                configuredProviders === providerOrder.length
+                  ? "All providers are configured. You can move straight into triage and review."
+                  : `${providerOrder.length - configuredProviders} provider connection${providerOrder.length - configuredProviders === 1 ? "" : "s"} still need attention.`
+              }
+            </div>
+            <div class="notice">
+              Default review agents currently start with ${defaultAgents || 1} profile${defaultAgents === 1 ? "" : "s"} enabled.
+            </div>
+          </section>
+        </section>
+
         <div class="summary-grid">
-          <section class="metric panel">
-            <span class="eyebrow">Configured providers</span>
-            <strong>${configuredProviders}/3</strong>
-            <span class="muted">GitLab, GitHub, and Review Board status at a glance</span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Open review queue</span>
-            <strong>${queueSize}</strong>
-            <span class="muted">Current open items discovered from configured providers</span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Default agents</span>
-            <strong>${defaultAgents || 1}</strong>
-            <span class="muted">Review profiles that start selected in workflow runs</span>
-          </section>
+          <cr-stat-card
+            .eyebrow=${"Configured providers"}
+            .value=${`${configuredProviders}/3`}
+            .note=${"GitLab, GitHub, and Review Board status at a glance"}
+            .tone=${configuredProviders === providerOrder.length ? "success" : "accent"}
+            .icon=${ShieldCheck}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Open review queue"}
+            .value=${String(queueSize)}
+            .note=${"Current open items discovered from configured providers"}
+            .tone=${queueSize > 0 ? "accent" : "default"}
+            .icon=${Workflow}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Default agents"}
+            .value=${String(defaultAgents || 1)}
+            .note=${"Review profiles that start selected in workflow runs"}
+            .icon=${Bot}
+          ></cr-stat-card>
         </div>
 
         <section class="provider-grid">
@@ -1248,7 +1752,10 @@ export class CrDashboardApp extends LitElement {
         <div class="provider-card-head">
           <div>
             <div class="eyebrow">${label}</div>
-            <h3>${label} workflows</h3>
+            <h3>
+              <cr-icon .icon=${this.iconForSection(provider)} .size=${18}></cr-icon>
+              ${label} workflows
+            </h3>
           </div>
           <div class="badge" data-tone=${data?.configured ? "success" : "danger"}>
             ${data?.configured ? "configured" : "missing config"}
@@ -1262,9 +1769,11 @@ export class CrDashboardApp extends LitElement {
 
         <div class="actions">
           <button class="button" type="button" @click=${() => this.handleSectionChange(provider)}>
+            <cr-icon .icon=${this.iconForSection(provider)} .size=${16}></cr-icon>
             Open ${label}
           </button>
           <button class="button" data-tone="ghost" type="button" @click=${() => this.handleSectionChange("settings")}>
+            <cr-icon .icon=${Settings2} .size=${16}></cr-icon>
             Settings
           </button>
         </div>
@@ -1303,41 +1812,66 @@ export class CrDashboardApp extends LitElement {
 
     return html`
       <section class="provider-shell">
+        ${this.renderRepositorySelector()}
+
         <div class="summary-grid">
-          <section class="metric panel">
-            <span class="eyebrow">${label} queue</span>
-            <strong>${this.targets.length}</strong>
-            <span class="muted">${this.stateFilter} requests currently loaded</span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Selected agents</span>
-            <strong>${this.selectedAgents.length || 1}</strong>
-            <span class="muted">Profiles ready for the next review run</span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Diff workspace</span>
-            <strong>${detail ? this.diffFiles.length : 0}</strong>
-            <span class="muted">${detail ? detail.title : "Choose a request to inspect"}</span>
-          </section>
+          <cr-stat-card
+            .eyebrow=${`${label} queue`}
+            .value=${String(this.targets.length)}
+            .note=${`${this.stateFilter} requests currently loaded`}
+            .tone=${this.targets.length > 0 ? "accent" : "default"}
+            .icon=${FolderSearch}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Selected agents"}
+            .value=${String(this.selectedAgents.length || 1)}
+            .note=${"Profiles ready for the next review run"}
+            .icon=${BrainCircuit}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Diff workspace"}
+            .value=${String(detail ? this.diffFiles.length : 0)}
+            .note=${detail ? detail.title : "Choose a request to inspect"}
+            .tone=${detail ? "success" : "default"}
+            .icon=${FileDiff}
+          ></cr-stat-card>
         </div>
 
         <section class="provider-hero panel">
-          <div class="section-head">
-            <div>
-              <div class="eyebrow">${label}</div>
-              <h2>${label} review workspace</h2>
+          <div class="provider-hero-copy">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">${label}</div>
+                <h2>${label} review workspace</h2>
+              </div>
+              <div class="actions">
+                <div class="badge" data-tone="success">configured</div>
+                <button class="button" data-tone="ghost" type="button" @click=${() => this.handleSectionChange("settings")}>
+                  <cr-icon .icon=${Settings2} .size=${16}></cr-icon>
+                  Edit settings
+                </button>
+              </div>
             </div>
-            <div class="actions">
-              <div class="badge" data-tone="success">configured</div>
-              <button class="button" data-tone="ghost" type="button" @click=${() => this.handleSectionChange("settings")}>
-                Edit settings
-              </button>
-            </div>
+            <p class="muted">
+              Workflows for ${label} stay isolated here, while provider credentials and defaults live in Settings.
+            </p>
+            ${providerError ? html`<div class="notice" data-tone="warning">${providerError}</div>` : ""}
           </div>
-          <p class="muted">
-            Workflows for ${label} stay isolated here, while provider credentials and defaults live in Settings.
-          </p>
-          ${providerError ? html`<div class="notice" data-tone="warning">${providerError}</div>` : ""}
+
+          <div class="provider-toolbar">
+            <div class="notice">
+              Active state filter: <strong>${this.stateFilter}</strong>. Search narrows by id, title, author, and branch names.
+            </div>
+            ${
+              detail
+                ? html`
+                  <div class="notice" data-tone="success">
+                    Inspecting ${detail.provider === "gitlab" ? `!${detail.id}` : `#${detail.id}`} with ${this.diffFiles.length} file${this.diffFiles.length === 1 ? "" : "s"} loaded.
+                  </div>
+                `
+                : html`<div class="notice">Select a request from the queue to load its diff, commits, and action rail.</div>`
+            }
+          </div>
         </section>
 
         <div class="layout">
@@ -1367,15 +1901,18 @@ export class CrDashboardApp extends LitElement {
                 </div>
               </div>
 
-              <input
-                class="field search"
-                type="search"
-                placeholder="Search id, title, author, branch"
-                .value=${this.searchTerm}
-                @input=${(event: Event) => {
-                  this.searchTerm = (event.target as HTMLInputElement).value;
-                }}
-              />
+              <label class="search-shell">
+                <cr-icon .icon=${Search} .size=${16}></cr-icon>
+                <input
+                  class="field search"
+                  type="search"
+                  placeholder="Search id, title, author, branch"
+                  .value=${this.searchTerm}
+                  @input=${(event: Event) => {
+                    this.searchTerm = (event.target as HTMLInputElement).value;
+                  }}
+                />
+              </label>
 
               <cr-review-list
                 .provider=${this.provider}
@@ -1437,6 +1974,7 @@ export class CrDashboardApp extends LitElement {
                               this.workspaceTab = tab;
                             }}
                           >
+                            <cr-icon .icon=${this.iconForWorkspaceTab(tab)} .size=${15}></cr-icon>
                             ${tab}
                           </button>
                         `
@@ -1498,6 +2036,7 @@ export class CrDashboardApp extends LitElement {
                         }
                       }}
                     >
+                      <cr-icon .icon=${this.iconForAnalysisTab(tab)} .size=${15}></cr-icon>
                       ${tab}
                     </button>
                   `
@@ -1534,26 +2073,38 @@ export class CrDashboardApp extends LitElement {
     return html`
       <section class="settings-shell">
         <div class="summary-grid">
-          <section class="metric panel">
-            <span class="eyebrow">AI runtime</span>
-            <strong>${this.dashboard?.config.openai.model || "Not configured"}</strong>
-            <span class="muted">
-              ${this.dashboard?.config.openai.configured ? "Model endpoint ready for workflows" : "Add API settings to enable AI workflows"}
-            </span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Webhook queue</span>
-            <strong>${this.configDraft.webhookConcurrency}</strong>
-            <span class="muted">Concurrent workers with queue limit ${this.configDraft.webhookQueueLimit}</span>
-          </section>
-          <section class="metric panel">
-            <span class="eyebrow">Theme override</span>
-            <strong>${this.configDraft.terminalTheme || "auto"}</strong>
-            <span class="muted">Applies when the CLI/server renders terminal surfaces</span>
-          </section>
+          <cr-stat-card
+            .eyebrow=${"AI runtime"}
+            .value=${this.dashboard?.config.openai.model || "Not configured"}
+            .note=${
+              this.dashboard?.config.openai.configured
+                ? "Model endpoint ready for workflows"
+                : "Add API settings to enable AI workflows"
+            }
+            .tone=${this.dashboard?.config.openai.configured ? "success" : "accent"}
+            .icon=${BrainCircuit}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Webhook queue"}
+            .value=${this.configDraft.webhookConcurrency}
+            .note=${`Concurrent workers with queue limit ${this.configDraft.webhookQueueLimit}`}
+            .icon=${Webhook}
+          ></cr-stat-card>
+          <cr-stat-card
+            .eyebrow=${"Theme override"}
+            .value=${this.configDraft.terminalTheme || "auto"}
+            .note=${"Applies when the CLI or server renders terminal surfaces"}
+            .icon=${Waypoints}
+          ></cr-stat-card>
         </div>
 
-        <section class="settings-grid">
+        <form
+          class="settings-grid"
+          @submit=${async (event: Event) => {
+            event.preventDefault();
+            await this.handleConfigSave();
+          }}
+        >
           <section class="settings-panel panel">
             <div class="section-head">
               <div>
@@ -1806,9 +2357,8 @@ export class CrDashboardApp extends LitElement {
               <button
                 class="button"
                 data-tone="primary"
-                type="button"
+                type="submit"
                 ?disabled=${this.savingConfig || !this.configDirty}
-                @click=${() => this.handleConfigSave()}
               >
                 ${this.savingConfig ? "Saving…" : "Save configuration"}
               </button>
@@ -1822,7 +2372,7 @@ export class CrDashboardApp extends LitElement {
               </button>
             </div>
           </section>
-        </section>
+        </form>
       </section>
     `;
   }
@@ -1912,7 +2462,18 @@ export class CrDashboardApp extends LitElement {
 
   private renderReviewPanel() {
     return html`
-      <section class="card">
+      ${
+        !this.canRunLocalWorkflows
+          ? html`<div class="notice" data-tone="warning">AI review runs require a local checkout. Switch the repository source to a local path to enable this workflow.</div>`
+          : ""
+      }
+      <form
+        class="card"
+        @submit=${async (event: Event) => {
+          event.preventDefault();
+          await this.handleRunReview();
+        }}
+      >
         <div class="section-head">
           <div>
             <div class="eyebrow">Run review</div>
@@ -1968,9 +2529,8 @@ export class CrDashboardApp extends LitElement {
           <button
             class="button"
             data-tone="primary"
-            type="button"
-            ?disabled=${this.runningReview || this.selectedAgents.length === 0}
-            @click=${() => this.handleRunReview()}
+            type="submit"
+            ?disabled=${!this.canRunLocalWorkflows || this.runningReview || this.selectedAgents.length === 0}
           >
             ${this.runningReview ? "Running review…" : "Run review"}
           </button>
@@ -1983,7 +2543,7 @@ export class CrDashboardApp extends LitElement {
             ${this.postingGeneratedReview ? "Posting…" : "Post generated review"}
           </button>
         </div>
-      </section>
+      </form>
 
       ${this.reviewWarnings.map((warning) => html`<div class="notice" data-tone="warning">${warning}</div>`)}
 
@@ -2042,20 +2602,30 @@ export class CrDashboardApp extends LitElement {
 
   private renderSummaryPanel() {
     return html`
-      <section class="card">
+      ${
+        !this.canRunLocalWorkflows
+          ? html`<div class="notice" data-tone="warning">Summary generation needs a local checkout because the AI workflow loads repository context from disk.</div>`
+          : ""
+      }
+      <form
+        class="card"
+        @submit=${async (event: Event) => {
+          event.preventDefault();
+          await this.handleRunSummary();
+        }}
+      >
         <div class="eyebrow">Generate summary</div>
         <div class="actions">
           <button
             class="button"
             data-tone="primary"
-            type="button"
-            ?disabled=${this.runningSummary}
-            @click=${() => this.handleRunSummary()}
+            type="submit"
+            ?disabled=${!this.canRunLocalWorkflows || this.runningSummary}
           >
             ${this.runningSummary ? "Generating…" : "Generate summary"}
           </button>
         </div>
-      </section>
+      </form>
 
       ${
         this.summaryResult
@@ -2073,6 +2643,11 @@ export class CrDashboardApp extends LitElement {
   private renderChatPanel() {
     return html`
       ${
+        !this.canRunLocalWorkflows
+          ? html`<div class="notice" data-tone="warning">Review chat is available only when a local repository checkout is selected.</div>`
+          : ""
+      }
+      ${
         this.chatContext
           ? html`
             <section class="card">
@@ -2084,13 +2659,13 @@ export class CrDashboardApp extends LitElement {
             <section class="card">
               <div class="eyebrow">Prepare context</div>
               <div class="actions">
-                <button
-                  class="button"
-                  data-tone="primary"
-                  type="button"
-                  ?disabled=${this.loadingChat}
-                  @click=${() => this.ensureChatContext()}
-                >
+                  <button
+                    class="button"
+                    data-tone="primary"
+                    type="button"
+                    ?disabled=${!this.canRunLocalWorkflows || this.loadingChat}
+                    @click=${() => this.ensureChatContext()}
+                  >
                   ${this.loadingChat ? "Preparing…" : "Load chat context"}
                 </button>
               </div>
@@ -2111,7 +2686,13 @@ export class CrDashboardApp extends LitElement {
           : ""
       }
 
-      <section class="card">
+      <form
+        class="card"
+        @submit=${async (event: Event) => {
+          event.preventDefault();
+          await this.handleAskQuestion();
+        }}
+      >
         <div class="eyebrow">Ask a question</div>
         <textarea
           class="textarea"
@@ -2125,14 +2706,13 @@ export class CrDashboardApp extends LitElement {
           <button
             class="button"
             data-tone="primary"
-            type="button"
-            ?disabled=${this.loadingChat || !this.chatContext || !this.chatQuestion.trim()}
-            @click=${() => this.handleAskQuestion()}
+            type="submit"
+            ?disabled=${!this.canRunLocalWorkflows || this.loadingChat || !this.chatContext || !this.chatQuestion.trim()}
           >
             ${this.loadingChat ? "Thinking…" : "Ask"}
           </button>
         </div>
-      </section>
+      </form>
     `;
   }
 
@@ -2140,7 +2720,13 @@ export class CrDashboardApp extends LitElement {
     const reviewBoardInlineDisabled = this.selectedTarget?.provider === "reviewboard";
 
     return html`
-      <section class="card">
+      <form
+        class="card"
+        @submit=${async (event: Event) => {
+          event.preventDefault();
+          await this.handlePostSummaryComment();
+        }}
+      >
         <div class="eyebrow">Summary comment</div>
         <textarea
           class="textarea"
@@ -2154,9 +2740,8 @@ export class CrDashboardApp extends LitElement {
           <button
             class="button"
             data-tone="primary"
-            type="button"
+            type="submit"
             ?disabled=${this.postingSummary || !this.summaryDraft.trim()}
-            @click=${() => this.handlePostSummaryComment()}
           >
             ${this.postingSummary ? "Posting…" : "Post summary comment"}
           </button>
@@ -2177,9 +2762,15 @@ export class CrDashboardApp extends LitElement {
               : ""
           }
         </div>
-      </section>
+      </form>
 
-      <section class="card">
+      <form
+        class="card"
+        @submit=${async (event: Event) => {
+          event.preventDefault();
+          await this.handlePostInlineComment();
+        }}
+      >
         <div class="eyebrow">Inline comment composer</div>
         ${
           this.selectedLine
@@ -2210,14 +2801,13 @@ export class CrDashboardApp extends LitElement {
           <button
             class="button"
             data-tone="primary"
-            type="button"
+            type="submit"
             ?disabled=${this.postingInline || reviewBoardInlineDisabled || !this.selectedLine || !this.inlineDraft.trim()}
-            @click=${() => this.handlePostInlineComment()}
           >
             ${this.postingInline ? "Posting…" : "Post inline comment"}
           </button>
         </div>
-      </section>
+      </form>
     `;
   }
 
