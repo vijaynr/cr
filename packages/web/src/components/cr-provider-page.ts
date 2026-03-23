@@ -17,7 +17,6 @@ import {
   type ReviewWorkflowResult,
 } from "../types.js";
 import "./cr-icon.js";
-import "./cr-provider-repository-picker.js";
 import "./cr-queue-rail.js";
 import "./cr-workspace-panel.js";
 import "./cr-analysis-rail.js";
@@ -28,6 +27,8 @@ type SelectedInlineTarget = {
   positionType: "new" | "old";
   text: string;
   key: string;
+  anchorTop: number;
+  anchorLeft: number;
 };
 
 type WorkspaceTab = "overview" | "diff" | "commits" | "comments";
@@ -51,8 +52,7 @@ export class CrProviderPage extends LitElement {
   // Workspace UI state
   @property() workspaceTab: WorkspaceTab = "diff";
   @property() analysisTab: AnalysisTab = "review";
-  @property({ type: Boolean }) queueRailCollapsed = false;
-  @property({ type: Boolean }) analysisRailCollapsed = false;
+  @property({ type: Boolean }) analysisPanelOpen = false;
   @property() searchTerm = "";
 
   // Drafts
@@ -142,13 +142,8 @@ export class CrProviderPage extends LitElement {
     }
 
     return html`
-      <div class="cr-fade-in cr-provider-page flex h-full min-h-0 flex-col gap-5">
-        ${this.renderRepositorySelectionCard(label)}
-
-        <div
-          class="cr-provider-workspace"
-          style=${`--cr-left-rail:${this.queueRailCollapsed ? "4rem" : "22rem"}; --cr-right-rail:${this.analysisRailCollapsed ? "4rem" : "24rem"};`}
-        >
+      <div class="cr-fade-in cr-provider-page flex h-full min-h-0 flex-col">
+        <div class="cr-provider-workspace">
           <cr-queue-rail
             .provider=${this.provider}
             .targets=${this.targets}
@@ -159,124 +154,91 @@ export class CrProviderPage extends LitElement {
             .targetsError=${this.targetsError}
             .configured=${this.configured}
             .selectedRepository=${this.selectedRepository}
-            .collapsed=${this.queueRailCollapsed}
-            @toggle-queue-rail=${() => { this.queueRailCollapsed = !this.queueRailCollapsed; }}
+            .repositoryOptions=${this.providerRepositoryOptions}
+            .repositoryLoading=${this.providerRepositoryLoading}
+            .repositoryError=${this.providerRepositoryError}
             @search-change=${(e: CustomEvent) => { this.searchTerm = e.detail; }}
+            @provider-repository-selected=${(e: CustomEvent) => this.emit("repository-selected", e.detail)}
+            @provider-repository-refresh=${() => this.emit("repository-refresh")}
+            @repository-clear=${() => this.emit("repository-clear")}
           ></cr-queue-rail>
 
-          <cr-workspace-panel
-            .provider=${this.provider}
-            .detailTarget=${this.detailTarget}
-            .diffFiles=${this.diffFiles}
-            .commits=${this.commits}
-            .selectedFileId=${this.selectedFileId}
-            .selectedFilePatch=${this.selectedFilePatch}
-            .selectedLine=${this.selectedLine}
-            .workspaceTab=${this.workspaceTab}
-            .loadingDetail=${this.loadingDetail}
-            .loadingDiffPatch=${this.loadingDiffPatch}
-            .detailError=${this.detailError}
-            .selectedRepository=${this.selectedRepository}
-            .discussions=${this.discussions}
-            .loadingDiscussions=${this.loadingDiscussions}
-            .discussionsError=${this.discussionsError}
-            .replyingToThreadId=${this.replyingToThreadId}
-            .discussionReplyDraft=${this.discussionReplyDraft}
-            .postingDiscussionReply=${this.postingDiscussionReply}
-            .summaryDraft=${this.summaryDraft}
-            .postingSummary=${this.postingSummary}
-            .reviewResult=${this.reviewResult}
-            .summaryResult=${this.summaryResult}
-            .inlineDraft=${this.inlineDraft}
-            .postingInline=${this.postingInline}
-            @workspace-tab-change=${(e: CustomEvent) => {
-              this.workspaceTab = e.detail;
-              if (e.detail !== "diff") this.selectedLine = null;
-            }}
-            @summary-draft-change=${(e: CustomEvent) => { this.summaryDraft = e.detail; }}
-            @inline-draft-change=${(e: CustomEvent) => { this.inlineDraft = e.detail; }}
-            @reply-draft-change=${(e: CustomEvent) => { this.discussionReplyDraft = e.detail; }}
-            @close-inline=${() => { this.selectedLine = null; this.inlineDraft = ""; }}
-            @line-selected=${(e: CustomEvent) => { this.selectedLine = e.detail; }}
-          ></cr-workspace-panel>
+          <div class="cr-provider-stage">
+            <cr-workspace-panel
+              .provider=${this.provider}
+              .detailTarget=${this.detailTarget}
+              .diffFiles=${this.diffFiles}
+              .commits=${this.commits}
+              .selectedFileId=${this.selectedFileId}
+              .selectedFilePatch=${this.selectedFilePatch}
+              .selectedLine=${this.selectedLine}
+              .workspaceTab=${this.workspaceTab}
+              .loadingDetail=${this.loadingDetail}
+              .loadingDiffPatch=${this.loadingDiffPatch}
+              .detailError=${this.detailError}
+              .selectedRepository=${this.selectedRepository}
+              .discussions=${this.discussions}
+              .loadingDiscussions=${this.loadingDiscussions}
+              .discussionsError=${this.discussionsError}
+              .replyingToThreadId=${this.replyingToThreadId}
+              .discussionReplyDraft=${this.discussionReplyDraft}
+              .postingDiscussionReply=${this.postingDiscussionReply}
+              .summaryDraft=${this.summaryDraft}
+              .postingSummary=${this.postingSummary}
+              .reviewResult=${this.reviewResult}
+              .summaryResult=${this.summaryResult}
+              .inlineDraft=${this.inlineDraft}
+              .postingInline=${this.postingInline}
+              .assistantOpen=${this.analysisPanelOpen}
+              @workspace-tab-change=${(e: CustomEvent) => {
+                this.workspaceTab = e.detail;
+                if (e.detail !== "diff") this.selectedLine = null;
+              }}
+              @summary-draft-change=${(e: CustomEvent) => { this.summaryDraft = e.detail; }}
+              @inline-draft-change=${(e: CustomEvent) => { this.inlineDraft = e.detail; }}
+              @reply-draft-change=${(e: CustomEvent) => { this.discussionReplyDraft = e.detail; }}
+              @close-inline=${() => { this.selectedLine = null; this.inlineDraft = ""; }}
+              @line-selected=${(e: CustomEvent) => { this.selectedLine = e.detail; }}
+              @open-ai-assistant=${() => { this.analysisPanelOpen = true; }}
+            ></cr-workspace-panel>
 
-          <cr-analysis-rail
-            .provider=${this.provider}
-            .detailTarget=${this.detailTarget}
-            .analysisTab=${this.analysisTab}
-            .collapsed=${this.analysisRailCollapsed}
-            .selectedRepository=${this.selectedRepository}
-            .canRunWorkflows=${this.canRunRepositoryWorkflows}
-            .agentOptions=${this.agentOptions}
-            .selectedAgents=${this.selectedAgents}
-            .inlineCommentsEnabled=${this.inlineCommentsEnabled}
-            .feedbackDraft=${this.feedbackDraft}
-            .runningReview=${this.runningReview}
-            .postingGeneratedReview=${this.postingGeneratedReview}
-            .reviewResult=${this.reviewResult}
-            .reviewWarnings=${this.reviewWarnings}
-            .runningSummary=${this.runningSummary}
-            .summaryResult=${this.summaryResult}
-            .chatContext=${this.chatContext}
-            .chatHistory=${this.chatHistory}
-            .chatQuestion=${this.chatQuestion}
-            .loadingChat=${this.loadingChat}
-            @toggle-analysis-rail=${() => { this.analysisRailCollapsed = !this.analysisRailCollapsed; }}
-            @analysis-tab-change=${(e: CustomEvent) => { this.analysisTab = e.detail; }}
-            @agent-toggle=${(e: CustomEvent) => {
-              const { value, checked } = e.detail;
-              const next = new Set(this.selectedAgents);
-              if (checked) next.add(value);
-              else if (next.size > 1) next.delete(value);
-              this.selectedAgents = Array.from(next);
-            }}
-            @inline-toggle=${(e: CustomEvent) => { this.inlineCommentsEnabled = e.detail; }}
-            @question-change=${(e: CustomEvent) => { this.chatQuestion = e.detail; }}
-          ></cr-analysis-rail>
+            <cr-analysis-rail
+              .provider=${this.provider}
+              .detailTarget=${this.detailTarget}
+              .analysisTab=${this.analysisTab}
+              .open=${this.analysisPanelOpen}
+              .selectedRepository=${this.selectedRepository}
+              .canRunWorkflows=${this.canRunRepositoryWorkflows}
+              .agentOptions=${this.agentOptions}
+              .selectedAgents=${this.selectedAgents}
+              .inlineCommentsEnabled=${this.inlineCommentsEnabled}
+              .feedbackDraft=${this.feedbackDraft}
+              .runningReview=${this.runningReview}
+              .postingGeneratedReview=${this.postingGeneratedReview}
+              .reviewResult=${this.reviewResult}
+              .reviewWarnings=${this.reviewWarnings}
+              .runningSummary=${this.runningSummary}
+              .summaryResult=${this.summaryResult}
+              .chatContext=${this.chatContext}
+              .chatHistory=${this.chatHistory}
+              .chatQuestion=${this.chatQuestion}
+              .loadingChat=${this.loadingChat}
+              @close-analysis-panel=${() => { this.analysisPanelOpen = false; }}
+              @analysis-tab-change=${(e: CustomEvent) => { this.analysisTab = e.detail; }}
+              @agent-toggle=${(e: CustomEvent) => {
+                const { value, checked } = e.detail;
+                const next = new Set(this.selectedAgents);
+                if (checked) next.add(value);
+                else if (next.size > 1) next.delete(value);
+                this.selectedAgents = Array.from(next);
+              }}
+              @inline-toggle=${(e: CustomEvent) => { this.inlineCommentsEnabled = e.detail; }}
+              @question-change=${(e: CustomEvent) => { this.chatQuestion = e.detail; }}
+            ></cr-analysis-rail>
+          </div>
         </div>
       </div>
     `;
   }
 
-  private renderRepositorySelectionCard(label: string) {
-    return html`
-      <section class="rounded-[0.55rem] border border-base-300 bg-base-200/80 px-4 py-3">
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <div class="min-w-0 flex items-center gap-3">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-              <cr-icon .icon=${Settings2} .size=${14} class="text-primary"></cr-icon>
-            </div>
-            <div>
-              <h2 class="text-sm font-semibold">${label} Repository</h2>
-              <div class="text-[0.72rem] text-base-content/40">Select a project to load its review queue</div>
-            </div>
-          </div>
-
-          <div class="min-w-[18rem] flex-1 max-w-xl">
-            <cr-provider-repository-picker
-              .provider=${this.provider}
-              .options=${this.providerRepositoryOptions}
-              .selectedId=${this.selectedRepository?.id || ""}
-              .loading=${this.providerRepositoryLoading}
-              .error=${this.providerRepositoryError}
-              @provider-repository-selected=${(e: CustomEvent) => this.emit("repository-selected", e.detail)}
-              @provider-repository-refresh=${() => this.emit("repository-refresh")}
-            ></cr-provider-repository-picker>
-          </div>
-
-          ${this.selectedRepository
-            ? html`
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm rounded-[0.55rem] text-base-content/60 hover:text-base-content"
-                  @click=${() => this.emit("repository-clear")}
-                >
-                  Clear
-                </button>
-              `
-            : ""}
-        </div>
-      </section>
-    `;
-  }
 }

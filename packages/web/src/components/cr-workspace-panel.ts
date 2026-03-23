@@ -2,6 +2,7 @@ import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import {
   ArrowUpRight,
+  Bot,
   FileDiff,
   FolderSearch,
   GitBranch,
@@ -33,6 +34,8 @@ type SelectedInlineTarget = {
   positionType: "new" | "old";
   text: string;
   key: string;
+  anchorTop: number;
+  anchorLeft: number;
 };
 
 @customElement("cr-workspace-panel")
@@ -61,6 +64,7 @@ export class CrWorkspacePanel extends LitElement {
   @property({ attribute: false }) summaryResult: ReviewWorkflowResult | null = null;
   @property() inlineDraft = "";
   @property({ type: Boolean }) postingInline = false;
+  @property({ type: Boolean }) assistantOpen = false;
 
   override createRenderRoot() {
     return this;
@@ -90,7 +94,7 @@ export class CrWorkspacePanel extends LitElement {
     const detail = this.detailTarget;
 
     return html`
-      <section class="cr-review-workspace-panel relative rounded-[0.55rem] border border-base-300 bg-base-200 p-4">
+      <section class="cr-review-workspace-panel relative h-full min-h-0 rounded-[0.55rem] border border-base-300 bg-base-200 p-4">
         ${detail
           ? this.renderContent(detail)
           : this.selectedRepository
@@ -133,7 +137,19 @@ export class CrWorkspacePanel extends LitElement {
             ${detail.updatedAt ? html`<span class="badge badge-sm badge-ghost">${detail.updatedAt}</span>` : ""}
           </div>
         </div>
-        ${detail.url ? html`<a class="btn btn-ghost btn-xs shrink-0 gap-1.5" href=${detail.url} target="_blank" rel="noreferrer"><cr-icon .icon=${ArrowUpRight} .size=${12}></cr-icon>Open</a>` : ""}
+        <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm gap-1.5 rounded-[0.8rem] shadow-sm cr-ai-assistant-trigger"
+            @click=${() => this.emit("open-ai-assistant")}
+            aria-pressed=${String(this.assistantOpen)}
+            data-open=${String(this.assistantOpen)}
+          >
+            <cr-icon .icon=${Bot} .size=${14}></cr-icon>
+            AI Assistant
+          </button>
+          ${detail.url ? html`<a class="btn btn-ghost btn-xs shrink-0 gap-1.5" href=${detail.url} target="_blank" rel="noreferrer"><cr-icon .icon=${ArrowUpRight} .size=${12}></cr-icon>Open</a>` : ""}
+        </div>
       </div>
 
       <div class="tabs tabs-boxed cr-tab-strip cr-tab-strip--inline self-start">
@@ -182,7 +198,7 @@ export class CrWorkspacePanel extends LitElement {
                 : this.workspaceTab === "commits"
                   ? html`<div class="h-full overflow-auto pr-1"><cr-commits-list .commits=${this.commits}></cr-commits-list></div>`
                   : html`
-                      <div class="relative h-full min-h-0">
+                      <div class="relative flex h-full min-h-0 flex-col overflow-hidden">
                         <cr-diff-viewer
                           .files=${this.diffFiles}
                           .selectedFileId=${this.selectedFileId}
@@ -210,7 +226,7 @@ export class CrWorkspacePanel extends LitElement {
         <div class="rounded-[0.55rem] border border-base-100/10 bg-base-300 px-4 py-4 flex flex-col gap-3">
           <h3 class="text-sm font-semibold">Description</h3>
           ${renderMarkdown(detail.description || detail.summary, {
-            className: "text-sm text-base-content/70",
+            className: "cr-markdown--muted",
             emptyText: "No rich description from the provider. Use the diff and commit tabs for full review context.",
           })}
         </div>

@@ -1,12 +1,9 @@
 import { Hono, type Context } from "hono";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  WEB_APP_FAVICON_ROUTE,
-  WEB_APP_ICON_ROUTE,
-  getCrAppIconSvg,
-  getCrFaviconSvg,
-} from "./brand.js";
+import crFaviconSvg from "./assets/cr-favicon.svg" with { type: "text" };
+import crAppIconSvg from "./assets/cr-app-icon.svg" with { type: "text" };
+import { WEB_APP_FAVICON_ROUTE, WEB_APP_ICON_ROUTE } from "./asset-routes.js";
 import {
   getBootLoaderHtml,
   getBootLoaderScript,
@@ -77,8 +74,14 @@ export function getWebAppHtml(styles: string): string {
 ${styles}
 body { margin: 0; }
 cr-dashboard-app { display: block; min-height: 100vh; }
-cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header, cr-overview-page, cr-provider-page, cr-settings-page, cr-theme-toggle, cr-queue-rail, cr-workspace-panel, cr-analysis-rail, cr-review-panel, cr-summary-panel, cr-chat-panel, cr-comments-workspace, cr-inline-comment-popover, cr-commits-list, cr-discussion-thread, cr-config-input, cr-provider-summary-card, cr-toast-notification { display: contents; }
+cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header, cr-overview-page, cr-provider-page, cr-settings-page, cr-theme-toggle, cr-queue-rail, cr-workspace-panel, cr-analysis-rail, cr-review-panel, cr-summary-panel, cr-chat-panel, cr-comments-workspace, cr-inline-comment-popover, cr-commits-list, cr-discussion-thread, cr-config-input, cr-provider-summary-card, cr-provider-icon, cr-toast-notification { display: contents; }
 cr-sidebar-nav { display: flex; flex-direction: column; min-height: 100vh; width: 16rem; }
+@media (min-width: 1024px) {
+  cr-sidebar-nav {
+    transition: width 220ms ease;
+    width: var(--cr-sidebar-shell-width, 16rem);
+  }
+}
 ${getBootLoaderStyles()}
     </style>
   </head>
@@ -197,14 +200,14 @@ export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> 
   });
 
   app.get(WEB_APP_ICON_ROUTE, (c) =>
-    c.body(getCrAppIconSvg(), 200, {
+    c.body(crAppIconSvg, 200, {
       "Content-Type": "image/svg+xml; charset=utf-8",
       "Cache-Control": "no-store",
     })
   );
 
   app.get(WEB_APP_FAVICON_ROUTE, (c) =>
-    c.body(getCrFaviconSvg(), 200, {
+    c.body(crFaviconSvg, 200, {
       "Content-Type": "image/svg+xml; charset=utf-8",
       "Cache-Control": "no-store",
     })

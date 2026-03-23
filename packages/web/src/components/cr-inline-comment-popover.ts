@@ -8,6 +8,8 @@ type SelectedInlineTarget = {
   positionType: "new" | "old";
   text: string;
   key: string;
+  anchorTop: number;
+  anchorLeft: number;
 };
 
 const sectionEyebrowClass =
@@ -31,13 +33,32 @@ export class CrInlineCommentPopover extends LitElement {
     );
   }
 
+  private popoverStyle() {
+    if (typeof window === "undefined" || !this.selectedLine) {
+      return "";
+    }
+
+    const popoverWidth = Math.min(384, window.innerWidth - 32);
+    const maxLeft = Math.max(16, window.innerWidth - popoverWidth - 16);
+    const left = Math.min(
+      Math.max(16, this.selectedLine.anchorLeft - popoverWidth - 14),
+      maxLeft
+    );
+    const top = Math.min(
+      Math.max(16, this.selectedLine.anchorTop - 28),
+      Math.max(16, window.innerHeight - 160)
+    );
+
+    return `--cr-inline-comment-popover-left:${left}px;--cr-inline-comment-popover-top:${top}px;`;
+  }
+
   render() {
     if (!this.selectedLine) return nothing;
 
     return html`
       <div
         class="cr-inline-comment-popover rounded-[0.75rem] border border-base-300 bg-base-200/98 p-4 backdrop-blur-md"
-        style="box-shadow:var(--cr-shadow-3)"
+        style="${this.popoverStyle()}box-shadow:var(--cr-shadow-3)"
       >
         <div class="flex items-start justify-between gap-3">
           <div>

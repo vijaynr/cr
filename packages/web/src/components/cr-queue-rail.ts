@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { ChevronLeft, ChevronRight, Search } from "lucide";
+import { Search } from "lucide";
 import {
   providerLabels,
   providerQueueLabels,
@@ -11,6 +11,7 @@ import {
   type ReviewTarget,
 } from "../types.js";
 import "./cr-icon.js";
+import "./cr-provider-repository-picker.js";
 import "./cr-review-list.js";
 
 @customElement("cr-queue-rail")
@@ -24,7 +25,11 @@ export class CrQueueRail extends LitElement {
   @property() targetsError = "";
   @property({ type: Boolean }) configured = true;
   @property({ attribute: false }) selectedRepository: ProviderRepositoryOption | null = null;
-  @property({ type: Boolean }) collapsed = false;
+
+  // Repository picker
+  @property({ attribute: false }) repositoryOptions: ProviderRepositoryOption[] = [];
+  @property({ type: Boolean }) repositoryLoading = false;
+  @property() repositoryError = "";
 
   override createRenderRoot() {
     return this;
@@ -61,74 +66,77 @@ export class CrQueueRail extends LitElement {
 
   render() {
     const filtered = this.filteredTargets;
+    const queueLabel = providerQueueLabels[this.provider];
 
     return html`
       <section
-        class="cr-side-rail cr-side-rail--left rounded-[0.55rem] border border-base-300 bg-base-200 ${this.collapsed ? "cr-side-rail--collapsed" : ""}"
+        class="cr-side-rail cr-side-rail--left rounded-[0.55rem] border border-base-300 bg-base-200"
       >
-        <button
-          class="cr-side-rail__toggle cr-side-rail__toggle--left btn btn-ghost btn-sm"
-          type="button"
-          @click=${() => this.emit("toggle-queue-rail")}
-          aria-label=${this.collapsed ? `Expand ${providerQueueLabels[this.provider]}` : `Collapse ${providerQueueLabels[this.provider]}`}
-          aria-expanded=${String(!this.collapsed)}
-          title=${this.collapsed ? `Expand ${providerQueueLabels[this.provider]}` : `Collapse ${providerQueueLabels[this.provider]}`}
-        >
-          <cr-icon .icon=${this.collapsed ? ChevronRight : ChevronLeft} .size=${16}></cr-icon>
-        </button>
+        <div class="cr-side-rail__inner flex h-full min-h-0 flex-col p-4">
+          <!-- Repository section -->
+          <div class="cr-queue-section">
+            <div class="cr-queue-section__label">Repository</div>
+            <cr-provider-repository-picker
+              .provider=${this.provider}
+              .options=${this.repositoryOptions}
+              .selectedId=${this.selectedRepository?.id || ""}
+              .loading=${this.repositoryLoading}
+              .error=${this.repositoryError}
+            ></cr-provider-repository-picker>
+          </div>
 
-        <div class="cr-side-rail__inner flex h-full min-h-0 flex-col gap-3 p-4">
-          <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <h2 class="text-base font-semibold">${providerQueueLabels[this.provider]}</h2>
+          <hr class="cr-queue-divider" />
+
+          <!-- Queue section -->
+          <div class="cr-queue-section cr-queue-section--grow">
+            <div class="cr-queue-section__header">
+              <span class="cr-queue-section__label">${queueLabel}</span>
+              <span class="cr-queue-count">${this.queueCountLabel(filtered.length)}</span>
             </div>
-            <div class="badge badge-primary badge-sm">${this.formatLabel(this.stateFilter)}</div>
-          </div>
 
-          <div class="tabs tabs-boxed cr-tab-strip cr-tab-strip--full">
-            ${reviewStates.map(
-              (state) => html`
-                <button
-                  type="button"
-                  class="tab tab-sm cr-tab ${this.stateFilter === state ? "tab-active" : ""}"
+            <div class="cr-queue-filter-row">
+              <select
+                class="cr-state-filter"
+                .value=${this.stateFilter}
+                ?disabled=${!this.selectedRepository}
+                @change=${(e: Event) =>
+                  this.emit("state-filter-change", (e.target as HTMLSelectElement).value)}
+              >
+                ${reviewStates.map(
+                  (state) => html`
+                    <option value=${state} ?selected=${this.stateFilter === state}>
+                      ${this.formatLabel(state)}
+                    </option>
+                  `
+                )}
+              </select>
+              <label class="input input-bordered input-sm flex items-center gap-2 flex-1 min-w-0">
+                <cr-icon .icon=${Search} .size=${14}></cr-icon>
+                <input
+                  type="search"
+                  class="grow text-sm min-w-0"
+                  placeholder="Search…"
                   ?disabled=${!this.selectedRepository}
-                  @click=${() => this.emit("state-filter-change", state)}
-                >
-                  ${this.formatLabel(state)}
-                </button>
-              `
-            )}
+                  .value=${this.searchTerm}
+                  @input=${(e: Event) => {
+                    this.emit("search-change", (e.target as HTMLInputElement).value);
+                  }}
+                />
+              </label>
+            </div>
+
+            <cr-review-list
+              .provider=${this.provider}
+              .targets=${filtered}
+              .selectedId=${this.selectedTarget?.id ?? 0}
+              .loading=${this.loadingTargets}
+              .error=${this.targetsError}
+              .configured=${this.configured}
+              .emptyTitle=${this.selectedRepository ? "" : `${providerLabels[this.provider]} repository required`}
+              .emptyDescription=${this.selectedRepository ? "" : `Choose a repository above to load its review queue.`}
+              @review-selected=${(e: CustomEvent<ReviewTarget>) => this.emit("target-selected", e.detail)}
+            ></cr-review-list>
           </div>
-
-          <label class="input input-bordered input-sm flex items-center gap-2 w-full">
-            <cr-icon .icon=${Search} .size=${14}></cr-icon>
-            <input
-              type="search"
-              class="grow text-sm"
-              placeholder="Search ID, title, author, or branch"
-              ?disabled=${!this.selectedRepository}
-              .value=${this.searchTerm}
-              @input=${(e: Event) => {
-                this.emit("search-change", (e.target as HTMLInputElement).value);
-              }}
-            />
-          </label>
-
-          <div class="flex items-center justify-between gap-2 text-xs text-base-content/50">
-            <span>${this.queueCountLabel(filtered.length)}</span>
-          </div>
-
-          <cr-review-list
-            .provider=${this.provider}
-            .targets=${filtered}
-            .selectedId=${this.selectedTarget?.id ?? 0}
-            .loading=${this.loadingTargets}
-            .error=${this.targetsError}
-            .configured=${this.configured}
-            .emptyTitle=${this.selectedRepository ? "" : `${providerLabels[this.provider]} repository required`}
-            .emptyDescription=${this.selectedRepository ? "" : `Choose a ${providerLabels[this.provider]} repository to load its review queue.`}
-            @review-selected=${(e: CustomEvent<ReviewTarget>) => this.emit("target-selected", e.detail)}
-          ></cr-review-list>
         </div>
       </section>
     `;

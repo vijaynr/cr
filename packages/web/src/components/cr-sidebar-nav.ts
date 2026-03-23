@@ -2,11 +2,11 @@ import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import {
   BrainCircuit,
+  ChevronLeft,
+  ChevronRight,
   GitBranch,
   LayoutDashboard,
   Settings2,
-  ShieldCheck,
-  Workflow,
   type IconNode,
 } from "lucide";
 import {
@@ -16,8 +16,9 @@ import {
   type DashboardSection,
   type UITheme,
 } from "../types.js";
-import { WEB_APP_ICON_ROUTE } from "../brand.js";
+import { WEB_APP_ICON_ROUTE } from "../asset-routes.js";
 import "./cr-icon.js";
+import "./cr-provider-icon.js";
 import "./cr-theme-toggle.js";
 
 @customElement("cr-sidebar-nav")
@@ -28,6 +29,7 @@ export class CrSidebarNav extends LitElement {
   @property() repositoryLabel = "";
   @property({ type: Boolean }) isLoading = false;
   @property() uiTheme: UITheme = "dark";
+  @property({ type: Boolean }) collapsed = false;
 
   override createRenderRoot() {
     return this;
@@ -37,14 +39,10 @@ export class CrSidebarNav extends LitElement {
     switch (section) {
       case "overview":
         return LayoutDashboard;
-      case "gitlab":
-        return Workflow;
-      case "github":
-        return GitBranch;
-      case "reviewboard":
-        return ShieldCheck;
       case "settings":
         return Settings2;
+      default:
+        return LayoutDashboard;
     }
   }
 
@@ -58,24 +56,50 @@ export class CrSidebarNav extends LitElement {
     );
   }
 
+  private emitToggleSidebar() {
+    this.dispatchEvent(
+      new CustomEvent("toggle-sidebar", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
   private renderNavItem(section: DashboardSection, label: string) {
     const isActive = this.activeSection === section;
+    const isProvider =
+      section === "gitlab" || section === "github" || section === "reviewboard";
+
     return html`
-      <li>
-        <a
-          href="#/${section}"
-          class="${isActive
-            ? "active bg-primary/10 text-primary font-semibold"
-            : ""} flex items-center gap-2.5 rounded-lg cursor-pointer"
-          @click=${(e: Event) => {
-            e.preventDefault();
-            this.emitSectionChange(section);
-          }}
-        >
-          <cr-icon .icon=${this.iconForSection(section)} .size=${15}></cr-icon>
-          ${label}
-        </a>
-      </li>
+      <a
+        href="#/${section}"
+        class="cr-app-sidebar__nav-link ${isActive
+          ? "cr-app-sidebar__nav-link--active"
+          : ""}"
+        title=${label}
+        aria-label=${label}
+        @click=${(e: Event) => {
+          e.preventDefault();
+          this.emitSectionChange(section);
+        }}
+      >
+        <span class="cr-app-sidebar__nav-icon">
+          ${isProvider
+            ? html`
+                <cr-provider-icon
+                  .provider=${section}
+                  .size=${15}
+                ></cr-provider-icon>
+              `
+            : html`
+                <cr-icon
+                  .icon=${this.iconForSection(section)}
+                  .size=${15}
+                ></cr-icon>
+              `}
+        </span>
+        <span class="cr-app-sidebar__label">${label}</span>
+      </a>
     `;
   }
 
@@ -86,68 +110,102 @@ export class CrSidebarNav extends LitElement {
 
     return html`
       <aside
-        class="border-r border-base-300/75 bg-base-200/96 w-64 min-h-screen flex flex-col gap-5 p-5 backdrop-blur-md"
+        class="cr-app-sidebar ${this.collapsed ? "cr-app-sidebar--collapsed" : ""}"
       >
-        <!-- Brand -->
-        <div class="flex items-center gap-2 pt-1 pb-2 border-b border-base-300">
-          <img
-            src=${WEB_APP_ICON_ROUTE}
-            alt="CR"
-            width="40"
-            height="40"
-            class="h-10 w-10 shrink-0 rounded-xl ring-1 ring-white/10 shadow-sm"
-          />
-          <div>
-            <div class="font-bold text-sm tracking-tight">
-              Code Review Platform
-            </div>
-            <div class="text-xs text-base-content/40">
-              Review Command Center
-            </div>
-          </div>
-          ${this.isLoading
-            ? html`<span
-                class="loading loading-spinner loading-xs text-primary ml-auto"
-              ></span>`
-            : ""}
+        <div
+          class="cr-app-sidebar__edge"
+          @click=${() => this.emitToggleSidebar()}
+          role="button"
+          tabindex="0"
+          aria-label=${this.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title=${this.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.emitToggleSidebar(); } }}
+        >
+          <span class="cr-app-sidebar__edge-indicator" aria-hidden="true">
+            <cr-icon
+              .icon=${this.collapsed ? ChevronRight : ChevronLeft}
+              .size=${12}
+            ></cr-icon>
+          </span>
         </div>
 
-        <!-- Navigation -->
-        <ul class="menu menu-sm p-0 gap-1 flex-none">
+        <div class="cr-app-sidebar__header">
+          <div class="cr-app-sidebar__brand">
+            <img
+              src=${WEB_APP_ICON_ROUTE}
+              alt="CR"
+              width="40"
+              height="40"
+              class="cr-app-sidebar__brand-mark"
+            />
+            <div class="cr-app-sidebar__brand-copy">
+              <div class="cr-app-sidebar__brand-title">
+                Code Review Platform
+              </div>
+              <div class="cr-app-sidebar__brand-subtitle">
+                Review Command Center
+              </div>
+            </div>
+          </div>
+          <div class="cr-app-sidebar__header-actions">
+            ${this.isLoading
+              ? html`<span
+                  class="loading loading-spinner loading-xs text-primary"
+                ></span>`
+              : ""}
+          </div>
+        </div>
+
+        <nav class="cr-app-sidebar__nav" aria-label="Main navigation">
           ${this.renderNavItem("overview", "Overview")}
           ${providerOrder.map((p) =>
             this.renderNavItem(p, providerLabels[p])
           )}
           ${this.renderNavItem("settings", "Settings")}
-        </ul>
+        </nav>
 
-        <!-- Workspace status -->
-        <div class="flex flex-col gap-2 text-xs text-base-content/50">
-          <div class="flex items-center gap-2">
-            <cr-icon .icon=${Workflow} .size=${12}></cr-icon>
-            <span>${configuredProviders}/3 providers configured</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <cr-icon .icon=${BrainCircuit} .size=${12}></cr-icon>
-            <span>${this.selectedAgentCount || 1} active agents</span>
-          </div>
-          ${this.repositoryLabel
-            ? html`
-                <div class="flex items-center gap-2">
-                  <cr-icon .icon=${GitBranch} .size=${12}></cr-icon>
-                  <span class="truncate font-mono"
-                    >${this.repositoryLabel}</span
+        ${this.collapsed
+          ? ""
+          : html`
+              <div class="cr-app-sidebar__status">
+                <div
+                  class="cr-app-sidebar__status-item"
+                  title="${configuredProviders}/3 providers configured"
+                >
+                  <cr-icon .icon=${LayoutDashboard} .size=${12}></cr-icon>
+                  <span class="cr-app-sidebar__label"
+                    >${configuredProviders}/3 providers configured</span
                   >
                 </div>
-              `
-            : ""}
-        </div>
+                <div
+                  class="cr-app-sidebar__status-item"
+                  title="${this.selectedAgentCount || 1} active agents"
+                >
+                  <cr-icon .icon=${BrainCircuit} .size=${12}></cr-icon>
+                  <span class="cr-app-sidebar__label"
+                    >${this.selectedAgentCount || 1} active agents</span
+                  >
+                </div>
+                ${this.repositoryLabel
+                  ? html`
+                      <div
+                        class="cr-app-sidebar__status-item"
+                        title=${this.repositoryLabel}
+                      >
+                        <cr-icon .icon=${GitBranch} .size=${12}></cr-icon>
+                        <span class="cr-app-sidebar__label truncate font-mono"
+                          >${this.repositoryLabel}</span
+                        >
+                      </div>
+                    `
+                  : ""}
+              </div>
+            `}
 
-        <!-- Footer -->
-        <div
-          class="mt-auto flex flex-col gap-3 border-t border-base-300 pt-4"
-        >
-          <cr-theme-toggle .theme=${this.uiTheme}></cr-theme-toggle>
+        <div class="cr-app-sidebar__footer">
+          <cr-theme-toggle
+            .theme=${this.uiTheme}
+          ></cr-theme-toggle>
         </div>
       </aside>
     `;

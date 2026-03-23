@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="cr-app-icon-title">
+  <title id="cr-app-icon-title">CR app icon</title>
+  <defs>
+    <linearGradient id="cr-app-icon-bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="1" stop-color="#050816" />
+    </linearGradient>
+    <radialGradient id="cr-app-icon-glow" cx="32" cy="28" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.14" />
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="cr-app-icon-stroke" x1="10" y1="18" x2="54" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7dd3fc" />
+      <stop offset="0.5" stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="16" fill="url(#cr-app-icon-bg)" />
+  <rect x="1.5" y="1.5" width="61" height="61" rx="16" fill="none" stroke="#ffffff10" stroke-width="1" />
+  <circle cx="32" cy="28" r="22" fill="url(#cr-app-icon-glow)" />
+  <polyline points="23,20 12,32 23,44" fill="none" stroke="url(#cr-app-icon-stroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="41,20 52,32 41,44" fill="none" stroke="url(#cr-app-icon-stroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <polyline points="27.5,33 31,37 37,27" fill="none" stroke="url(#cr-app-icon-stroke)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

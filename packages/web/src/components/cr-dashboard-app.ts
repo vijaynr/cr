@@ -64,6 +64,8 @@ type SelectedInlineTarget = {
   positionType: "new" | "old";
   text: string;
   key: string;
+  anchorTop: number;
+  anchorLeft: number;
 };
 
 type ConfigDraft = {
@@ -245,12 +247,14 @@ export class CrDashboardApp extends LitElement {
   // ── Theme ───────────────────────────────────────────
 
   @state() uiTheme: UITheme = "dark";
+  @state() sidebarCollapsed = true;
 
   // ── Lifecycle ───────────────────────────────────────
 
   connectedCallback() {
     super.connectedCallback();
     this.uiTheme = this.readStoredTheme();
+    this.sidebarCollapsed = this.readStoredSidebarCollapsed();
     this.syncTheme();
     void this.loadInitialData();
   }
@@ -754,12 +758,13 @@ export class CrDashboardApp extends LitElement {
     this.discussionReplyDraft = "";
   }
 
-  private async handlePostDiscussionReply(thread: ReviewDiscussionThread) {
-    if (
-      !this.selectedTarget ||
-      !thread.replyable ||
-      !this.discussionReplyDraft.trim()
-    ) {
+  private async handlePostDiscussionReply(detail: {
+    threadId: string;
+    replyTargetId?: string;
+    body: string;
+  }) {
+    const body = detail.body.trim();
+    if (!this.selectedTarget || !body) {
       return;
     }
 
@@ -768,9 +773,9 @@ export class CrDashboardApp extends LitElement {
       await replyToReviewDiscussion({
         provider: this.selectedTarget.provider,
         targetId: this.selectedTarget.id,
-        threadId: thread.id,
-        replyTargetId: thread.replyTargetId,
-        body: this.discussionReplyDraft.trim(),
+        threadId: detail.threadId,
+        replyTargetId: detail.replyTargetId,
+        body,
         repositoryContext: this.activeRepositoryContext,
       });
       this.cancelReplyToThread();
@@ -1252,6 +1257,25 @@ export class CrDashboardApp extends LitElement {
     }
   }
 
+  private readStoredSidebarCollapsed() {
+    try {
+      return window.localStorage.getItem("cr:web-sidebar-collapsed") !== "false";
+    } catch {
+      return true;
+    }
+  }
+
+  private persistSidebarCollapsed(collapsed: boolean) {
+    try {
+      window.localStorage.setItem(
+        "cr:web-sidebar-collapsed",
+        String(collapsed)
+      );
+    } catch {
+      // Ignore storage errors in restricted environments.
+    }
+  }
+
   private syncTheme() {
     document.documentElement.setAttribute("data-theme", this.themeName);
     const themeColor =
@@ -1265,6 +1289,11 @@ export class CrDashboardApp extends LitElement {
     this.uiTheme = this.uiTheme === "dark" ? "light" : "dark";
     this.persistTheme(this.uiTheme);
     this.syncTheme();
+  }
+
+  private toggleSidebarCollapsed() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    this.persistSidebarCollapsed(this.sidebarCollapsed);
   }
 
   // ── Render ──────────────────────────────────────────
@@ -1281,6 +1310,7 @@ export class CrDashboardApp extends LitElement {
         @section-change=${(e: CustomEvent) =>
           void this.handleSectionChange(e.detail)}
         @theme-toggle=${() => this.toggleUiTheme()}
+        @toggle-sidebar=${() => this.toggleSidebarCollapsed()}
       >
         <input id="cr-drawer" type="checkbox" class="drawer-toggle" />
 
@@ -1301,7 +1331,6 @@ export class CrDashboardApp extends LitElement {
             >
             <cr-theme-toggle
               .theme=${this.uiTheme}
-              compact
             ></cr-theme-toggle>
             ${isLoading
               ? html`<span
@@ -1331,6 +1360,8 @@ export class CrDashboardApp extends LitElement {
               ?.label ?? ""}
             .isLoading=${isLoading}
             .uiTheme=${this.uiTheme}
+            .collapsed=${this.sidebarCollapsed}
+            style=${`--cr-sidebar-shell-width:${this.sidebarCollapsed ? "5.5rem" : "16rem"};`}
           ></cr-sidebar-nav>
         </div>
 
@@ -1432,7 +1463,7 @@ export class CrDashboardApp extends LitElement {
         .providerRepositoryError=${this.providerRepositoryError}
         .canRunRepositoryWorkflows=${this.canRunRepositoryWorkflows}
         .searchTerm=${this.searchTerm}
-        @review-selected=${(e: CustomEvent) =>
+        @target-selected=${(e: CustomEvent) =>
           void this.loadTargetDetail(e.detail)}
         @state-filter-change=${(e: CustomEvent) =>
           void this.handleStateChange(e.detail)}
@@ -1472,15 +1503,15 @@ export class CrDashboardApp extends LitElement {
         }}
         @run-review=${() => void this.handleRunReview()}
         @run-summary=${() => void this.handleRunSummary()}
-        @post-review=${() => void this.handlePostGeneratedReview()}
+        @post-generated-review=${() => void this.handlePostGeneratedReview()}
         @load-chat-context=${() => void this.ensureChatContext()}
         @ask-question=${() => void this.handleAskQuestion()}
-        @post-summary=${() => void this.handlePostSummaryComment()}
-        @post-inline=${() => void this.handlePostInlineComment()}
+        @post-summary-comment=${() => void this.handlePostSummaryComment()}
+        @post-inline-comment=${() => void this.handlePostInlineComment()}
         @start-reply=${(e: CustomEvent) =>
           this.startReplyToThread(e.detail)}
         @cancel-reply=${() => this.cancelReplyToThread()}
-        @post-reply=${(e: CustomEvent) =>
+        @post-discussion-reply=${(e: CustomEvent) =>
           void this.handlePostDiscussionReply(e.detail)}
         @insert-review=${() => {
           this.summaryDraft =

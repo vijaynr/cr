@@ -1,0 +1,26 @@
+import { describe, expect, it } from "bun:test";
+
+const dashboardAppPath =
+  "/Users/vijay/Documents/code/gh/vijaynr/cr/packages/web/src/components/cr-dashboard-app.ts";
+const discussionThreadPath =
+  "/Users/vijay/Documents/code/gh/vijaynr/cr/packages/web/src/components/cr-discussion-thread.ts";
+
+describe("web event contracts", () => {
+  it("listens for the custom events emitted by interactive review components", async () => {
+    const source = await Bun.file(dashboardAppPath).text();
+
+    expect(source).toContain("@target-selected=");
+    expect(source).toContain("@post-generated-review=");
+    expect(source).toContain("@post-summary-comment=");
+    expect(source).toContain("@post-inline-comment=");
+    expect(source).toContain("@post-discussion-reply=");
+  });
+
+  it("renders reply timestamps using relative time formatting", async () => {
+    const source = await Bun.file(discussionThreadPath).text();
+
+    expect(source).toContain("const relativeTimestamp = timestamp");
+    expect(source).toContain("this.formatRelativeTime(timestamp)");
+    expect(source).not.toContain("${timestamp ? html`<span>${timestamp}</span>` : \"\"}");
+  });
+});

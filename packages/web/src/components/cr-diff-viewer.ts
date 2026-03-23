@@ -20,6 +20,8 @@ type InlineTarget = {
   positionType: "new" | "old";
   text: string;
   key: string;
+  anchorTop: number;
+  anchorLeft: number;
 };
 
 type BlockEnd = {
@@ -75,9 +77,25 @@ export class CrDiffViewer extends LitElement {
 
     const availableIds = new Set(this.files.map((file) => file.id));
     const preferredFileId = this.selectedFileId || this.files[0]?.id;
-    const nextExpanded = preferredFileId && availableIds.has(preferredFileId)
-      ? [preferredFileId]
-      : [];
+    const nextExpanded = this.expandedFileIds.filter((fileId) =>
+      availableIds.has(fileId)
+    );
+
+    if (
+      this.selectedFileId &&
+      availableIds.has(this.selectedFileId) &&
+      !nextExpanded.includes(this.selectedFileId)
+    ) {
+      nextExpanded.push(this.selectedFileId);
+    }
+
+    if (
+      nextExpanded.length === 0 &&
+      preferredFileId &&
+      availableIds.has(preferredFileId)
+    ) {
+      nextExpanded.push(preferredFileId);
+    }
 
     if (!sameIds(nextExpanded, this.expandedFileIds)) {
       this.expandedFileIds = nextExpanded;
@@ -108,12 +126,26 @@ export class CrDiffViewer extends LitElement {
     const isOpen = (event.currentTarget as HTMLDetailsElement).open;
 
     if (isOpen) {
-      this.expandedFileIds = [file.id];
+      if (!this.expandedFileIds.includes(file.id)) {
+        this.expandedFileIds = [...this.expandedFileIds, file.id];
+      }
       this.chooseFile(file);
       return;
     }
 
-    this.expandedFileIds = [];
+    const nextExpanded = this.expandedFileIds.filter(
+      (fileId) => fileId !== file.id,
+    );
+    this.expandedFileIds = nextExpanded;
+
+    if (this.selectedFileId === file.id && nextExpanded.length > 0) {
+      const fallbackFile = this.files.find(
+        (candidate) => candidate.id === nextExpanded[nextExpanded.length - 1],
+      );
+      if (fallbackFile) {
+        this.chooseFile(fallbackFile);
+      }
+    }
   }
 
   private isExpanded(fileId: string) {
@@ -187,6 +219,8 @@ export class CrDiffViewer extends LitElement {
         positionType: "old",
         text: this.lineContent(line),
         key: `${file.path}:old:${line.oldNumber}`,
+        anchorTop: 0,
+        anchorLeft: 0,
       };
     }
 
@@ -197,6 +231,8 @@ export class CrDiffViewer extends LitElement {
         positionType: "new",
         text: this.lineContent(line),
         key: `${file.path}:new:${line.newNumber}`,
+        anchorTop: 0,
+        anchorLeft: 0,
       };
     }
 
@@ -260,7 +296,15 @@ export class CrDiffViewer extends LitElement {
               <button
                 class="btn btn-ghost btn-xs cr-diff-viewer__comment-button"
                 type="button"
-                @click=${() => this.chooseLine(target)}
+                @click=${(event: Event) => {
+                  const button = event.currentTarget as HTMLButtonElement;
+                  const rect = button.getBoundingClientRect();
+                  this.chooseLine({
+                    ...target,
+                    anchorTop: rect.top + rect.height / 2,
+                    anchorLeft: rect.left,
+                  });
+                }}
                 aria-label=${`Comment on ${parsedFile.newName || file.path} line ${target.line}`}
               >
                 <cr-icon .icon=${MessageSquareMore} .size=${12}></cr-icon>

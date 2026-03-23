@@ -59,6 +59,24 @@ function stringValue(record: JsonObject, ...keys: string[]): string | undefined 
   return undefined;
 }
 
+function isMaskedDisplayValue(value: string): boolean {
+  return /^[*\s]+$/.test(value.trim());
+}
+
+function identityValue(record: JsonObject, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value !== "string" || value.length === 0) {
+      continue;
+    }
+    if (!isMaskedDisplayValue(value)) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function numberValue(record: JsonObject, ...keys: string[]): number | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -118,8 +136,8 @@ function normalizeReviewTarget(provider: ProviderId, item: unknown): ReviewTarge
     state: stringValue(record, "state", "status"),
     draft: booleanValue(record, "draft", "work_in_progress"),
     author:
-      stringValue(authorRecord, "name", "username", "login") ??
-      stringValue(submitterRecord, "title", "username"),
+      identityValue(authorRecord, "name", "username", "login") ??
+      identityValue(submitterRecord, "title", "username"),
     repository:
       stringValue(record, "references", "repository") ??
       nestedStringValue(record, "references", "full") ??
@@ -143,7 +161,7 @@ function normalizeCommit(item: unknown): ReviewCommit {
       String(numberValue(record, "id") ?? ""),
     title: stringValue(record, "title", "message") ?? stringValue(record, "summary") ?? "Commit",
     author:
-      stringValue(authorRecord, "name", "username", "login") ??
+      identityValue(authorRecord, "name", "username", "login") ??
       stringValue(record, "author_name", "author"),
     createdAt: normalizeUpdatedAt(
       stringValue(record, "created_at", "authored_date", "date", "timestamp")
@@ -289,7 +307,7 @@ function normalizeGitLabDiscussions(items: unknown[]): ReviewDiscussionThread[] 
         return {
           id: String(numberValue(note, "id") ?? stringValue(note, "id") ?? "0"),
           body: stringValue(note, "body") ?? "",
-          author: stringValue(author, "name", "username"),
+          author: identityValue(author, "name", "username"),
           createdAt: normalizeUpdatedAt(stringValue(note, "created_at")),
           updatedAt: normalizeUpdatedAt(stringValue(note, "updated_at")),
           inline: inlinePath

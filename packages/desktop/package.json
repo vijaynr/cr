@@ -8,11 +8,12 @@
   },
   "scripts": {
     "start": "electrobun run",
-    "build:dev": "bun install && electrobun build",
-    "build:canary": "bun install && electrobun build --env=canary",
-    "build:stable": "bun install && electrobun build --env=stable",
+    "icons": "bun ../../scripts/generate-desktop-icons.ts",
+    "build:dev": "bun install && bun run icons && electrobun build",
+    "build:canary": "bun install && bun run icons && electrobun build --env=canary",
+    "build:stable": "bun install && bun run icons && electrobun build --env=stable",
     "dev": "bun run build:dev && electrobun dev",
-    "dev:watch": "electrobun dev --watch"
+    "dev:watch": "bun run icons && electrobun dev --watch"
   },
   "dependencies": {
     "@cr/core": "workspace:*",

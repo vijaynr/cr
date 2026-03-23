@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { ArrowUpRight, GitBranch, ShieldCheck, Workflow, type IconNode } from "lucide";
+import { ArrowUpRight } from "lucide";
 import {
   providerLabels,
   type DashboardData,
@@ -8,6 +8,7 @@ import {
   type ProviderRepositoryOption,
 } from "../types.js";
 import "./cr-icon.js";
+import "./cr-provider-icon.js";
 
 @customElement("cr-provider-summary-card")
 export class CrProviderSummaryCard extends LitElement {
@@ -17,17 +18,6 @@ export class CrProviderSummaryCard extends LitElement {
 
   override createRenderRoot() {
     return this;
-  }
-
-  private iconForProvider(provider: ProviderId): IconNode {
-    switch (provider) {
-      case "gitlab":
-        return Workflow;
-      case "github":
-        return GitBranch;
-      case "reviewboard":
-        return ShieldCheck;
-    }
   }
 
   private emitSectionChange() {
@@ -72,11 +62,12 @@ export class CrProviderSummaryCard extends LitElement {
       >
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
-            <cr-icon
-              .icon=${this.iconForProvider(this.provider)}
-              .size=${14}
-              class="text-base-content/50 shrink-0"
-            ></cr-icon>
+            <span class="text-base-content/60 shrink-0">
+              <cr-provider-icon
+                .provider=${this.provider}
+                .size=${14}
+              ></cr-provider-icon>
+            </span>
             <span
               class="text-[0.7rem] font-semibold tracking-[0.06em] uppercase text-base-content/45"
               >${label}</span

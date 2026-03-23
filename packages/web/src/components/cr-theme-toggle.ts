@@ -7,7 +7,6 @@ import "./cr-icon.js";
 @customElement("cr-theme-toggle")
 export class CrThemeToggle extends LitElement {
   @property() theme: UITheme = "dark";
-  @property({ type: Boolean }) compact = false;
 
   override createRenderRoot() {
     return this;
@@ -15,16 +14,21 @@ export class CrThemeToggle extends LitElement {
 
   render() {
     const isDark = this.theme === "dark";
+    const nextLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
+
     return html`
       <button
         type="button"
-        class="btn ${this.compact ? "btn-ghost btn-sm btn-square" : "btn-ghost btn-sm justify-start gap-2 rounded-[0.8rem] border border-base-100/10 bg-base-100/50"}"
+        class="cr-theme-btn"
         @click=${this.toggle}
-        aria-label=${isDark ? "Switch to light theme" : "Switch to dark theme"}
-        title=${isDark ? "Switch to light theme" : "Switch to dark theme"}
+        aria-label=${nextLabel}
+        title=${nextLabel}
+        data-theme=${this.theme}
       >
-        <cr-icon .icon=${isDark ? SunMedium : MoonStar} .size=${this.compact ? 16 : 15}></cr-icon>
-        ${this.compact ? "" : html`<span>${isDark ? "Light theme" : "Dark theme"}</span>`}
+        <cr-icon
+          .icon=${isDark ? SunMedium : MoonStar}
+          .size=${15}
+        ></cr-icon>
       </button>
     `;
   }

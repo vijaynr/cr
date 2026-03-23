@@ -1,6 +1,6 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { Bot, ChevronLeft, ChevronRight } from "lucide";
+import { Bot, Sparkles, X } from "lucide";
 import type {
   ProviderId,
   ProviderRepositoryOption,
@@ -23,7 +23,7 @@ export class CrAnalysisRail extends LitElement {
   @property() provider: ProviderId = "gitlab";
   @property({ attribute: false }) detailTarget: ReviewTarget | null = null;
   @property() analysisTab: AnalysisTab = "review";
-  @property({ type: Boolean }) collapsed = false;
+  @property({ type: Boolean }) open = false;
   @property({ attribute: false }) selectedRepository: ProviderRepositoryOption | null = null;
   @property({ type: Boolean }) canRunWorkflows = false;
 
@@ -68,51 +68,74 @@ export class CrAnalysisRail extends LitElement {
 
     return html`
       <section
-        class="cr-side-rail cr-side-rail--right rounded-[0.55rem] border border-base-300 bg-base-200 ${this.collapsed ? "cr-side-rail--collapsed" : ""}"
+        class="cr-assistant-overlay"
+        data-open=${String(this.open)}
+        aria-hidden=${String(!this.open)}
       >
         <button
-          class="cr-side-rail__toggle cr-side-rail__toggle--right btn btn-ghost btn-sm"
           type="button"
-          @click=${() => this.emit("toggle-analysis-rail")}
-          aria-label=${this.collapsed ? "Expand AI action rail" : "Collapse AI action rail"}
-          aria-expanded=${String(!this.collapsed)}
-          title=${this.collapsed ? "Expand AI action rail" : "Collapse AI action rail"}
-        >
-          <cr-icon .icon=${this.collapsed ? ChevronLeft : ChevronRight} .size=${16}></cr-icon>
-        </button>
+          class="cr-assistant-overlay__backdrop"
+          ?disabled=${!this.open}
+          aria-label="Close AI Assistant"
+          @click=${() => this.emit("close-analysis-panel")}
+        ></button>
 
-        <div class="cr-side-rail__inner flex h-full min-h-0 flex-col gap-3 p-4">
-          <div class="flex items-center justify-between gap-2">
-            <div><h2 class="text-base font-semibold">Actions</h2></div>
-            ${detail
-              ? html`<div class="badge badge-primary badge-sm">${label}</div>`
-              : html`<div class="badge badge-ghost badge-sm">Standby</div>`}
-          </div>
+        <aside class="cr-assistant-overlay__panel">
+          <header class="cr-assistant-overlay__header">
+            <div class="cr-assistant-overlay__header-copy">
+              <div class="cr-assistant-overlay__eyebrow">
+                <cr-icon .icon=${Sparkles} .size=${13}></cr-icon>
+                ${detail ? "Merge request context" : "Assistant ready"}
+              </div>
+              <h2 class="cr-assistant-overlay__title">AI Assistant</h2>
+              <div class="cr-assistant-overlay__subtitle">
+                ${detail
+                  ? `Loaded for ${label} ${detail.provider === "gitlab" ? `!${detail.id}` : `#${detail.id}`} · ${detail.title}`
+                  : this.selectedRepository
+                    ? "Open a review request to review, summarize, or chat with its context."
+                    : `Choose a ${label} repository, then open a review request to start.`}
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              ${detail
+                ? html`<div class="badge badge-primary badge-sm">${label}</div>`
+                : html`<div class="badge badge-ghost badge-sm">Standby</div>`}
+              <button
+                class="btn btn-ghost btn-sm btn-square"
+                type="button"
+                @click=${() => this.emit("close-analysis-panel")}
+                aria-label="Close AI Assistant"
+                title="Close AI Assistant"
+              >
+                <cr-icon .icon=${X} .size=${16}></cr-icon>
+              </button>
+            </div>
+          </header>
 
-          <div class="tabs tabs-boxed cr-tab-strip cr-tab-strip--full">
+          <nav class="cr-panel-tabs">
             ${(["review", "summary", "chat"] as AnalysisTab[]).map(
               (tab) => html`
                 <button
                   type="button"
-                  class="tab tab-sm cr-tab ${this.analysisTab === tab ? "tab-active" : ""}"
+                  class="cr-panel-tab ${this.analysisTab === tab ? "cr-panel-tab--active" : ""}"
                   @click=${() => this.emit("analysis-tab-change", tab)}
                 >
                   ${this.formatLabel(tab)}
                 </button>
               `
             )}
-          </div>
+          </nav>
 
-          <div class="cr-side-rail__content">
+          <div class="cr-assistant-overlay__content">
             ${!detail
               ? html`
-                  <div class="cr-empty-state" style="min-height:10rem">
+                  <div class="cr-empty-state" style="min-height:12rem">
                     <div class="cr-empty-state__icon"><cr-icon .icon=${Bot} .size=${24}></cr-icon></div>
-                    <div class="cr-empty-state__title">AI Actions</div>
+                    <div class="cr-empty-state__title">AI Assistant</div>
                     <div class="cr-empty-state__description">
                       ${this.selectedRepository
-                        ? "Open a review request to run AI workflows."
-                        : `Choose a ${label} repository, then open a review request.`}
+                        ? "Open a review request from the queue to load its context into the assistant."
+                        : `Choose a ${label} repository, then open a review request to start.`}
                     </div>
                   </div>
                 `
@@ -148,7 +171,7 @@ export class CrAnalysisRail extends LitElement {
                       ></cr-chat-panel>
                     `}
           </div>
-        </div>
+        </aside>
       </section>
     `;
   }

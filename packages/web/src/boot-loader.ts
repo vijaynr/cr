@@ -243,35 +243,25 @@ export function getBootLoaderStyles(): string {
 }
 
 export function getBootLoaderHtml(): string {
-  // Inline SVG brand glyph (matches brand.ts icon, self-contained)
+  // Inline SVG brand mark — minimalist <✓> code review glyph
   const glyphSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="bl-bg" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bl-bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#050816"/>
     </linearGradient>
-    <radialGradient id="bl-glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 16) rotate(90) scale(24 28)">
-      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.65"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    <radialGradient id="bl-glow" cx="32" cy="28" r="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.14"/><stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="bl-fill" x1="12" y1="11" x2="51" y2="52" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#8be9ff"/><stop offset="1" stop-color="#2563eb"/>
-    </linearGradient>
-    <linearGradient id="bl-acc" x1="18" y1="9" x2="46" y2="22" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f8fbff"/><stop offset="1" stop-color="#8be9ff"/>
+    <linearGradient id="bl-stroke" x1="10" y1="18" x2="54" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7dd3fc"/><stop offset="0.5" stop-color="#38bdf8"/><stop offset="1" stop-color="#2563eb"/>
     </linearGradient>
   </defs>
-  <rect x="1.5" y="1.5" width="61" height="61" rx="18" fill="url(#bl-bg)"/>
-  <rect x="1.5" y="1.5" width="61" height="61" rx="18" fill="none" stroke="#ffffff1c" stroke-width="1.5"/>
-  <circle cx="32" cy="19" r="21" fill="url(#bl-glow)"/>
-  <rect x="13" y="11" width="12" height="8" rx="4" fill="url(#bl-acc)"/>
-  <rect x="39" y="11" width="12" height="8" rx="4" fill="url(#bl-acc)"/>
-  <rect x="10" y="22" width="8" height="17" rx="4" fill="url(#bl-fill)"/>
-  <rect x="19" y="22" width="10" height="17" rx="4" fill="url(#bl-fill)"/>
-  <path d="M29 22H35L39 39H25L29 22Z" fill="url(#bl-fill)"/>
-  <rect x="35" y="22" width="10" height="17" rx="4" fill="url(#bl-fill)"/>
-  <rect x="46" y="22" width="8" height="17" rx="4" fill="url(#bl-fill)"/>
-  <rect x="16" y="45" width="8" height="6" rx="3" fill="url(#bl-fill)"/>
-  <rect x="28" y="45" width="8" height="6" rx="3" fill="url(#bl-fill)"/>
-  <rect x="40" y="45" width="8" height="6" rx="3" fill="url(#bl-fill)"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="16" fill="url(#bl-bg)"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="16" fill="none" stroke="#ffffff10" stroke-width="1"/>
+  <circle cx="32" cy="28" r="22" fill="url(#bl-glow)"/>
+  <polyline points="23,20 12,32 23,44" fill="none" stroke="url(#bl-stroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="41,20 52,32 41,44" fill="none" stroke="url(#bl-stroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="27.5,33 31,37 37,27" fill="none" stroke="url(#bl-stroke)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`;
 
   return `

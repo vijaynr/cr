@@ -14,7 +14,7 @@ export default {
       icons: "icon.iconset",
     },
     win: {
-      icon: "icon.png",
+      icon: "icon.ico",
     },
     linux: {
       icon: "icon.png",

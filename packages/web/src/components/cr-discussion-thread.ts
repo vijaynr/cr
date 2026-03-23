@@ -175,6 +175,9 @@ export class CrDiscussionThread extends LitElement {
   ) {
     const author = message.author || "Reviewer";
     const timestamp = message.updatedAt || message.createdAt || "";
+    const relativeTimestamp = timestamp
+      ? this.formatRelativeTime(timestamp)
+      : "";
     const showInlineLocation =
       Boolean(message.inline) && thread.kind !== "inline";
     const inlineLocation = this.discussionLocationLabel(message.inline);
@@ -192,7 +195,9 @@ export class CrDiscussionThread extends LitElement {
                   <span class="cr-discussion-message__author"
                     >${author}</span
                   >
-                  ${timestamp ? html`<span>${timestamp}</span>` : ""}
+                  ${relativeTimestamp
+                    ? html`<span>${relativeTimestamp}</span>`
+                    : ""}
                   ${showInlineLocation && inlineLocation
                     ? html`<span class="cr-discussion-thread__location"
                         >${inlineLocation}</span
@@ -215,7 +220,7 @@ export class CrDiscussionThread extends LitElement {
           : ""}
         <div class="cr-discussion-message__bubble">
           ${renderMarkdown(message.body, {
-            className: "cr-discussion-message__markdown",
+            className: "cr-discussion-message__markdown cr-markdown--muted",
             compact: true,
             emptyText: "No comment body.",
           })}

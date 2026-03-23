@@ -1,5 +1,5 @@
-import { LitElement, html } from "lit";
-import { ChevronDown, RefreshCw, Search } from "lucide";
+import { LitElement, html, nothing } from "lit";
+import { ChevronDown, RefreshCw, Search, X } from "lucide";
 import type { ProviderId, ProviderRepositoryOption } from "../types.js";
 import "./cr-icon.js";
 
@@ -126,6 +126,18 @@ export class CrProviderRepositoryPicker extends LitElement {
     return "Repository selected";
   }
 
+  private emitClear(event: Event) {
+    event.stopPropagation();
+    this.open = false;
+    this.query = "";
+    this.dispatchEvent(
+      new CustomEvent("repository-clear", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
   private emitRefresh() {
     this.dispatchEvent(
       new CustomEvent("provider-repository-refresh", {
@@ -153,6 +165,10 @@ export class CrProviderRepositoryPicker extends LitElement {
     this.open = !this.open;
     if (this.open) {
       this.query = "";
+      requestAnimationFrame(() => {
+        const input = this.querySelector<HTMLInputElement>('.cr-provider-picker__panel input[type="search"]');
+        input?.focus();
+      });
     }
   }
 
@@ -188,9 +204,19 @@ export class CrProviderRepositoryPicker extends LitElement {
             </span>
           </button>
 
+          ${selected
+            ? html`<button
+                type="button"
+                class="cr-picker-icon-btn"
+                @click=${(e: Event) => this.emitClear(e)}
+                aria-label="Clear repository selection"
+                title="Clear selection"
+              ><cr-icon .icon=${X} .size=${14}></cr-icon></button>`
+            : nothing}
+
           <button
             type="button"
-            class="btn btn-sm btn-ghost min-h-11 rounded-[0.55rem] border border-base-300 bg-base-200/72 px-3"
+            class="cr-picker-icon-btn"
             @click=${() => this.emitRefresh()}
             ?disabled=${this.loading}
             aria-label="Refresh repositories"
