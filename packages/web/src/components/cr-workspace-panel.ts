@@ -58,6 +58,10 @@ export class CrWorkspacePanel extends LitElement {
   @property() replyingToThreadId = "";
   @property() discussionReplyDraft = "";
   @property({ type: Boolean }) postingDiscussionReply = false;
+  @property() editingDiscussionMessageId = "";
+  @property() editingDiscussionDraft = "";
+  @property({ type: Boolean }) savingDiscussionMessage = false;
+  @property() deletingDiscussionMessageId = "";
   @property() summaryDraft = "";
   @property({ type: Boolean }) postingSummary = false;
   @property({ attribute: false }) reviewResult: ReviewWorkflowResult | null = null;
@@ -193,6 +197,10 @@ export class CrWorkspacePanel extends LitElement {
                       .replyingToThreadId=${this.replyingToThreadId}
                       .discussionReplyDraft=${this.discussionReplyDraft}
                       .postingDiscussionReply=${this.postingDiscussionReply}
+                      .editingDiscussionMessageId=${this.editingDiscussionMessageId}
+                      .editingDiscussionDraft=${this.editingDiscussionDraft}
+                      .savingDiscussionMessage=${this.savingDiscussionMessage}
+                      .deletingDiscussionMessageId=${this.deletingDiscussionMessageId}
                     ></cr-comments-workspace>
                   `
                 : this.workspaceTab === "commits"

@@ -14,6 +14,8 @@ describe("web event contracts", () => {
     expect(source).toContain("@post-summary-comment=");
     expect(source).toContain("@post-inline-comment=");
     expect(source).toContain("@post-discussion-reply=");
+    expect(source).toContain("@save-discussion-message-edit=");
+    expect(source).toContain("@delete-discussion-message=");
   });
 
   it("renders reply timestamps using relative time formatting", async () => {
@@ -21,6 +23,9 @@ describe("web event contracts", () => {
 
     expect(source).toContain("const relativeTimestamp = timestamp");
     expect(source).toContain("this.formatRelativeTime(timestamp)");
+    expect(source).toContain('"start-edit-discussion-message"');
+    expect(source).toContain('"save-discussion-message-edit"');
+    expect(source).toContain('"delete-discussion-message"');
     expect(source).not.toContain("${timestamp ? html`<span>${timestamp}</span>` : \"\"}");
   });
 });

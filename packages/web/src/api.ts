@@ -842,6 +842,98 @@ export async function replyToReviewDiscussion(args: {
   throw new Error("Discussion replies are not supported for Review Board in the web workspace.");
 }
 
+function githubDiscussionMessagePath(
+  targetId: number,
+  threadId: string,
+  messageId: string
+): string {
+  const encodedMessageId = encodeURIComponent(messageId);
+
+  if (threadId.startsWith("issue:")) {
+    return `/api/github/pull-requests/${targetId}/issue-comments/${encodedMessageId}`;
+  }
+
+  if (threadId.startsWith("review:")) {
+    return `/api/github/pull-requests/${targetId}/review-comments/${encodedMessageId}`;
+  }
+
+  throw new Error("Unsupported GitHub discussion thread.");
+}
+
+export async function updateReviewDiscussionMessage(args: {
+  provider: ProviderId;
+  targetId: number;
+  threadId: string;
+  messageId: string;
+  body: string;
+  repositoryContext?: RepositoryContext;
+}): Promise<void> {
+  if (args.provider === "gitlab") {
+    await fetchJson(
+      `/api/gitlab/merge-requests/${args.targetId}/discussions/${encodeURIComponent(args.threadId)}/notes/${encodeURIComponent(args.messageId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          body: args.body,
+          repoPath: args.repositoryContext?.repoPath,
+          url: args.repositoryContext?.remoteUrl,
+        }),
+      }
+    );
+    return;
+  }
+
+  if (args.provider === "github") {
+    await fetchJson(githubDiscussionMessagePath(args.targetId, args.threadId, args.messageId), {
+      method: "PATCH",
+      body: JSON.stringify({
+        body: args.body,
+        repoPath: args.repositoryContext?.repoPath,
+        remoteUrl: args.repositoryContext?.remoteUrl,
+      }),
+    });
+    return;
+  }
+
+  throw new Error("Editing comments is not supported for Review Board after publish.");
+}
+
+export async function deleteReviewDiscussionMessage(args: {
+  provider: ProviderId;
+  targetId: number;
+  threadId: string;
+  messageId: string;
+  repositoryContext?: RepositoryContext;
+}): Promise<void> {
+  if (args.provider === "gitlab") {
+    await fetchJson(
+      queryWithRepositoryContext(
+        `/api/gitlab/merge-requests/${args.targetId}/discussions/${encodeURIComponent(args.threadId)}/notes/${encodeURIComponent(args.messageId)}`,
+        args.repositoryContext
+      ),
+      {
+        method: "DELETE",
+      }
+    );
+    return;
+  }
+
+  if (args.provider === "github") {
+    await fetchJson(
+      queryWithRepositoryContext(
+        githubDiscussionMessagePath(args.targetId, args.threadId, args.messageId),
+        args.repositoryContext
+      ),
+      {
+        method: "DELETE",
+      }
+    );
+    return;
+  }
+
+  throw new Error("Deleting comments is not supported for Review Board after publish.");
+}
+
 export type TestConnectionResult = { ok: boolean; message: string };
 
 export async function testConnection(

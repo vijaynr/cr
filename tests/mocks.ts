@@ -185,6 +185,8 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     addInlineMergeRequestComment: mock(async () => {}),
     listMergeRequestDiscussions: mock(async () => []),
     replyToMergeRequestDiscussion: mock(async () => ""),
+    updateMergeRequestDiscussionNote: mock(async () => ({})),
+    deleteMergeRequestDiscussionNote: mock(async () => {}),
     // github helpers
     remoteToGitHubRepoPath: mock(() => ""),
     isGitHubRemote: mock(() => false),
@@ -198,6 +200,8 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     getGitHubPullRequestCommits: mock(async () => []),
     getGitHubFileContent: mock(async () => null),
     addGitHubPullRequestComment: mock(async () => ""),
+    updateGitHubPullRequestComment: mock(async () => ""),
+    deleteGitHubPullRequestComment: mock(async () => {}),
     addGitHubInlinePullRequestComment: mock(async () => ""),
     compareGitHubBranches: mock(async () => ""),
     findExistingGitHubPullRequest: mock(async () => null),
@@ -206,6 +210,8 @@ export function makeCoreMock(overrides: Record<string, unknown> = {}): Record<st
     listGitHubIssueComments: mock(async () => []),
     listGitHubReviewComments: mock(async () => []),
     replyToGitHubReviewComment: mock(async () => ""),
+    updateGitHubReviewComment: mock(async () => ""),
+    deleteGitHubReviewComment: mock(async () => {}),
     listGitLabProjects: mock(async () => []),
     listGitHubRepositories: mock(async () => []),
     // svn helpers

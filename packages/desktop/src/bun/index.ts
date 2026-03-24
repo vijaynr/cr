@@ -16,6 +16,7 @@ async function startEmbeddedServer(): Promise<{ port: number; url: string }> {
   const handle = await startServer(0, {
     enableWeb: true,
     enableWebhook: false,
+    desktop: true,
     repoPath: loadAppState().preferences.lastRepoPath ?? process.cwd(),
   })
   return { port: handle.port, url: handle.url.toString() }
@@ -50,6 +51,7 @@ async function main() {
   const win = new BrowserWindow({
     title: "CR Review Command Center",
     url: server.url,
+    titleBarStyle: "hiddenInset",
     frame: {
       width: geometry.width,
       height: geometry.height,

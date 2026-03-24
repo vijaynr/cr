@@ -78,6 +78,10 @@ export class CrProviderPage extends LitElement {
   @property({ attribute: false }) discussions: ReviewDiscussionThread[] = [];
   @property({ type: Boolean }) loadingDiscussions = false;
   @property() discussionsError = "";
+  @property() editingDiscussionMessageId = "";
+  @property() editingDiscussionDraft = "";
+  @property({ type: Boolean }) savingDiscussionMessage = false;
+  @property() deletingDiscussionMessageId = "";
 
   // Loading states
   @property({ type: Boolean }) loadingTargets = false;
@@ -183,6 +187,10 @@ export class CrProviderPage extends LitElement {
               .replyingToThreadId=${this.replyingToThreadId}
               .discussionReplyDraft=${this.discussionReplyDraft}
               .postingDiscussionReply=${this.postingDiscussionReply}
+              .editingDiscussionMessageId=${this.editingDiscussionMessageId}
+              .editingDiscussionDraft=${this.editingDiscussionDraft}
+              .savingDiscussionMessage=${this.savingDiscussionMessage}
+              .deletingDiscussionMessageId=${this.deletingDiscussionMessageId}
               .summaryDraft=${this.summaryDraft}
               .postingSummary=${this.postingSummary}
               .reviewResult=${this.reviewResult}

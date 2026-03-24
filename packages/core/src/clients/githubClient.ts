@@ -16,5 +16,5 @@ export type {
   ReviewComment,
   ReviewEvent,
   UpdatePullRequestParams,
-} from "@cr/github";
-export { createGitHubClient, GitHubClient, isGitHubRemote, remoteToRepoPath } from "@cr/github";
+} from "@cr/vcs/github";
+export { createGitHubClient, GitHubClient, isGitHubRemote, remoteToRepoPath } from "@cr/vcs/github";

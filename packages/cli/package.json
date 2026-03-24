@@ -9,7 +9,13 @@
   "dependencies": {
     "@cr/core": "workspace:*",
     "@cr/workflows": "workspace:*",
-    "@cr/tui": "workspace:*",
-    "@cr/server": "workspace:*"
+    "@cr/server": "workspace:*",
+    "ora": "^8.2.0",
+    "prompts": "^2.4.2",
+    "marked": "^16.4.1",
+    "marked-terminal": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9"
   }
 }

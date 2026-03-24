@@ -23,6 +23,10 @@ export class CrCommentsWorkspace extends LitElement {
   @property() replyingToThreadId = "";
   @property() discussionReplyDraft = "";
   @property({ type: Boolean }) postingDiscussionReply = false;
+  @property() editingDiscussionMessageId = "";
+  @property() editingDiscussionDraft = "";
+  @property({ type: Boolean }) savingDiscussionMessage = false;
+  @property() deletingDiscussionMessageId = "";
 
   override createRenderRoot() {
     return this;
@@ -182,6 +186,12 @@ export class CrCommentsWorkspace extends LitElement {
                               .replyingToThreadId=${this.replyingToThreadId}
                               .discussionReplyDraft=${this.discussionReplyDraft}
                               .postingReply=${this.postingDiscussionReply}
+                              .editingMessageId=${this.editingDiscussionMessageId}
+                              .editingDraft=${this.editingDiscussionDraft}
+                              .savingEdit=${this.savingDiscussionMessage}
+                              .deletingMessageId=${this.deletingDiscussionMessageId}
+                              .allowMessageMutations=${this.detail.provider !==
+                              "reviewboard"}
                             ></cr-discussion-thread>
                           `
                         )}

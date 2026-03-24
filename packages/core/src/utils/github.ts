@@ -3,17 +3,17 @@
  * Implementation lives in @cr/github (GitHubClient); this module provides
  * backward-compatible free-function wrappers for @cr/core consumers.
  */
-import { GitHubClient } from "@cr/github";
+import { GitHubClient } from "@cr/vcs/github";
 
-export type { GitHubInlineComment, GitHubIssueComment } from "@cr/github";
-export { isGitHubRemote, looksLikeConfiguredGitHub } from "@cr/github";
+export type { GitHubInlineComment, GitHubIssueComment } from "@cr/vcs/github";
+export { isGitHubRemote, looksLikeConfiguredGitHub } from "@cr/vcs/github";
 
 function client(token: string, baseUrl?: string): GitHubClient {
   return new GitHubClient(token, baseUrl);
 }
 
 /** @deprecated Use remoteToRepoPath from @cr/github instead */
-export { remoteToRepoPath as remoteToGitHubRepoPath } from "@cr/github";
+export { remoteToRepoPath as remoteToGitHubRepoPath } from "@cr/vcs/github";
 
 export function listGitHubBranches(token: string, repoPath: string): Promise<string[]> {
   return client(token).listBranches(repoPath);
@@ -82,11 +82,28 @@ export function addGitHubPullRequestComment(
   return client(token).addPullRequestComment(repoPath, prNumber, body);
 }
 
+export function updateGitHubPullRequestComment(
+  token: string,
+  repoPath: string,
+  commentId: number,
+  body: string
+): Promise<string> {
+  return client(token).updatePullRequestComment(repoPath, commentId, body);
+}
+
+export function deleteGitHubPullRequestComment(
+  token: string,
+  repoPath: string,
+  commentId: number
+): Promise<void> {
+  return client(token).deletePullRequestComment(repoPath, commentId);
+}
+
 export function listGitHubIssueComments(
   token: string,
   repoPath: string,
   prNumber: number
-): Promise<import("@cr/github").GitHubIssueComment[]> {
+): Promise<import("@cr/vcs/github").GitHubIssueComment[]> {
   return client(token).listIssueComments(repoPath, prNumber);
 }
 
@@ -94,7 +111,7 @@ export function listGitHubReviewComments(
   token: string,
   repoPath: string,
   prNumber: number
-): Promise<import("@cr/github").GitHubInlineComment[]> {
+): Promise<import("@cr/vcs/github").GitHubInlineComment[]> {
   return client(token).listReviewComments(repoPath, prNumber);
 }
 
@@ -118,6 +135,23 @@ export function replyToGitHubReviewComment(
   body: string
 ): Promise<string> {
   return client(token).replyToReviewComment(repoPath, prNumber, commentId, body);
+}
+
+export function updateGitHubReviewComment(
+  token: string,
+  repoPath: string,
+  commentId: number,
+  body: string
+): Promise<string> {
+  return client(token).updateReviewComment(repoPath, commentId, body);
+}
+
+export function deleteGitHubReviewComment(
+  token: string,
+  repoPath: string,
+  commentId: number
+): Promise<void> {
+  return client(token).deleteReviewComment(repoPath, commentId);
 }
 
 export function compareGitHubBranches(

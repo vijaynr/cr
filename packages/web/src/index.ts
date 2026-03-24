@@ -17,6 +17,7 @@ export const WEB_APP_DASHBOARD_ROUTE = "/api/dashboard";
 
 export type WebRoutesOptions = {
   loadDashboard: (args?: { repoPath?: string; remoteUrl?: string }) => Promise<unknown>;
+  desktop?: boolean;
 };
 
 type WebAppAssets = {
@@ -49,9 +50,10 @@ function isBundledRuntime(): boolean {
   }
 }
 
-export function getWebAppHtml(styles: string): string {
+export function getWebAppHtml(styles: string, options?: { desktop?: boolean }): string {
+  const desktopAttr = options?.desktop ? ' data-desktop="true"' : "";
   return `<!doctype html>
-<html lang="en" data-theme="cr-black">
+<html lang="en" data-theme="cr-black"${desktopAttr}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -215,7 +217,7 @@ export async function createWebRoutes(options: WebRoutesOptions): Promise<Hono> 
 
   const renderHtml = async (c: Context) => {
     const styles = await readWebAppStyles();
-    return c.html(getWebAppHtml(styles), 200, {
+    return c.html(getWebAppHtml(styles, { desktop: options.desktop }), 200, {
       "Cache-Control": "no-store",
     });
   };

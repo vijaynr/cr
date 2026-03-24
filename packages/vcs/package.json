@@ -1,0 +1,11 @@
+{
+  "name": "@cr/vcs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./github": "./src/github/index.ts",
+    "./gitlab": "./src/gitlab/index.ts",
+    "./reviewboard": "./src/reviewboard/index.ts"
+  }
+}

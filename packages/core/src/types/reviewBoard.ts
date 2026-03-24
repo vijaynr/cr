@@ -1,1 +1,1 @@
-export * from "@cr/reviewboard";
+export * from "@cr/vcs/reviewboard";

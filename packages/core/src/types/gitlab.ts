@@ -14,4 +14,4 @@ export type {
   GitLabMrDetails as GitLabMrWithBasics,
   GitLabNote,
   GitLabNotePosition,
-} from "@cr/gitlab";
+} from "@cr/vcs/gitlab";

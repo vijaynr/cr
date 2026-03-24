@@ -10,6 +10,7 @@ import type { ServerContext } from "./types.js";
 export type ServerOptions = {
   enableWeb?: boolean;
   enableWebhook?: boolean;
+  desktop?: boolean;
   repoPath?: string;
   sslCertPath?: string;
   sslKeyPath?: string;
@@ -50,6 +51,7 @@ async function createServerApp(context: ServerContext): Promise<Hono> {
           repoPath: args?.repoPath ?? context.repoPath,
           remoteUrl: args?.remoteUrl,
         }),
+      desktop: context.desktop,
     });
     app.route("/", webRoutes);
   }
@@ -131,6 +133,7 @@ export async function startServer(port = 3000, options?: ServerOptions): Promise
   const context: ServerContext = {
     enableWeb,
     enableWebhook,
+    desktop: options?.desktop ?? false,
     protocol: "http",
     repoPath,
     runtime,

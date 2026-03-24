@@ -15,8 +15,9 @@
  */
 
 import { mock } from "bun:test";
-import { makeCoreMock, makeWorkflowsMock } from "./mocks.ts";
+import { makeCoreMock, makeUiMock, makeWorkflowsMock } from "./mocks.ts";
 
+mock.module("@cr/tui", () => makeUiMock());
 mock.module("@cr/core", () => makeCoreMock());
 mock.module("@cr/workflows", () => makeWorkflowsMock());
 

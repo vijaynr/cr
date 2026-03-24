@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { createReviewBoardClient } from "../packages/reviewboard/src/client.js";
+import { createReviewBoardClient } from "../packages/vcs/src/reviewboard/client.js";
 
 describe("reviewboard client", () => {
   it("hydrates repository.path from the linked repository resource", async () => {

@@ -25,6 +25,8 @@ const getMergeRequestMock = mock(async () => ({ iid: 7, title: "MR 7", state: "o
 const getMergeRequestChangesMock = mock(async () => [{ old_path: "a.ts", new_path: "a.ts" }]);
 const getMergeRequestCommitsMock = mock(async () => [{ id: "abc123" }]);
 const addMergeRequestCommentMock = mock(async () => "https://gitlab.example.com/mr/7#note_1");
+const updateMergeRequestDiscussionNoteMock = mock(async () => ({ id: 401, body: "Updated" }));
+const deleteMergeRequestDiscussionNoteMock = mock(async () => {});
 const listGitHubPullRequestsMock = mock(async () => [{ number: 12, title: "PR 12" }]);
 const getGitHubPullRequestMock = mock(async () => ({ number: 12, title: "PR 12", state: "open" }));
 const getGitHubPullRequestFilesMock = mock(async () => [
@@ -34,6 +36,14 @@ const getGitHubPullRequestCommitsMock = mock(async () => [{ sha: "def456" }]);
 const addGitHubPullRequestCommentMock = mock(
   async () => "https://github.com/org/repo/pull/12#issuecomment-1"
 );
+const updateGitHubPullRequestCommentMock = mock(
+  async () => "https://github.com/org/repo/pull/12#issuecomment-2"
+);
+const deleteGitHubPullRequestCommentMock = mock(async () => {});
+const updateGitHubReviewCommentMock = mock(
+  async () => "https://github.com/org/repo/pull/12#discussion_r2"
+);
+const deleteGitHubReviewCommentMock = mock(async () => {});
 const listRepositoriesMock = mock(async () => [{ id: 9, name: "demo-repo" }]);
 const listReviewRequestsMock = mock(async () => [{ id: 42, summary: "RR 42" }]);
 const getReviewRequestMock = mock(async () => ({ id: 42, summary: "RR 42" }));
@@ -119,11 +129,17 @@ mock.module("@cr/core", () =>
     getMergeRequestChanges: getMergeRequestChangesMock,
     getMergeRequestCommits: getMergeRequestCommitsMock,
     addMergeRequestComment: addMergeRequestCommentMock,
+    updateMergeRequestDiscussionNote: updateMergeRequestDiscussionNoteMock,
+    deleteMergeRequestDiscussionNote: deleteMergeRequestDiscussionNoteMock,
     listGitHubPullRequests: listGitHubPullRequestsMock,
     getGitHubPullRequest: getGitHubPullRequestMock,
     getGitHubPullRequestFiles: getGitHubPullRequestFilesMock,
     getGitHubPullRequestCommits: getGitHubPullRequestCommitsMock,
     addGitHubPullRequestComment: addGitHubPullRequestCommentMock,
+    updateGitHubPullRequestComment: updateGitHubPullRequestCommentMock,
+    deleteGitHubPullRequestComment: deleteGitHubPullRequestCommentMock,
+    updateGitHubReviewComment: updateGitHubReviewCommentMock,
+    deleteGitHubReviewComment: deleteGitHubReviewCommentMock,
     listRepositories: listRepositoriesMock,
     listReviewRequests: listReviewRequestsMock,
     getReviewRequest: getReviewRequestMock,
@@ -153,11 +169,17 @@ afterEach(() => {
   getMergeRequestChangesMock.mockClear();
   getMergeRequestCommitsMock.mockClear();
   addMergeRequestCommentMock.mockClear();
+  updateMergeRequestDiscussionNoteMock.mockClear();
+  deleteMergeRequestDiscussionNoteMock.mockClear();
   listGitHubPullRequestsMock.mockClear();
   getGitHubPullRequestMock.mockClear();
   getGitHubPullRequestFilesMock.mockClear();
   getGitHubPullRequestCommitsMock.mockClear();
   addGitHubPullRequestCommentMock.mockClear();
+  updateGitHubPullRequestCommentMock.mockClear();
+  deleteGitHubPullRequestCommentMock.mockClear();
+  updateGitHubReviewCommentMock.mockClear();
+  deleteGitHubReviewCommentMock.mockClear();
   listRepositoriesMock.mockClear();
   listReviewRequestsMock.mockClear();
   getReviewRequestMock.mockClear();
@@ -291,6 +313,52 @@ describe("API routes", () => {
     expect(remoteToProjectPathMock).toHaveBeenCalled();
   });
 
+  it("edits and deletes GitLab discussion notes", async () => {
+    const port = await startApiServer();
+
+    const [editResponse, deleteResponse] = await Promise.all([
+      fetch(
+        `http://localhost:${port}/api/gitlab/merge-requests/7/discussions/discussion-1/notes/401`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: "Updated note body" }),
+        }
+      ),
+      fetch(
+        `http://localhost:${port}/api/gitlab/merge-requests/7/discussions/discussion-1/notes/401`,
+        {
+          method: "DELETE",
+        }
+      ),
+    ]);
+
+    expect(editResponse.status).toBe(200);
+    expect(await editResponse.json()).toMatchObject({
+      note: { id: 401, body: "Updated" },
+    });
+    expect(updateMergeRequestDiscussionNoteMock).toHaveBeenCalledWith(
+      "https://gitlab.example.com",
+      "gitlab-key",
+      "group/project",
+      7,
+      "discussion-1",
+      401,
+      "Updated note body"
+    );
+
+    expect(deleteResponse.status).toBe(200);
+    expect(await deleteResponse.json()).toMatchObject({ ok: true });
+    expect(deleteMergeRequestDiscussionNoteMock).toHaveBeenCalledWith(
+      "https://gitlab.example.com",
+      "gitlab-key",
+      "group/project",
+      7,
+      "discussion-1",
+      401
+    );
+  });
+
   it("serves GitHub pull request APIs", async () => {
     const port = await startApiServer();
 
@@ -320,6 +388,68 @@ describe("API routes", () => {
       url: "https://github.com/org/repo/pull/12#issuecomment-1",
     });
     expect(remoteToGitHubRepoPathMock).toHaveBeenCalled();
+  });
+
+  it("edits and deletes GitHub issue and review comments", async () => {
+    const port = await startApiServer();
+
+    const [issueEditResponse, issueDeleteResponse, reviewEditResponse, reviewDeleteResponse] =
+      await Promise.all([
+        fetch(`http://localhost:${port}/api/github/pull-requests/12/issue-comments/21`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: "Edited issue comment" }),
+        }),
+        fetch(`http://localhost:${port}/api/github/pull-requests/12/issue-comments/21`, {
+          method: "DELETE",
+        }),
+        fetch(`http://localhost:${port}/api/github/pull-requests/12/review-comments/34`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ body: "Edited review comment" }),
+        }),
+        fetch(`http://localhost:${port}/api/github/pull-requests/12/review-comments/34`, {
+          method: "DELETE",
+        }),
+      ]);
+
+    expect(issueEditResponse.status).toBe(200);
+    expect(await issueEditResponse.json()).toMatchObject({
+      url: "https://github.com/org/repo/pull/12#issuecomment-2",
+    });
+    expect(updateGitHubPullRequestCommentMock).toHaveBeenCalledWith(
+      "github-token",
+      "org/repo",
+      21,
+      "Edited issue comment"
+    );
+
+    expect(issueDeleteResponse.status).toBe(200);
+    expect(await issueDeleteResponse.json()).toMatchObject({ ok: true });
+    expect(deleteGitHubPullRequestCommentMock).toHaveBeenCalledWith(
+      "github-token",
+      "org/repo",
+      21
+    );
+
+    expect(reviewEditResponse.status).toBe(200);
+    expect(await reviewEditResponse.json()).toMatchObject({
+      url: "https://github.com/org/repo/pull/12#discussion_r2",
+    });
+    expect(updateGitHubReviewCommentMock).toHaveBeenCalledWith(
+      "github-token",
+      "org/repo",
+      34,
+      "Edited review comment"
+    );
+
+    expect(reviewDeleteResponse.status).toBe(200);
+    expect(await reviewDeleteResponse.json()).toMatchObject({ ok: true });
+    expect(deleteGitHubReviewCommentMock).toHaveBeenCalledWith(
+      "github-token",
+      "org/repo",
+      34
+    );
   });
 
   it("filters merged GitHub pull requests correctly", async () => {

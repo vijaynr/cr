@@ -13,11 +13,11 @@ export type {
   GitLabNote,
   MergeRequestState,
   UpdateMergeRequestParams,
-} from "@cr/gitlab";
-export { createGitLabClient, GitLabClient, remoteToProjectPath } from "@cr/gitlab";
+} from "@cr/vcs/gitlab";
+export { createGitLabClient, GitLabClient, remoteToProjectPath } from "@cr/vcs/gitlab";
 
 // Re-export a legacy-compatible interface alias so existing call-sites that
 // type-annotate with `GitLabClient` continue to compile unchanged.
-import type { GitLabClient as _GitLabClient } from "@cr/gitlab";
+import type { GitLabClient as _GitLabClient } from "@cr/vcs/gitlab";
 
 export type { _GitLabClient as GitLabClientInterface };

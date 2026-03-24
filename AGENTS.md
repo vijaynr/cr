@@ -2,21 +2,19 @@
 
 ## Project Structure & Module Organization
 
-`cr-cli` is a TypeScript monorepo running on Bun with nine packages under `packages/`:
+`cr-cli` is a TypeScript monorepo running on Bun with seven packages under `packages/`:
 
 | Package            | Path                     | Role                                                               |
 | ------------------ | ------------------------ | ------------------------------------------------------------------ |
-| `@cr/cli`          | `packages/cli/`          | Binary entrypoint and command handlers                             |
+| `@cr/cli`          | `packages/cli/`          | Binary entrypoint, command handlers, and terminal UI (TUI)         |
 | `@cr/core`         | `packages/core/`         | Shared business logic, types, resource loading, and integrations   |
-| `@cr/github`       | `packages/github/`       | GitHub API client/types adapter used by `@cr/core`                 |
-| `@cr/gitlab`       | `packages/gitlab/`       | GitLab API client/types adapter used by `@cr/core`                 |
-| `@cr/tui`          | `packages/tui/`          | Terminal rendering, prompts, spinners, banners, and help output    |
+| `@cr/vcs`          | `packages/vcs/`          | VCS provider adapters (GitHub, GitLab, Review Board) used by `@cr/core` |
 | `@cr/workflows`    | `packages/workflows/`    | Review, summarize, chat, MR/PR draft creation, and Review Board workflows |
-| `@cr/reviewboard`  | `packages/reviewboard/`  | Review Board client/types adapter used by `@cr/core`               |
 | `@cr/server`       | `packages/server/`       | Unified server for webhook endpoints, web shell, and API routes    |
 | `@cr/web`          | `packages/web/`          | Lit dashboard UI and route helpers served by `@cr/server`          |
+| `@cr/desktop`      | `packages/desktop/`      | Electrobun desktop app wrapper                                     |
 
-Package-specific `AGENTS.md` files exist in `packages/cli`, `packages/core`, `packages/tui`, `packages/workflows`, `packages/server`, and `packages/web`. If a package has no local guide, follow this root file.
+Package-specific `AGENTS.md` files exist in `packages/cli`, `packages/core`, `packages/workflows`, `packages/server`, and `packages/web`. If a package has no local guide, follow this root file.
 
 - `resources/prompts/` — bundled prompt templates for review, summarize, chat, MR drafting, aggregate review synthesis, and review agents.
 - `resources/specs/templates/` — bundled spec templates (`prd.md`, `design.md`, `threat-model.md`, `refine.md`, `plan.md`, `doit.md`).

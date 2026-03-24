@@ -1,12 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "paths": {
-      "@cr/core": ["../core/src/index.ts"],
-      "@cr/workflows": ["../workflows/src/index.ts"],
-      "@cr/tui": ["../tui/src/index.ts"]
-    }
+    "outDir": "dist"
   },
   "include": ["src/**/*"]
 }

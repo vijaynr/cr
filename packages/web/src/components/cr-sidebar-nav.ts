@@ -103,6 +103,35 @@ export class CrSidebarNav extends LitElement {
     `;
   }
 
+  private renderSidebarToggle() {
+    const isCollapsed = this.collapsed;
+    const label = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
+
+    return html`
+      <button
+        type="button"
+        class="cr-app-sidebar__toggle"
+        aria-label=${label}
+        title=${label}
+        @click=${() => this.emitToggleSidebar()}
+      >
+        ${isCollapsed
+          ? html`
+              <span class="cr-app-sidebar__toggle-bar" aria-hidden="true"></span>
+              <span class="cr-app-sidebar__toggle-icon" aria-hidden="true">
+                <cr-icon .icon=${ChevronRight} .size=${14}></cr-icon>
+              </span>
+            `
+          : html`
+              <span class="cr-app-sidebar__toggle-icon" aria-hidden="true">
+                <cr-icon .icon=${ChevronLeft} .size=${14}></cr-icon>
+              </span>
+              <span class="cr-app-sidebar__toggle-bar" aria-hidden="true"></span>
+            `}
+      </button>
+    `;
+  }
+
   render() {
     const configuredProviders = providerOrder.filter(
       (p) => this.dashboard?.providers?.[p]?.configured
@@ -112,23 +141,6 @@ export class CrSidebarNav extends LitElement {
       <aside
         class="cr-app-sidebar ${this.collapsed ? "cr-app-sidebar--collapsed" : ""}"
       >
-        <div
-          class="cr-app-sidebar__edge"
-          @click=${() => this.emitToggleSidebar()}
-          role="button"
-          tabindex="0"
-          aria-label=${this.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title=${this.collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.emitToggleSidebar(); } }}
-        >
-          <span class="cr-app-sidebar__edge-indicator" aria-hidden="true">
-            <cr-icon
-              .icon=${this.collapsed ? ChevronRight : ChevronLeft}
-              .size=${12}
-            ></cr-icon>
-          </span>
-        </div>
-
         <div class="cr-app-sidebar__header">
           <div class="cr-app-sidebar__brand">
             <img
@@ -153,6 +165,7 @@ export class CrSidebarNav extends LitElement {
                   class="loading loading-spinner loading-xs text-primary"
                 ></span>`
               : ""}
+            ${this.renderSidebarToggle()}
           </div>
         </div>
 

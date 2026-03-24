@@ -12,4 +12,4 @@ export type {
   GitHubPrFile as GitHubPrFilesResponse,
   GitHubRepository,
   GitHubReviewComment as GitHubPrReviewComment,
-} from "@cr/github";
+} from "@cr/vcs/github";

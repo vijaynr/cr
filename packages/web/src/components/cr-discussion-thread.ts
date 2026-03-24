@@ -1,6 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { ArrowUpRight, Reply, X } from "lucide";
+import { ArrowUpRight, Check, Pencil, Reply, Trash2, X } from "lucide";
 import type { ReviewDiscussionMessage, ReviewDiscussionThread } from "../types.js";
 import { renderMarkdown } from "./render-markdown.js";
 import "./cr-icon.js";
@@ -11,6 +11,11 @@ export class CrDiscussionThread extends LitElement {
   @property() replyingToThreadId = "";
   @property() discussionReplyDraft = "";
   @property({ type: Boolean }) postingReply = false;
+  @property() editingMessageId = "";
+  @property() editingDraft = "";
+  @property({ type: Boolean }) savingEdit = false;
+  @property() deletingMessageId = "";
+  @property({ type: Boolean }) allowMessageMutations = true;
 
   override createRenderRoot() {
     return this;
@@ -90,6 +95,10 @@ export class CrDiscussionThread extends LitElement {
   render() {
     const thread = this.thread;
     const replying = this.isReplying;
+    const rootMessage = thread.messages[0];
+    const rootEditing = rootMessage
+      ? this.editingMessageId === rootMessage.id
+      : false;
     const starter = thread.messages[0]?.author || "Reviewer";
     const lastUpdated = this.threadTimestamp();
     const location = this.discussionLocationLabel(
@@ -154,6 +163,9 @@ export class CrDiscussionThread extends LitElement {
                   </button>
                 `
               : ""}
+            ${this.allowMessageMutations && rootMessage && !rootEditing
+              ? this.renderMessageActions(thread, rootMessage)
+              : nothing}
           </div>
         </div>
 
@@ -173,6 +185,8 @@ export class CrDiscussionThread extends LitElement {
     message: ReviewDiscussionMessage,
     index: number
   ) {
+    const isRoot = index === 0;
+    const isEditing = this.editingMessageId === message.id;
     const author = message.author || "Reviewer";
     const timestamp = message.updatedAt || message.createdAt || "";
     const relativeTimestamp = timestamp
@@ -181,6 +195,10 @@ export class CrDiscussionThread extends LitElement {
     const showInlineLocation =
       Boolean(message.inline) && thread.kind !== "inline";
     const inlineLocation = this.discussionLocationLabel(message.inline);
+    const showMessageMeta = !isRoot || isEditing || showInlineLocation;
+    const showMessageActions =
+      this.allowMessageMutations && !isEditing && !isRoot;
+    const showMetaRow = showMessageMeta || showMessageActions;
 
     return html`
       <article
@@ -188,36 +206,94 @@ export class CrDiscussionThread extends LitElement {
           ? "cr-discussion-message--root"
           : ""}"
       >
-        ${index > 0
+        ${showMetaRow
           ? html`
               <div class="cr-discussion-message__meta">
                 <div class="cr-discussion-message__author-line">
-                  <span class="cr-discussion-message__author"
-                    >${author}</span
-                  >
-                  ${relativeTimestamp
-                    ? html`<span>${relativeTimestamp}</span>`
-                    : ""}
+                  ${!isRoot
+                    ? html`
+                        <span class="cr-discussion-message__author"
+                          >${author}</span
+                        >
+                        ${relativeTimestamp
+                          ? html`<span>${relativeTimestamp}</span>`
+                          : ""}
+                      `
+                    : nothing}
                   ${showInlineLocation && inlineLocation
                     ? html`<span class="cr-discussion-thread__location"
                         >${inlineLocation}</span
                       >`
                     : ""}
                 </div>
-                ${message.url
-                  ? html`
-                      <a
-                        class="cr-discussion-message__link"
-                        href=${message.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        >Open</a
-                      >
-                    `
-                  : ""}
+                <div class="cr-discussion-message__actions">
+                  ${message.url
+                    ? html`
+                        <a
+                          class="cr-discussion-message__link"
+                          href=${message.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          >Open</a
+                        >
+                      `
+                    : ""}
+                  ${showMessageActions
+                    ? this.renderMessageActions(thread, message)
+                    : nothing}
+                </div>
               </div>
             `
-          : ""}
+          : nothing}
+        ${this.renderMessageBody(thread, message)}
+      </article>
+    `;
+  }
+
+  private renderMessageActions(
+    thread: ReviewDiscussionThread,
+    message: ReviewDiscussionMessage
+  ) {
+    const isDeleting = this.deletingMessageId === message.id;
+    const disabled = this.savingEdit || isDeleting || this.postingReply;
+
+    return html`
+      <button
+        type="button"
+        class="cr-discussion-thread__action cr-discussion-thread__action--secondary"
+        ?disabled=${disabled}
+        @click=${() =>
+          this.emit("start-edit-discussion-message", { thread, message })}
+      >
+        <cr-icon .icon=${Pencil} .size=${12}></cr-icon>
+        Edit
+      </button>
+      <button
+        type="button"
+        class="cr-discussion-thread__action cr-discussion-thread__action--secondary"
+        ?disabled=${disabled}
+        @click=${() =>
+          this.emit("delete-discussion-message", {
+            threadId: thread.id,
+            messageId: message.id,
+          })}
+      >
+        ${isDeleting
+          ? html`<span class="loading loading-spinner loading-xs"></span>`
+          : html`<cr-icon .icon=${Trash2} .size=${12}></cr-icon>`}
+        Delete
+      </button>
+    `;
+  }
+
+  private renderMessageBody(
+    thread: ReviewDiscussionThread,
+    message: ReviewDiscussionMessage
+  ) {
+    const isEditing = this.editingMessageId === message.id;
+
+    if (!isEditing) {
+      return html`
         <div class="cr-discussion-message__bubble">
           ${renderMarkdown(message.body, {
             className: "cr-discussion-message__markdown cr-markdown--muted",
@@ -225,7 +301,51 @@ export class CrDiscussionThread extends LitElement {
             emptyText: "No comment body.",
           })}
         </div>
-      </article>
+      `;
+    }
+
+    return html`
+      <form
+        class="cr-discussion-edit"
+        @submit=${(event: Event) => {
+          event.preventDefault();
+          this.emit("save-discussion-message-edit", {
+            threadId: thread.id,
+            messageId: message.id,
+            body: this.editingDraft.trim(),
+          });
+        }}
+      >
+        <textarea
+          class="textarea textarea-bordered textarea-sm min-h-24 text-sm w-full"
+          rows="4"
+          .value=${this.editingDraft}
+          @input=${(e: Event) =>
+            this.emit(
+              "discussion-edit-draft-change",
+              (e.target as HTMLTextAreaElement).value
+            )}
+        ></textarea>
+        <div class="cr-discussion-edit__footer">
+          <button
+            class="btn btn-ghost btn-sm"
+            type="button"
+            @click=${() => this.emit("cancel-edit-discussion-message")}
+          >
+            Cancel
+          </button>
+          <button
+            class="btn btn-primary btn-sm gap-1.5"
+            type="submit"
+            ?disabled=${this.savingEdit || !this.editingDraft.trim()}
+          >
+            ${this.savingEdit
+              ? html`<span class="loading loading-spinner loading-xs"></span>`
+              : html`<cr-icon .icon=${Check} .size=${12}></cr-icon>`}
+            Save
+          </button>
+        </div>
+      </form>
     `;
   }
 

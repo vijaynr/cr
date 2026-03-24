@@ -15,12 +15,12 @@
     "paths": {
       "@cr/core": ["./packages/core/src/index.ts"],
       "@cr/workflows": ["./packages/workflows/src/index.ts"],
-      "@cr/tui": ["./packages/tui/src/index.ts"],
+      "@cr/tui": ["./packages/cli/src/tui/index.ts"],
       "@cr/web": ["./packages/web/src/index.ts"],
       "@cr/server": ["./packages/server/src/index.ts"],
-      "@cr/reviewboard": ["./packages/reviewboard/src/index.ts"],
-      "@cr/gitlab": ["./packages/gitlab/src/index.ts"],
-      "@cr/github": ["./packages/github/src/index.ts"],
+      "@cr/vcs/github": ["./packages/vcs/src/github/index.ts"],
+      "@cr/vcs/gitlab": ["./packages/vcs/src/gitlab/index.ts"],
+      "@cr/vcs/reviewboard": ["./packages/vcs/src/reviewboard/index.ts"],
       "@cr/desktop": ["./packages/desktop/src/bun/index.ts"]
     }
   },

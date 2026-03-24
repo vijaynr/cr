@@ -9,6 +9,9 @@ import {
   addMergeRequestComment,
   createReview,
   createReviewRequest,
+  deleteGitHubPullRequestComment,
+  deleteGitHubReviewComment,
+  deleteMergeRequestDiscussionNote,
   defaultConfig,
   getFileDiffData,
   getFileDiffs,
@@ -41,6 +44,9 @@ import {
   remoteToGitHubRepoPath,
   remoteToProjectPath,
   saveCRConfig,
+  updateGitHubPullRequestComment,
+  updateGitHubReviewComment,
+  updateMergeRequestDiscussionNote,
   updateReviewRequestDraft,
   uploadReviewRequestDiff,
 } from "@cr/core";
@@ -400,6 +406,16 @@ const operations = [
         description: "Reply to a merge request discussion thread.",
       },
       {
+        method: "PATCH",
+        path: "/api/gitlab/merge-requests/:iid/discussions/:discussionId/notes/:noteId",
+        description: "Edit a merge request discussion note.",
+      },
+      {
+        method: "DELETE",
+        path: "/api/gitlab/merge-requests/:iid/discussions/:discussionId/notes/:noteId",
+        description: "Delete a merge request discussion note.",
+      },
+      {
         method: "POST",
         path: "/api/gitlab/merge-requests/:iid/inline-comments",
         description: "Add an inline merge request comment.",
@@ -437,9 +453,29 @@ const operations = [
         description: "Add a pull request comment.",
       },
       {
+        method: "PATCH",
+        path: "/api/github/pull-requests/:number/issue-comments/:commentId",
+        description: "Edit a pull request conversation comment.",
+      },
+      {
+        method: "DELETE",
+        path: "/api/github/pull-requests/:number/issue-comments/:commentId",
+        description: "Delete a pull request conversation comment.",
+      },
+      {
         method: "POST",
         path: "/api/github/pull-requests/:number/review-comments/:commentId/replies",
         description: "Reply to an inline review comment thread.",
+      },
+      {
+        method: "PATCH",
+        path: "/api/github/pull-requests/:number/review-comments/:commentId",
+        description: "Edit a pull request review comment.",
+      },
+      {
+        method: "DELETE",
+        path: "/api/github/pull-requests/:number/review-comments/:commentId",
+        description: "Delete a pull request review comment.",
       },
       {
         method: "POST",
@@ -924,6 +960,74 @@ export function createApiRoutes(context: ServerContext): Hono {
     }
   });
 
+  app.patch(
+    `${API_PREFIX}/gitlab/merge-requests/:iid/discussions/:discussionId/notes/:noteId`,
+    async (c) => {
+      try {
+        const body = (await c.req.json()) as {
+          repoPath?: string;
+          projectPath?: string;
+          url?: string;
+          body?: string;
+        };
+        if (!body.body) {
+          return badRequest("Missing note body.");
+        }
+        const { baseUrl, token } = await requireGitLabConfig();
+        const projectPath = await resolveGitLabProjectPath({
+          defaultRepoPath: context.repoPath,
+          repoPath: body.repoPath,
+          explicitProjectPath: body.projectPath,
+          remoteUrl: body.url,
+        });
+        const iid = parseInteger(c.req.param("iid"), "merge request iid");
+        const discussionId = c.req.param("discussionId");
+        const noteId = parseInteger(c.req.param("noteId"), "discussion note id");
+        const note = await updateMergeRequestDiscussionNote(
+          baseUrl,
+          token,
+          projectPath,
+          iid,
+          discussionId,
+          noteId,
+          body.body
+        );
+        return c.json({ note });
+      } catch (error) {
+        return serverError(error instanceof Error ? error.message : String(error));
+      }
+    }
+  );
+
+  app.delete(
+    `${API_PREFIX}/gitlab/merge-requests/:iid/discussions/:discussionId/notes/:noteId`,
+    async (c) => {
+      try {
+        const { baseUrl, token } = await requireGitLabConfig();
+        const projectPath = await resolveGitLabProjectPath({
+          defaultRepoPath: context.repoPath,
+          repoPath: c.req.query("repoPath") ?? undefined,
+          explicitProjectPath: c.req.query("projectPath") ?? undefined,
+          remoteUrl: c.req.query("remoteUrl") ?? undefined,
+        });
+        const iid = parseInteger(c.req.param("iid"), "merge request iid");
+        const discussionId = c.req.param("discussionId");
+        const noteId = parseInteger(c.req.param("noteId"), "discussion note id");
+        await deleteMergeRequestDiscussionNote(
+          baseUrl,
+          token,
+          projectPath,
+          iid,
+          discussionId,
+          noteId
+        );
+        return c.json({ ok: true });
+      } catch (error) {
+        return serverError(error instanceof Error ? error.message : String(error));
+      }
+    }
+  );
+
   app.post(`${API_PREFIX}/gitlab/merge-requests/:iid/inline-comments`, async (c) => {
     try {
       const body = (await c.req.json()) as {
@@ -1088,6 +1192,42 @@ export function createApiRoutes(context: ServerContext): Hono {
     }
   });
 
+  app.patch(`${API_PREFIX}/github/pull-requests/:number/issue-comments/:commentId`, async (c) => {
+    try {
+      const body = (await c.req.json()) as { repoPath?: string; remoteUrl?: string; body?: string };
+      if (!body.body) {
+        return badRequest("Missing comment body.");
+      }
+      const { token } = await requireGitHubConfig();
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        remoteUrl: body.remoteUrl,
+      });
+      const commentId = parseInteger(c.req.param("commentId"), "issue comment id");
+      const url = await updateGitHubPullRequestComment(token, repoPath, commentId, body.body);
+      return c.json({ url });
+    } catch (error) {
+      return serverError(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  app.delete(`${API_PREFIX}/github/pull-requests/:number/issue-comments/:commentId`, async (c) => {
+    try {
+      const { token } = await requireGitHubConfig();
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
+      const commentId = parseInteger(c.req.param("commentId"), "issue comment id");
+      await deleteGitHubPullRequestComment(token, repoPath, commentId);
+      return c.json({ ok: true });
+    } catch (error) {
+      return serverError(error instanceof Error ? error.message : String(error));
+    }
+  });
+
   app.post(`${API_PREFIX}/github/pull-requests/:number/review-comments/:commentId/replies`, async (c) => {
     try {
       const body = (await c.req.json()) as {
@@ -1114,6 +1254,46 @@ export function createApiRoutes(context: ServerContext): Hono {
         body.body
       );
       return c.json({ url });
+    } catch (error) {
+      return serverError(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  app.patch(`${API_PREFIX}/github/pull-requests/:number/review-comments/:commentId`, async (c) => {
+    try {
+      const body = (await c.req.json()) as {
+        repoPath?: string;
+        remoteUrl?: string;
+        body?: string;
+      };
+      if (!body.body) {
+        return badRequest("Missing comment body.");
+      }
+      const { token } = await requireGitHubConfig();
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: body.repoPath,
+        remoteUrl: body.remoteUrl,
+      });
+      const commentId = parseInteger(c.req.param("commentId"), "review comment id");
+      const url = await updateGitHubReviewComment(token, repoPath, commentId, body.body);
+      return c.json({ url });
+    } catch (error) {
+      return serverError(error instanceof Error ? error.message : String(error));
+    }
+  });
+
+  app.delete(`${API_PREFIX}/github/pull-requests/:number/review-comments/:commentId`, async (c) => {
+    try {
+      const { token } = await requireGitHubConfig();
+      const repoPath = await resolveGitHubRepoPath({
+        defaultRepoPath: context.repoPath,
+        repoPath: c.req.query("repoPath") ?? undefined,
+        remoteUrl: c.req.query("remoteUrl") ?? undefined,
+      });
+      const commentId = parseInteger(c.req.param("commentId"), "review comment id");
+      await deleteGitHubReviewComment(token, repoPath, commentId);
+      return c.json({ ok: true });
     } catch (error) {
       return serverError(error instanceof Error ? error.message : String(error));
     }

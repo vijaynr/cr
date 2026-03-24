@@ -1,6 +1,6 @@
-import { createReviewBoardClient as createClient } from "@cr/reviewboard";
+import { createReviewBoardClient as createClient } from "@cr/vcs/reviewboard";
 
-export type { ReviewBoardClient } from "@cr/reviewboard";
+export type { ReviewBoardClient } from "@cr/vcs/reviewboard";
 
 /**
  * Creates a Review Board client using the standalone @cr/reviewboard package.

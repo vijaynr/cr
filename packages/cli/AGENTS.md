@@ -20,14 +20,14 @@ Entry point for the `cr` binary. Parses CLI arguments and delegates to the appro
 ## Dependencies
 
 - `@cr/core` — config, git helpers, bootstrap.
-- `@cr/tui` — all terminal output, prompts, spinners.
 - `@cr/workflows` — workflow implementations.
 - `@cr/server` — server startup used by `serve`.
+- TUI code lives in `src/tui/` (imported as `@cr/tui` via tsconfig paths).
 
 ## Key Rules
 
 - Keep this package thin: argument parsing, command routing, and CLI glue belong here; reusable business logic belongs in `@cr/core`, `@cr/workflows`, or `@cr/server`.
-- Prefer `@cr/tui` for user-facing terminal output and prompts. If a direct `console.*` call is necessary for a narrow bootstrap or fatal-error path, keep it minimal and localized.
+- Prefer `@cr/tui` (`src/tui/`) for user-facing terminal output and prompts. If a direct `console.*` call is necessary for a narrow bootstrap or fatal-error path, keep it minimal and localized.
 - Spinners must be created via `createSpinner` from `@cr/tui`, not `ora` directly.
 - Keep command help text, aliases, and the `printHelpView()` summary aligned when commands or workflows change.
 - Prefer adding new behavior in dedicated files under `src/commands/` instead of expanding `src/commands/index.ts` inline.

@@ -4,8 +4,8 @@
  * re-exports free-function wrappers for backward compatibility.
  */
 
-import type { GitLabDiscussion, GitLabInlineComment } from "@cr/gitlab";
-import { GitLabClient } from "@cr/gitlab";
+import type { GitLabDiscussion, GitLabInlineComment } from "@cr/vcs/gitlab";
+import { GitLabClient } from "@cr/vcs/gitlab";
 
 export type { GitLabDiscussion, GitLabInlineComment };
 
@@ -69,6 +69,40 @@ export function replyToMergeRequestDiscussion(
   mrIid: number,
   discussionId: string,
   body: string
-): Promise<import("@cr/gitlab").GitLabDiscussionNote> {
+): Promise<import("@cr/vcs/gitlab").GitLabDiscussionNote> {
   return client(baseUrl, token).replyToDiscussion(projectPath, mrIid, discussionId, body);
+}
+
+export function updateMergeRequestDiscussionNote(
+  baseUrl: string,
+  token: string,
+  projectPath: string,
+  mrIid: number,
+  discussionId: string,
+  noteId: number,
+  body: string
+): Promise<import("@cr/vcs/gitlab").GitLabDiscussionNote> {
+  return client(baseUrl, token).updateDiscussionNote(
+    projectPath,
+    mrIid,
+    discussionId,
+    noteId,
+    body
+  );
+}
+
+export function deleteMergeRequestDiscussionNote(
+  baseUrl: string,
+  token: string,
+  projectPath: string,
+  mrIid: number,
+  discussionId: string,
+  noteId: number
+): Promise<void> {
+  return client(baseUrl, token).deleteDiscussionNote(
+    projectPath,
+    mrIid,
+    discussionId,
+    noteId
+  );
 }

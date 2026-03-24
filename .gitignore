@@ -59,3 +59,11 @@ node_modules/
 bun.lock
 dist-ts/
 *.tsbuildinfo
+
+# Desktop app generated icons and builds
+packages/desktop/icon.icns
+packages/desktop/icon.ico
+packages/desktop/icon.png
+packages/desktop/icon.iconset/
+packages/desktop/build/
+packages/desktop/artifacts/

@@ -1,7 +1,7 @@
-import { GitLabClient, GitLabHttpClient } from "@cr/gitlab";
+import { GitLabClient, GitLabHttpClient } from "@cr/vcs/gitlab";
 
-export type { GitLabInlineComment } from "@cr/gitlab";
-export { remoteToProjectPath } from "@cr/gitlab";
+export type { GitLabInlineComment } from "@cr/vcs/gitlab";
+export { remoteToProjectPath } from "@cr/vcs/gitlab";
 
 // ---------------------------------------------------------------------------
 // Legacy free-function API — thin wrappers around GitLabClient.

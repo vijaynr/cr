@@ -3,6 +3,7 @@ import { customElement, state } from "lit/decorators.js";
 import { Menu } from "lucide";
 import {
   answerChatQuestion,
+  deleteReviewDiscussionMessage,
   loadChatContext,
   loadConfig,
   loadDashboard,
@@ -22,6 +23,7 @@ import {
   runSummary,
   saveConfig,
   testConnection,
+  updateReviewDiscussionMessage,
   type TestConnectionResult,
 } from "../api.js";
 import {
@@ -195,6 +197,10 @@ export class CrDashboardApp extends LitElement {
   @state() discussions: ReviewDiscussionThread[] = [];
   @state() loadingDiscussions = false;
   @state() discussionsError = "";
+  @state() editingDiscussionMessageId = "";
+  @state() editingDiscussionDraft = "";
+  @state() savingDiscussionMessage = false;
+  @state() deletingDiscussionMessageId = "";
 
   // ── Config ──────────────────────────────────────────
 
@@ -749,6 +755,7 @@ export class CrDashboardApp extends LitElement {
     if (!thread.replyable) {
       return;
     }
+    this.cancelEditingDiscussionMessage();
     this.replyingToThreadId = thread.id;
     this.discussionReplyDraft = "";
   }
@@ -756,6 +763,20 @@ export class CrDashboardApp extends LitElement {
   private cancelReplyToThread() {
     this.replyingToThreadId = "";
     this.discussionReplyDraft = "";
+  }
+
+  private startEditingDiscussionMessage(detail: {
+    thread: ReviewDiscussionThread;
+    message: ReviewDiscussionThread["messages"][number];
+  }) {
+    this.cancelReplyToThread();
+    this.editingDiscussionMessageId = detail.message.id;
+    this.editingDiscussionDraft = detail.message.body;
+  }
+
+  private cancelEditingDiscussionMessage() {
+    this.editingDiscussionMessageId = "";
+    this.editingDiscussionDraft = "";
   }
 
   private async handlePostDiscussionReply(detail: {
@@ -785,6 +806,72 @@ export class CrDashboardApp extends LitElement {
       this.setNotice(this.toMessage(error), "error");
     } finally {
       this.postingDiscussionReply = false;
+    }
+  }
+
+  private async handleSaveDiscussionMessageEdit(detail: {
+    threadId: string;
+    messageId: string;
+    body: string;
+  }) {
+    const body = detail.body.trim();
+    if (!this.selectedTarget || !body) {
+      return;
+    }
+
+    this.savingDiscussionMessage = true;
+    try {
+      await updateReviewDiscussionMessage({
+        provider: this.selectedTarget.provider,
+        targetId: this.selectedTarget.id,
+        threadId: detail.threadId,
+        messageId: detail.messageId,
+        body,
+        repositoryContext: this.activeRepositoryContext,
+      });
+      this.cancelEditingDiscussionMessage();
+      await this.loadDiscussions();
+      this.setNotice("Comment updated.", "success");
+    } catch (error) {
+      this.setNotice(this.toMessage(error), "error");
+    } finally {
+      this.savingDiscussionMessage = false;
+    }
+  }
+
+  private async handleDeleteDiscussionMessage(detail: {
+    threadId: string;
+    messageId: string;
+  }) {
+    if (!this.selectedTarget) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this comment permanently? This cannot be undone."
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingDiscussionMessageId = detail.messageId;
+    try {
+      await deleteReviewDiscussionMessage({
+        provider: this.selectedTarget.provider,
+        targetId: this.selectedTarget.id,
+        threadId: detail.threadId,
+        messageId: detail.messageId,
+        repositoryContext: this.activeRepositoryContext,
+      });
+      if (this.editingDiscussionMessageId === detail.messageId) {
+        this.cancelEditingDiscussionMessage();
+      }
+      await this.loadDiscussions();
+      this.setNotice("Comment deleted.", "success");
+    } catch (error) {
+      this.setNotice(this.toMessage(error), "error");
+    } finally {
+      this.deletingDiscussionMessageId = "";
     }
   }
 
@@ -996,6 +1083,10 @@ export class CrDashboardApp extends LitElement {
     this.discussionsError = "";
     this.replyingToThreadId = "";
     this.discussionReplyDraft = "";
+    this.editingDiscussionMessageId = "";
+    this.editingDiscussionDraft = "";
+    this.savingDiscussionMessage = false;
+    this.deletingDiscussionMessageId = "";
     this.feedbackDraft = "";
     this.reviewWarnings = [];
   }
@@ -1444,6 +1535,10 @@ export class CrDashboardApp extends LitElement {
         .discussions=${this.discussions}
         .loadingDiscussions=${this.loadingDiscussions}
         .discussionsError=${this.discussionsError}
+        .editingDiscussionMessageId=${this.editingDiscussionMessageId}
+        .editingDiscussionDraft=${this.editingDiscussionDraft}
+        .savingDiscussionMessage=${this.savingDiscussionMessage}
+        .deletingDiscussionMessageId=${this.deletingDiscussionMessageId}
         .loadingTargets=${this.loadingTargets}
         .loadingDetail=${this.loadingDetail}
         .loadingDiffPatch=${this.loadingDiffPatch}
@@ -1487,6 +1582,13 @@ export class CrDashboardApp extends LitElement {
         @reply-draft-change=${(e: CustomEvent) => {
           this.discussionReplyDraft = e.detail;
         }}
+        @start-edit-discussion-message=${(e: CustomEvent) =>
+          this.startEditingDiscussionMessage(e.detail)}
+        @cancel-edit-discussion-message=${() =>
+          this.cancelEditingDiscussionMessage()}
+        @discussion-edit-draft-change=${(e: CustomEvent) => {
+          this.editingDiscussionDraft = e.detail;
+        }}
         @question-change=${(e: CustomEvent) => {
           this.chatQuestion = e.detail;
         }}
@@ -1513,6 +1615,10 @@ export class CrDashboardApp extends LitElement {
         @cancel-reply=${() => this.cancelReplyToThread()}
         @post-discussion-reply=${(e: CustomEvent) =>
           void this.handlePostDiscussionReply(e.detail)}
+        @save-discussion-message-edit=${(e: CustomEvent) =>
+          void this.handleSaveDiscussionMessageEdit(e.detail)}
+        @delete-discussion-message=${(e: CustomEvent) =>
+          void this.handleDeleteDiscussionMessage(e.detail)}
         @insert-review=${() => {
           this.summaryDraft =
             this.reviewResult?.overallSummary ||
