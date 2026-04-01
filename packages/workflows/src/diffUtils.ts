@@ -12,6 +12,17 @@ export type DiffHunk = {
   oldChangedLines: number[];
 };
 
+/**
+ * Parses a unified diff string into structured hunk objects.
+ *
+ * Each hunk includes its header, the old/new start line numbers, all rows
+ * (additions, deletions, and context lines), and pre-computed sets of
+ * old and new line numbers that were changed. This makes it straightforward
+ * to map diff positions to file line numbers for inline comments.
+ *
+ * @param diffText - Raw unified diff text (e.g. from `git diff` output).
+ * @returns Array of parsed diff hunks.
+ */
 export function parseDiffHunks(diffText: string): DiffHunk[] {
   const hunks: DiffHunk[] = [];
   let currentHunk: DiffHunk | null = null;

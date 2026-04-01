@@ -52,6 +52,15 @@ async function generateTextWithCustomStreaming(config: LlmConfig, prompt: string
   return result;
 }
 
+/**
+ * Generates text from a configured LLM using either the standard OpenAI-compatible
+ * chat completions API or a custom SSE streaming endpoint.
+ *
+ * @param config - LLM connection and model configuration.
+ * @param prompt - The full prompt string to send as a user message.
+ * @returns The trimmed text response from the model.
+ * @throws If the model returns an empty response or the API call fails.
+ */
 export async function generateTextWithLlm(config: LlmConfig, prompt: string): Promise<string> {
   try {
     const output = config.useCustomStreaming

@@ -18,6 +18,7 @@ const runtime = {
   rbUrl: "https://reviews.example.com",
   rbToken: "rb-token",
   rbWebhookSecret: REVIEW_BOARD_WEBHOOK_SECRET,
+  gitlabWebhookSecret: undefined as string | undefined,
   webhookConcurrency: 1,
   webhookQueueLimit: 50,
   webhookJobTimeoutMs: 600000,
@@ -162,6 +163,7 @@ afterEach(() => {
   runtime.rbUrl = "https://reviews.example.com";
   runtime.rbToken = "rb-token";
   runtime.rbWebhookSecret = REVIEW_BOARD_WEBHOOK_SECRET;
+  runtime.gitlabWebhookSecret = undefined;
   runReviewWorkflowMock.mockClear();
   runReviewBoardWorkflowMock.mockClear();
   maybePostReviewBoardCommentMock.mockClear();
@@ -587,5 +589,102 @@ describe("Webhook Server", () => {
     expect(scriptResponse.status).toBe(200);
     expect(await scriptResponse.text()).toContain('"cr-dashboard-app"');
     expect(loadDashboardDataMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("should return 400 for a malformed JSON body on the GitLab webhook", async () => {
+    const { port } = await startTestServer();
+
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Gitlab-Token": "mock-key",
+      },
+      body: "{ not valid json",
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 400 for a malformed JSON body on the GitHub webhook", async () => {
+    const { port } = await startTestServer();
+
+    const body = "{ not valid json";
+    const response = await fetch(`http://localhost:${port}/webhook/github`, {
+      method: "POST",
+      headers: buildGitHubHeaders(body),
+      body,
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 400 for a malformed JSON body on the Review Board webhook", async () => {
+    const { port } = await startTestServer();
+
+    const body = "{ not valid json";
+    const response = await fetch(`http://localhost:${port}/webhook/reviewboard`, {
+      method: "POST",
+      headers: buildReviewBoardHeaders(body),
+      body,
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 400 for an empty body on the GitLab webhook", async () => {
+    const { port } = await startTestServer();
+
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Gitlab-Token": "mock-key",
+      },
+      body: "",
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("should return 403 for a GitLab webhook with a wrong token", async () => {
+    runtime.gitlabWebhookSecret = "correct-gitlab-secret";
+    const { port } = await startTestServer();
+
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Gitlab-Token": "wrong-token",
+      },
+      body: JSON.stringify({
+        object_kind: "merge_request",
+        object_attributes: { action: "open", iid: 7 },
+        project: { id: 1 },
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe("Forbidden");
+  });
+
+  it("should return 403 for a GitLab webhook with a missing token", async () => {
+    runtime.gitlabWebhookSecret = "correct-gitlab-secret";
+    const { port } = await startTestServer();
+
+    const response = await fetch(`http://localhost:${port}/webhook/gitlab`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        object_kind: "merge_request",
+        object_attributes: { action: "open", iid: 7 },
+        project: { id: 1 },
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).toBe("Forbidden");
   });
 });

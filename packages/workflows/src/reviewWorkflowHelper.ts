@@ -3,6 +3,19 @@ import type { ReviewChatContext, ReviewChatHistoryEntry } from "@pv/core";
 export { type DiffHunk, parseDiffHunks } from "./diffUtils.js";
 export { buildInlineReviewPrompt, resolveInlinePosition } from "./reviewWorkflowInlineHelper.js";
 
+/**
+ * Extracts a plain JavaScript object from an LLM text response.
+ *
+ * Attempts three strategies in order:
+ * 1. Direct JSON parse of the full trimmed text.
+ * 2. Extraction from a fenced `\`\`\`json … \`\`\`` block.
+ * 3. Extraction of the first `{…}` substring from the text.
+ *
+ * Returns an empty object `{}` when no valid object can be found.
+ *
+ * @param text - Raw LLM output that may contain a JSON object.
+ * @returns The parsed object, or `{}` on failure.
+ */
 export function extractJsonObject(text: string): Record<string, unknown> {
   const trimmed = text.trim();
   try {
@@ -43,6 +56,17 @@ export function extractJsonObject(text: string): Record<string, unknown> {
   return {};
 }
 
+/**
+ * Injects merge request context values into a review prompt template.
+ *
+ * If the template contains `{mr_content}`, `{mr_changes}`, `{mr_commits}`,
+ * or `{repo_guidelines}` placeholders, they are substituted in a single pass.
+ * When no placeholders are found the context is appended as labelled sections.
+ *
+ * @param template - The prompt template string (may contain named placeholders).
+ * @param context - The MR content, diff, commits, and optional repo guidelines.
+ * @returns The fully resolved prompt string ready to send to the LLM.
+ */
 export function injectMergeRequestContextIntoTemplate(
   template: string,
   context: {
@@ -59,11 +83,16 @@ export function injectMergeRequestContextIntoTemplate(
     template.includes("{repo_guidelines}");
 
   if (hasPlaceholders) {
-    return template
-      .replaceAll("{mr_content}", context.mrContent)
-      .replaceAll("{mr_changes}", context.mrChanges)
-      .replaceAll("{mr_commits}", context.mrCommits)
-      .replaceAll("{repo_guidelines}", context.guidelines ?? "(None provided)");
+    const substitutions: Record<string, string> = {
+      "{mr_content}": context.mrContent,
+      "{mr_changes}": context.mrChanges,
+      "{mr_commits}": context.mrCommits,
+      "{repo_guidelines}": context.guidelines ?? "(None provided)",
+    };
+    return template.replace(
+      /\{mr_content\}|\{mr_changes\}|\{mr_commits\}|\{repo_guidelines\}/g,
+      (match) => substitutions[match] ?? match
+    );
   }
 
   const sections = [
@@ -91,6 +120,17 @@ export function injectMergeRequestContextIntoTemplate(
 // Backward-compatible alias; prefer injectMergeRequestContextIntoTemplate.
 export const applyReviewTemplate = injectMergeRequestContextIntoTemplate;
 
+/**
+ * Builds the GitLab base URL from the configured URL and optional runtime input.
+ *
+ * When the input specifies `provider: "gitlab"` with a valid HTTPS/HTTP `url`,
+ * the origin of that URL is returned so that self-hosted GitLab instances are
+ * handled automatically. Falls back to `configuredGitLabUrl` in all other cases.
+ *
+ * @param configuredGitLabUrl - The GitLab base URL from the user's config.
+ * @param input - Optional provider/url hint, typically from CLI flags or a webhook payload.
+ * @returns The resolved GitLab origin URL.
+ */
 export function resolveGitLabBaseUrl(
   configuredGitLabUrl: string,
   input: { provider?: string; url?: string }
@@ -114,6 +154,16 @@ function formatChatHistory(history: ReviewChatHistoryEntry[]): string {
   return history.map((entry) => `Q: ${entry.question}\nA: ${entry.answer}`).join("\n\n");
 }
 
+/**
+ * Builds the full chat prompt combining the user question, conversation history,
+ * review context, and an optional custom chat template.
+ *
+ * @param args.question - The user's current question.
+ * @param args.history - Prior Q&A turns for multi-turn conversations.
+ * @param args.context - The MR content, diff, commits, and summary used as context.
+ * @param args.chatTemplate - Optional custom system/preamble template to prepend.
+ * @returns The fully assembled prompt string ready to send to the LLM.
+ */
 export function buildChatPrompt(args: {
   question: string;
   history: ReviewChatHistoryEntry[];

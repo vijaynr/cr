@@ -75,7 +75,19 @@ export abstract class VcsHttpClient {
   // Core request
   // -------------------------------------------------------------------------
 
-  async request<T>(endpoint: string, options: VcsRequestOptions = {}): Promise<T> {
+  /**
+   * Performs an HTTP request and returns the parsed JSON response.
+   *
+   * When `notFoundReturnsNull` is `true` in the options, a 404 response returns
+   * `null` instead of throwing — the return type reflects this as `Promise<T | null>`.
+   * Without that option the return type is `Promise<T>`.
+   */
+  async request<T>(
+    endpoint: string,
+    options: VcsRequestOptions & { notFoundReturnsNull: true }
+  ): Promise<T | null>;
+  async request<T>(endpoint: string, options?: VcsRequestOptions): Promise<T>;
+  async request<T>(endpoint: string, options: VcsRequestOptions = {}): Promise<T | null> {
     const {
       method = "GET",
       body,
@@ -98,7 +110,7 @@ export abstract class VcsHttpClient {
     });
 
     if (response.status === 404 && notFoundReturnsNull) {
-      return null as unknown as T;
+      return null;
     }
 
     if (!response.ok) {
@@ -114,7 +126,7 @@ export abstract class VcsHttpClient {
     this.log("trace", `${method} ${endpoint} → ${response.status}`);
 
     if (response.status === 204) {
-      return undefined as unknown as T;
+      return undefined as T;
     }
 
     return (await response.json()) as T;
@@ -162,8 +174,16 @@ export abstract class VcsHttpClient {
   // Convenience methods
   // -------------------------------------------------------------------------
 
-  get<T>(endpoint: string, options?: Omit<VcsRequestOptions, "method" | "body">): Promise<T> {
-    return this.request<T>(endpoint, { ...options, method: "GET" });
+  get<T>(
+    endpoint: string,
+    options: Omit<VcsRequestOptions, "method" | "body"> & { notFoundReturnsNull: true }
+  ): Promise<T | null>;
+  get<T>(endpoint: string, options?: Omit<VcsRequestOptions, "method" | "body">): Promise<T>;
+  get<T>(
+    endpoint: string,
+    options?: Omit<VcsRequestOptions, "method" | "body">
+  ): Promise<T | null> {
+    return this.request<T>(endpoint, { ...options, method: "GET" } as VcsRequestOptions);
   }
 
   post<T>(
