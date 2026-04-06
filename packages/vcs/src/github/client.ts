@@ -62,7 +62,7 @@ export function remoteToRepoPath(remoteUrl: string): string {
     // Strip /pull/... suffix that may appear in copied PR URLs
     const prMarker = "/pull/";
     if (path.includes(prMarker)) {
-      path = path.split(prMarker)[0]!;
+      path = path.split(prMarker)[0] ?? path;
     }
     return path;
   }
@@ -251,7 +251,8 @@ export class GitHubClient {
       `/repos/${repoPath}/pulls?state=open&head=${encodeURIComponent(headBranch)}&per_page=1`
     );
     // GitHub's head filter uses "owner:branch" format — fall back to manual filter
-    if (prs.length > 0 && prs[0]!.head.ref === headBranch) return prs[0]!;
+    const first = prs.at(0);
+    if (first?.head.ref === headBranch) return first;
 
     // Manual search (handles cases where the head filter returns owner:branch mismatches)
     const all = await this.listPullRequests(repoPath, "open");
@@ -440,9 +441,9 @@ export class GitHubClient {
     };
 
     if (endLine !== undefined && endLine !== line) {
-      payload["start_line"] = line;
-      payload["start_side"] = side;
-      payload["line"] = endLine;
+      payload.start_line = line;
+      payload.start_side = side;
+      payload.line = endLine;
     }
 
     const comment = await this.http.post<GitHubReviewComment>(
@@ -527,8 +528,8 @@ export class GitHubClient {
         side: c.side ?? "RIGHT",
       };
       if (c.startLine !== undefined && c.startLine !== c.line) {
-        comment["start_line"] = c.startLine;
-        comment["start_side"] = c.startSide ?? c.side ?? "RIGHT";
+        comment.start_line = c.startLine;
+        comment.start_side = c.startSide ?? c.side ?? "RIGHT";
       }
       return comment;
     });

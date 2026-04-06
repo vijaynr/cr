@@ -139,7 +139,8 @@ export class CrReviewPanel extends LitElement {
   }
 
   private renderResult() {
-    const result = this.reviewResult!;
+    if (!this.reviewResult) return html``;
+    const result = this.reviewResult;
     return html`
       <div class="cr-review-info-banner">
         <span class="cr-review-info-banner__check">✓</span>

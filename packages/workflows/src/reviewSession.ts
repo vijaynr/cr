@@ -182,7 +182,6 @@ function getGitHubPullRequestState(
       return { state: "closed", requireMerged: false };
     case "merged":
       return { state: "closed", requireMerged: true };
-    case "all":
     default:
       return { state: "all", requireMerged: false };
   }

@@ -84,10 +84,10 @@ export class ReviewBoardClient {
     fields: { summary?: string; description?: string }
   ): Promise<ReviewBoardRequest> {
     const params: Record<string, string> = {};
-    if (fields.summary !== undefined) params["summary"] = fields.summary;
+    if (fields.summary !== undefined) params.summary = fields.summary;
     if (fields.description !== undefined) {
-      params["description"] = fields.description;
-      params["description_text_type"] = "markdown";
+      params.description = fields.description;
+      params.description_text_type = "markdown";
     }
 
     const response = await this.http.requestFormEncoded<{ review_request: ReviewBoardRequest }>(
@@ -132,7 +132,7 @@ export class ReviewBoardClient {
       `/api/review-requests/${requestId}/diffs/`
     );
     const diffs = response.diffs ?? [];
-    return diffs.length > 0 ? diffs[diffs.length - 1]! : null;
+    return diffs.at(-1) ?? null;
   }
 
   async getFileDiffs(requestId: number, diffSetId: number): Promise<ReviewBoardFileDiff[]> {
@@ -157,9 +157,13 @@ export class ReviewBoardClient {
    * Downloads the raw unified diff for a specific revision as plain text.
    */
   async getRawDiff(requestId: number, revision: number): Promise<string> {
-    return (await this.http.requestText(
+    const text = await this.http.requestText(
       `/api/review-requests/${requestId}/diffs/${revision}/`
-    ))!;
+    );
+    if (text === null) {
+      throw new Error(`No diff data returned for request ${requestId}, revision ${revision}`);
+    }
+    return text;
   }
 
   // -------------------------------------------------------------------------

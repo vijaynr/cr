@@ -221,7 +221,7 @@ export abstract class VcsHttpClient {
   protected log(level: "debug" | "trace" | "error", message: string): void {
     if (level === "error") {
       console.error(`[${this.label}] ${message}`);
-    } else if (level === "debug" && process.env["DEBUG"]) {
+    } else if (level === "debug" && process.env.DEBUG) {
       console.debug(`[${this.label}] ${message}`);
     }
   }

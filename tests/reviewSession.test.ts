@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { ReviewWorkflowInput } from "@pv/core";
 import { makeCoreMock } from "./mocks.ts";
 
 const loadPVConfigMock = mock(async () => ({
@@ -13,7 +14,7 @@ const normalizeReviewAgentNamesMock = mock((agentNames?: string[]) => {
   return Array.from(new Set(values.filter(Boolean)));
 });
 const listMergeRequestsMock = mock(async () => []);
-const runInteractiveReviewWorkflowMock = mock((input: any) =>
+const runInteractiveReviewWorkflowMock = mock((input: ReviewWorkflowInput) =>
   (async function* () {
     return {
       output: "review output",

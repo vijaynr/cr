@@ -13,10 +13,22 @@
 // Detection
 // ---------------------------------------------------------------------------
 
+/** Typed interface for Electrobun's preload-injected window globals. */
+interface ElectrobunWindow {
+  __electrobunWebviewId: number;
+  __electrobunRpcSocketPort: number;
+  __electrobun_encrypt: (msg: string) => Promise<{ encryptedData: string; iv: string; tag: string }>;
+  __electrobun_decrypt: (encryptedData: string, iv: string, tag: string) => Promise<string>;
+}
+
+function electrobunWindow(): ElectrobunWindow {
+  return window as unknown as ElectrobunWindow;
+}
+
 export function isDesktop(): boolean {
   return (
     typeof window !== "undefined" &&
-    typeof (window as any).__electrobunWebviewId === "number"
+    typeof electrobunWindow().__electrobunWebviewId === "number"
   )
 }
 
@@ -36,8 +48,8 @@ const pending = new Map<
 >()
 
 // Re-export the encrypt/decrypt globals with short names
-const encrypt = () => (window as any).__electrobun_encrypt as (msg: string) => Promise<{ encryptedData: string; iv: string; tag: string }>
-const decrypt = () => (window as any).__electrobun_decrypt as (encryptedData: string, iv: string, tag: string) => Promise<string>
+const encrypt = () => electrobunWindow().__electrobun_encrypt
+const decrypt = () => electrobunWindow().__electrobun_decrypt
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -49,13 +61,13 @@ export function initBridge(): Promise<void> {
   if (socket) {
     // Already connecting
     return new Promise<void>((resolve, reject) => {
-      socket!.addEventListener("open", () => resolve(), { once: true })
-      socket!.addEventListener("error", () => reject(new Error("WebSocket error during init")), { once: true })
+      socket?.addEventListener("open", () => resolve(), { once: true })
+      socket?.addEventListener("error", () => reject(new Error("WebSocket error during init")), { once: true })
     })
   }
 
-  const webviewId = (window as any).__electrobunWebviewId as number
-  const rpcPort = (window as any).__electrobunRpcSocketPort as number
+  const webviewId = electrobunWindow().__electrobunWebviewId
+  const rpcPort = electrobunWindow().__electrobunRpcSocketPort
 
   return new Promise<void>((resolve, reject) => {
     const ws = new WebSocket(
@@ -79,12 +91,13 @@ export function initBridge(): Promise<void> {
         )
         const msg = JSON.parse(decrypted)
         if (msg.type === "response" && pending.has(msg.id)) {
-          const { resolve: res, reject: rej } = pending.get(msg.id)!
+          const handlers = pending.get(msg.id)
+          if (!handlers) return
           pending.delete(msg.id)
           if (msg.success) {
-            res(msg.payload)
+            handlers.resolve(msg.payload)
           } else {
-            rej(new Error(msg.error ?? "RPC request failed"))
+            handlers.reject(new Error(msg.error ?? "RPC request failed"))
           }
         }
       } catch (err) {
@@ -118,7 +131,7 @@ async function rpcRequest<T>(method: string, params: unknown): Promise<T> {
   const id = ++requestId
   const message = JSON.stringify({ type: "request", id, method, params })
   const encrypted = await encrypt()(message)
-  socket!.send(JSON.stringify(encrypted))
+  socket?.send(JSON.stringify(encrypted))
 
   return new Promise<T>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -152,7 +165,7 @@ export async function desktopFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const method = init?.method ?? "GET"
-  let body: unknown = undefined
+  let body: unknown 
   if (init?.body) {
     try {
       body = JSON.parse(init.body as string)

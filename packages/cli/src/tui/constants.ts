@@ -19,7 +19,7 @@ function getConfigTheme(): "dark" | "light" | null {
     }
     const content = fs.readFileSync(configPath, "utf-8");
     const themeMatch = content.match(/terminal_theme\s*=\s*(\w+)/);
-    if (themeMatch && themeMatch[1]) {
+    if (themeMatch?.[1]) {
       const theme = themeMatch[1].toLowerCase();
       if (theme === "dark" || theme === "light") {
         return theme;
@@ -77,7 +77,7 @@ function isDarkBackground(): boolean {
     if (parts.length >= 2) {
       const bg = parseInt(parts[1], 10);
       // Background colors 0-6 are typically dark, 7-15 are light
-      if (!isNaN(bg)) {
+      if (!Number.isNaN(bg)) {
         return bg < 7;
       }
     }

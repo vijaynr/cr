@@ -16,7 +16,7 @@ const runInteractiveReviewSessionMock = mock(async function* () {
     message: "Merge request selection cancelled.",
   };
 });
-const runLiveTaskMock = mock(async (_title: string, run: (ui: any) => Promise<void>) => {
+const runLiveTaskMock = mock(async (_title: string, run: (ui: unknown) => Promise<void>) => {
   await run({
     setResult: setResultMock,
   });

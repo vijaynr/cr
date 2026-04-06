@@ -129,7 +129,7 @@ export class LiveController {
           async next(): Promise<IteratorResult<LiveEvent>> {
             for (;;) {
               if (buffer.length > 0) {
-                return { value: buffer.shift()!, done: false };
+                return { value: buffer.shift() as LiveEvent, done: false };
               }
               if (ended) {
                 emitter.off("data", onData);
@@ -157,7 +157,7 @@ function persistSpinnerSuccess(spinner: OraSpinner, message: string): void {
     return;
   }
   spinner.stopAndPersist({
-    symbol: COLORS.green + `${DOT}` + COLORS.reset,
+    symbol: `${COLORS.green}${DOT}${COLORS.reset}`,
     text: message,
   });
 }
@@ -204,7 +204,7 @@ export function createWorkflowStatusController(args: {
       }
       if (event.type === "phase_started") {
         console.log(); // add spacing before new phase
-        startSpinner(" " + event.message);
+        startSpinner(` ${event.message}`);
         return;
       }
       if (event.type === "phase_completed") {
@@ -250,12 +250,12 @@ function levelToColor(level: LiveLevel): string {
 function printResultWithDots(level: LiveLevel, result: LiveResult): void {
   const color = levelToColor(level);
   console.log();
-  console.log(color + `${DOT} ` + result.title + COLORS.reset);
+  console.log(`${color}${DOT} ${result.title}${COLORS.reset}`);
   for (const line of result.body.split("\n")) {
     if (!line.trim()) {
       continue;
     }
-    console.log(color + `${DOT} ` + line + COLORS.reset);
+    console.log(`${color}${DOT} ${line}${COLORS.reset}`);
   }
   console.log();
 }
@@ -266,7 +266,7 @@ function deriveWorkflowLabel(title: string): string {
 
 function printTaskHeader(title: string, description?: string): void {
   const workflowLabel = deriveWorkflowLabel(title);
-  console.log(COLORS.cyan + COLORS.bold + "> " + workflowLabel + COLORS.reset);
+  console.log(`${COLORS.cyan + COLORS.bold}> ${workflowLabel}${COLORS.reset}`);
   if (description) {
     console.log(COLORS.dim + description + COLORS.reset);
   }
@@ -290,7 +290,7 @@ export async function runLiveTask(
   const renderDone = (async () => {
     for await (const evt of stream$) {
       const color = levelToColor(evt.level);
-      console.log(color + `${DOT} ` + evt.message + COLORS.reset);
+      console.log(`${color}${DOT} ${evt.message}${COLORS.reset}`);
     }
   })();
 
@@ -307,8 +307,8 @@ export async function runLiveTask(
 
   if (runError) {
     const message = runError instanceof Error ? runError.message : String(runError);
-    console.error(COLORS.red + `${DOT} Failed` + COLORS.reset);
-    console.error(COLORS.red + `${DOT} ` + message + COLORS.reset);
+    console.error(`${COLORS.red}${DOT} Failed${COLORS.reset}`);
+    console.error(`${COLORS.red}${DOT} ${message}${COLORS.reset}`);
     const resultData = controller.resultData.value;
     if (resultData) {
       printResultWithDots("error", resultData);
@@ -321,7 +321,7 @@ export async function runLiveTask(
     const isCancelled = /cancelled/i.test(finalResult.title) || /cancelled/i.test(finalResult.body);
     printResultWithDots(isCancelled ? "warning" : "success", finalResult);
   } else {
-    console.log(COLORS.green + `${DOT} Completed` + COLORS.reset);
+    console.log(`${COLORS.green}${DOT} Completed${COLORS.reset}`);
   }
 }
 

@@ -24,7 +24,7 @@ function formatEntry(level: LogLevel, context: string, message: string, data?: u
       }
     }
   }
-  return line + "\n";
+  return `${line}\n`;
 }
 
 class Logger {

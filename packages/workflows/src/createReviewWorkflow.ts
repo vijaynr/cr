@@ -321,7 +321,7 @@ async function generateDraft(args: {
     description = await args.llm.generate(prompt);
     phaseReporter.completed(
       "generate_mr_draft",
-      `${entityLabel[0]!.toUpperCase()}${entityLabel.slice(1)} description generated.`
+      `${entityLabel[0]?.toUpperCase()}${entityLabel.slice(1)} description generated.`
     );
 
     const titlePrompt = [
@@ -498,15 +498,15 @@ function resolveRepositoryMatch(args: {
     );
   }
 
-  if (candidates.length > 1 && candidates[0]!.score === candidates[1]!.score) {
+  if (candidates.length > 1 && candidates[0]?.score === candidates[1]?.score) {
     throw new Error(
       "Multiple Review Board repositories match this SVN working copy. Narrow svnRepositoryUrl or Review Board repository paths before using --rb."
     );
   }
 
   return {
-    repository: candidates[0]!.repository,
-    basedir: candidates[0]!.basedir || undefined,
+    repository: candidates[0]?.repository,
+    basedir: candidates[0]?.basedir || undefined,
   };
 }
 

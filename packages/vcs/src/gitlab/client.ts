@@ -62,7 +62,7 @@ export function remoteToProjectPath(remoteUrl: string): string {
     // Strip /-/merge_requests/... suffix that may appear in copied MR URLs
     const mrMarker = "/-/merge_requests/";
     if (path.includes(mrMarker)) {
-      path = path.split(mrMarker)[0]!;
+      path = path.split(mrMarker)[0] ?? path;
     }
     return path;
   }
@@ -489,18 +489,18 @@ export class GitLabClient {
     };
 
     if (positionType === "old") {
-      position["old_path"] = filePath;
-      position["old_line"] = line;
+      position.old_path = filePath;
+      position.old_line = line;
     } else {
-      position["new_path"] = filePath;
-      position["new_line"] = line;
+      position.new_path = filePath;
+      position.new_line = line;
     }
 
     // Multi-line comment: attach a line_range to the position
     if (endLine !== undefined && endLine !== line) {
       // GitLab requires line_code which is SHA1(filePath + lineType + lineNumber)
       // but for the API we can use the simplified form with line numbers directly
-      position["line_range"] = {
+      position.line_range = {
         start: {
           line_code: this.buildLineCode(filePath, line, positionType),
           type: positionType,

@@ -70,13 +70,13 @@ async function sleep(ms: number): Promise<void> {
 
 function renderBinaryLines(lines: string[]): void {
   for (const line of lines) {
-    process.stdout.write(COLORS.cyan + COLORS.dim + line + COLORS.reset + "\n");
+    process.stdout.write(`${COLORS.cyan + COLORS.dim + line + COLORS.reset}\n`);
   }
 }
 
 function renderBannerLines(lines: string[]): void {
   for (const line of lines) {
-    process.stdout.write(BANNER_COLOR + COLORS.bold + line + COLORS.reset + "\n");
+    process.stdout.write(`${BANNER_COLOR + COLORS.bold + line + COLORS.reset}\n`);
   }
 }
 
@@ -181,7 +181,7 @@ function printSection(
       console.log();
       continue;
     }
-    console.log(color + `${bullet ? `${DOT} ` : ""}` + line + COLORS.reset);
+    console.log(`${color}${bullet ? `${DOT} ` : ""}${line}${COLORS.reset}`);
   }
 }
 
@@ -243,7 +243,7 @@ export function printHeaderBox(): void {
 
   // Logo rows — row 0: title, row 2: desc, rest: empty
   for (let i = 0; i < logoLines.length; i++) {
-    const logoStr = logoLines[i]!;
+    const logoStr = logoLines[i] ?? "";
     const isFirst = i === 0;
     const isThird = i === 2;
     const textSuffix = isFirst ? GAP + title : isThird ? GAP + desc : "";
@@ -261,7 +261,7 @@ export function printHeaderBox(): void {
   }
 
   // Version row — left-padded to align under the logo
-  const versionColored = " " + COLORS.dim + " " + version + COLORS.reset;
+  const versionColored = ` ${COLORS.dim} ${version}${COLORS.reset}`;
   const versionVisibleLen = 1 + 1 + version.length;
   console.log(renderRow(versionColored, versionVisibleLen));
 
@@ -286,19 +286,19 @@ export async function printBanner(): Promise<void> {
 }
 
 export function printSuccess(message: string): void {
-  console.log(COLORS.green + `${DOT} ` + message + COLORS.reset);
+  console.log(`${COLORS.green}${DOT} ${message}${COLORS.reset}`);
 }
 
 export function printInfo(message: string): void {
-  console.log(COLORS.cyan + `${DOT} ` + message + COLORS.reset);
+  console.log(`${COLORS.cyan}${DOT} ${message}${COLORS.reset}`);
 }
 
 export function printWarning(message: string): void {
-  console.log(COLORS.yellow + `${DOT} ` + message + COLORS.reset);
+  console.log(`${COLORS.yellow}${DOT} ${message}${COLORS.reset}`);
 }
 
 export function printError(message: string): void {
-  console.error(COLORS.red + `${DOT} ` + message + COLORS.reset);
+  console.error(`${COLORS.red}${DOT} ${message}${COLORS.reset}`);
 }
 
 export function printEmptyLine(): void {
@@ -328,7 +328,7 @@ export function printCommandHelp(sections: { title: string; lines: string[] }[])
     console.log(section.title);
     console.log();
     for (const line of section.lines) {
-      console.log("  " + line);
+      console.log(`  ${line}`);
     }
     console.log();
   }
@@ -367,21 +367,21 @@ export function printHelpView(): void {
   console.log("COMMANDS");
   console.log();
   for (const line of commandRows) {
-    console.log("  " + line);
+    console.log(`  ${line}`);
   }
   console.log();
 
   console.log("WORKFLOWS");
   console.log();
   for (const line of workflowRows) {
-    console.log("  " + line);
+    console.log(`  ${line}`);
   }
   console.log();
 
   console.log("EXAMPLES");
   console.log();
   for (const line of exampleRows) {
-    console.log("  " + line);
+    console.log(`  ${line}`);
   }
   console.log();
 

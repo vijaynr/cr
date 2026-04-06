@@ -41,7 +41,7 @@ export class CrSummaryPanel extends LitElement {
                 <div class="cr-review-section">
                   <div class="cr-review-section__label">Overview</div>
                   <div class="cr-review-section__body">
-                    ${renderMarkdown(this.summaryResult!.output, {
+                    ${renderMarkdown(this.summaryResult?.output, {
                       className: "cr-markdown--muted",
                       emptyText: "No summary output was generated.",
                     })}

@@ -12,7 +12,6 @@ import {
   createRuntimeSvnClient,
   DEFAULT_REVIEW_AGENT_NAME,
   type GitHubClient,
-  type GitHubInlineComment,
   type GitLabClient,
   type GitLabInlineComment,
   getCurrentBranch,
@@ -191,7 +190,7 @@ function createPromptContextFromRemotePrContext(remoteContext: RemotePrContext):
   };
 }
 
-function mapGitHubFilesToDiffChanges(
+function _mapGitHubFilesToDiffChanges(
   files: RemotePrContext["files"]
 ): Array<{ old_path?: string; new_path?: string; diff?: string }> {
   return files.map((file) => ({

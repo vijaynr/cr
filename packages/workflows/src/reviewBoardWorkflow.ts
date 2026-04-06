@@ -258,8 +258,10 @@ export async function runReviewBoardWorkflow(
         return { runtime, llm, rb };
       },
       loadContext: async (state) => {
-        const rb = state.rb!;
-        const requestId = state.input.mrIid!;
+        if (!state.rb) throw new Error("Review Board client not initialized");
+        if (state.input.mrIid == null) throw new Error("mrIid not set");
+        const rb = state.rb;
+        const requestId = state.input.mrIid;
         const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
         phaseReporter.started("load_mr_context", "Loading Review Board context...");
 
@@ -272,7 +274,9 @@ export async function runReviewBoardWorkflow(
         const rawDiff = await rb.getRawDiff(requestId, diffSet.revision);
         let guidelines: string | undefined;
         try {
-          guidelines = await loadSvnRepositoryGuidelines(createRuntimeSvnClient(state.runtime!));
+          if (state.runtime) {
+            guidelines = await loadSvnRepositoryGuidelines(createRuntimeSvnClient(state.runtime));
+          }
         } catch {
           // Ignore errors fetching guidelines
         }
@@ -281,8 +285,10 @@ export async function runReviewBoardWorkflow(
         return { context: { requestId, request, diffSet, files, rawDiff, guidelines } };
       },
       generateReview: async (state) => {
-        const llm = state.llm!;
-        const context = state.context!;
+        if (!state.llm) throw new Error("LLM client not initialized");
+        if (!state.context) throw new Error("Context not loaded");
+        const llm = state.llm;
+        const context = state.context;
         const phaseReporter = createWorkflowPhaseReporter(WORKFLOW_NAME, state.input.events);
         const selectedAgents = normalizeReviewAgentNames(state.input.agentNames);
         const promptContext = buildPromptContext(context);
@@ -354,7 +360,8 @@ export async function runReviewBoardWorkflow(
     end: "end",
   });
 
-  return finalState.result!;
+  if (!finalState.result) throw new Error("Review workflow completed without a result");
+  return finalState.result;
 }
 
 export async function* runInteractiveReviewBoardWorkflow(

@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import type { ConditionalRoute, WorkflowStep } from "@pv/core";
 import { makeCoreMock } from "./mocks.ts";
+
+type RunWorkflowArgs<S = Record<string, unknown>> = {
+  initialState: S;
+  steps: Record<string, WorkflowStep<S>>;
+  routes: Record<string, string | ConditionalRoute<S>>;
+  start: string;
+  end: string;
+};
 
 let startedAgents: string[] = [];
 let aggregateCallCount = 0;
@@ -103,7 +112,7 @@ mock.module("@pv/core", () =>
       }
       return value;
     },
-    runWorkflow: async ({ initialState, steps, routes, start }: any) => {
+    runWorkflow: async <S>({ initialState, steps, routes, start }: RunWorkflowArgs<S>) => {
       const state = { ...initialState };
       let current = start;
       while (current && current !== "end") {

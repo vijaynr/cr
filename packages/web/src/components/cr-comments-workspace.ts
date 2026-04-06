@@ -8,7 +8,6 @@ import type {
 } from "../types.js";
 import "./cr-icon.js";
 import "./cr-discussion-thread.js";
-import { renderMarkdown } from "./render-markdown.js";
 
 @customElement("cr-comments-workspace")
 export class CrCommentsWorkspace extends LitElement {

@@ -1,5 +1,14 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { CreateReviewWorkflowInput } from "@pv/core";
 import { makeCoreMock, makeUiMock, makeWorkflowsMock } from "./mocks.ts";
+
+type RunLiveCreateReviewArgs = {
+  runWorkflow: (input: CreateReviewWorkflowInput) => AsyncGenerator;
+  repoPath: string;
+  targetBranch?: string;
+  mode: string;
+  repoRoot: string;
+};
 
 const printCommandHelpMock = mock(() => {});
 const runLiveTaskMock = mock(async (_title: string, run: (ui: unknown) => Promise<void>) => {
@@ -18,7 +27,7 @@ const createWorkflowStatusControllerMock = mock(() => ({
   startSpinner: () => ({ stop: () => {}, stopAndPersist: () => {} }),
   completeSpinner: () => {},
 }));
-const runLiveCreateReviewTaskMock = mock(async (args: any) => {
+const runLiveCreateReviewTaskMock = mock(async (args: RunLiveCreateReviewArgs) => {
   const workflow = args.runWorkflow({
     repoPath: args.repoPath,
     targetBranch: args.targetBranch,
@@ -27,7 +36,7 @@ const runLiveCreateReviewTaskMock = mock(async (args: any) => {
   });
   await workflow.next();
 });
-const runCreateReviewWorkflowMock = mock((input: any) =>
+const runCreateReviewWorkflowMock = mock((input: CreateReviewWorkflowInput) =>
   (async function* () {
     return {
       provider: input.provider,
