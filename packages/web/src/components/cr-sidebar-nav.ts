@@ -141,8 +141,8 @@ export class CrSidebarNav extends LitElement {
       <aside
         class="cr-app-sidebar ${this.collapsed ? "cr-app-sidebar--collapsed" : ""}"
       >
-        <div class="cr-app-sidebar__header">
-          <div class="cr-app-sidebar__brand">
+        <div class="cr-app-sidebar__header electrobun-webkit-app-region-drag">
+          <div class="cr-app-sidebar__brand electrobun-webkit-app-region-no-drag">
             <img
               src=${WEB_APP_ICON_ROUTE}
               alt="PeerView"
@@ -156,7 +156,7 @@ export class CrSidebarNav extends LitElement {
               </div>
             </div>
           </div>
-          <div class="cr-app-sidebar__header-actions">
+          <div class="cr-app-sidebar__header-actions electrobun-webkit-app-region-no-drag">
             ${this.isLoading
               ? html`<span
                   class="loading loading-spinner loading-xs text-primary"
