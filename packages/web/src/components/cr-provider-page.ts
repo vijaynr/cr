@@ -1,6 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Settings2 } from "lucide";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import {
   providerLabels,
   type DashboardData,
@@ -123,7 +124,7 @@ export class CrProviderPage extends LitElement {
     if (!this.configured) {
       return html`
         <div class="cr-fade-in flex flex-1 items-center justify-center py-16">
-          <div class="cr-empty-state cr-empty-state--warning max-w-md">
+          <div class="cr-empty-state max-w-md">
             <div class="cr-empty-state__icon">
               <cr-icon .icon=${Settings2} .size=${32}></cr-icon>
             </div>
@@ -132,22 +133,18 @@ export class CrProviderPage extends LitElement {
               Add your ${label} connection details in Settings before loading
               this provider's review queue.
             </div>
-            <button
-              class="btn btn-primary btn-sm gap-1.5 mt-3"
-              type="button"
-              @click=${() => this.emit("section-change", "settings")}
-            >
-              <cr-icon .icon=${Settings2} .size=${16}></cr-icon>
-              Open Settings
-            </button>
+            ${Button({ variant: "default", size: "sm", className: "gap-1.5 mt-3",
+              onClick: () => this.emit("section-change", "settings"),
+              children: html`<cr-icon .icon=${Settings2} .size=${16}></cr-icon> Open Settings`
+            })}
           </div>
         </div>
       `;
     }
 
     return html`
-      <div class="cr-fade-in cr-provider-page flex h-full min-h-0 flex-col">
-        <div class="cr-provider-workspace">
+      <div class="cr-fade-in cr-provider-page flex flex-1 min-h-0 min-w-0 flex-col">
+        <div class="grid grid-cols-1 lg:grid-cols-[24rem_minmax(0,1fr)] gap-4 flex-1 min-h-0">
           <cr-queue-rail
             .provider=${this.provider}
             .targets=${this.targets}
@@ -167,7 +164,7 @@ export class CrProviderPage extends LitElement {
             @repository-clear=${() => this.emit("repository-clear")}
           ></cr-queue-rail>
 
-          <div class="cr-provider-stage">
+          <div class="flex flex-auto h-full w-full min-h-0 min-w-0 relative">
             <cr-workspace-panel
               .provider=${this.provider}
               .detailTarget=${this.detailTarget}

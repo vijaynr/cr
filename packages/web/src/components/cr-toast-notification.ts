@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 
 type NoticeTone = "success" | "warning" | "error";
 
@@ -15,21 +16,20 @@ export class CrToastNotification extends LitElement {
   render() {
     if (!this.message) return nothing;
 
-    const alertClass =
-      this.tone === "success"
-        ? "alert-success"
-        : this.tone === "error"
-          ? "alert-error"
-          : "alert-warning";
+    const toneClass =
+      this.tone === "error"
+        ? "border-destructive/40 bg-destructive/10 text-destructive-foreground"
+        : this.tone === "warning"
+          ? "border-[var(--cr-warning)]/40 bg-[var(--cr-warning)]/10 text-foreground"
+          : "border-[var(--cr-success)]/40 bg-[var(--cr-success)]/10 text-foreground";
 
     return html`
-      <div class="cr-toast alert ${alertClass} text-sm shadow-lg">
+      <div class="cr-toast flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg ${toneClass}">
         <span class="flex-1">${this.message}</span>
-        <button
-          class="btn btn-ghost btn-xs opacity-70 hover:opacity-100"
-          type="button"
-          @click=${this.dismiss}
-        >✕</button>
+        ${Button({ variant: "ghost", size: "sm", className: "opacity-70 hover:opacity-100 shrink-0",
+          onClick: () => this.dismiss(),
+          children: "✕"
+        })}
       </div>
     `;
   }

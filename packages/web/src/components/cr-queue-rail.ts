@@ -1,6 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Search } from "lucide";
+import { Select } from "@mariozechner/mini-lit/dist/Select.js";
 import {
   providerLabels,
   providerQueueLabels,
@@ -70,12 +71,12 @@ export class CrQueueRail extends LitElement {
 
     return html`
       <section
-        class="cr-side-rail cr-side-rail--left rounded-[0.55rem] border border-base-300 bg-base-200"
+        class="rounded-lg border border-border bg-card flex flex-col h-full min-h-0 overflow-hidden"
       >
-        <div class="cr-side-rail__inner flex h-full min-h-0 flex-col p-4">
+        <div class="flex h-full min-h-0 flex-col p-4">
           <!-- Repository section -->
-          <div class="cr-queue-section">
-            <div class="cr-queue-section__label">Repository</div>
+          <div class="flex flex-col gap-1.5">
+            <div class="text-xs font-semibold tracking-widest uppercase text-muted-foreground">Repository</div>
             <cr-provider-repository-picker
               .provider=${this.provider}
               .options=${this.repositoryOptions}
@@ -85,32 +86,28 @@ export class CrQueueRail extends LitElement {
             ></cr-provider-repository-picker>
           </div>
 
-          <hr class="cr-queue-divider" />
+          <hr class="border-t border-border my-3" />
 
           <!-- Queue section -->
-          <div class="cr-queue-section cr-queue-section--grow">
-            <div class="cr-queue-section__header">
-              <span class="cr-queue-section__label">${queueLabel}</span>
-              <span class="cr-queue-count">${this.queueCountLabel(filtered.length)}</span>
+          <div class="flex flex-col gap-1.5 flex-auto min-h-0 overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold tracking-widest uppercase text-muted-foreground">${queueLabel}</span>
+              <span class="text-xs text-muted-foreground">${this.queueCountLabel(filtered.length)}</span>
             </div>
 
-            <div class="cr-queue-filter-row">
-              <select
-                class="cr-state-filter"
-                .value=${this.stateFilter}
-                ?disabled=${!this.selectedRepository}
-                @change=${(e: Event) =>
-                  this.emit("state-filter-change", (e.target as HTMLSelectElement).value)}
-              >
-                ${reviewStates.map(
-                  (state) => html`
-                    <option value=${state} ?selected=${this.stateFilter === state}>
-                      ${this.formatLabel(state)}
-                    </option>
-                  `
-                )}
-              </select>
-              <label class="input input-bordered input-sm flex items-center gap-2 flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              ${Select({
+                value: this.stateFilter,
+                size: "sm",
+                width: "110px",
+                disabled: !this.selectedRepository,
+                options: reviewStates.map((state) => ({
+                  value: state,
+                  label: this.formatLabel(state),
+                })),
+                onChange: (value) => this.emit("state-filter-change", value),
+              })}
+              <label class="flex items-center gap-2 rounded-md border border-border bg-background px-2.5 h-9 text-sm flex items-center gap-2 flex-1 min-w-0">
                 <cr-icon .icon=${Search} .size=${14}></cr-icon>
                 <input
                   type="search"

@@ -193,7 +193,6 @@ export type CRConfigRecord = {
   openaiApiUrl?: string;
   openaiApiKey?: string;
   openaiModel?: string;
-  useCustomStreaming?: boolean;
   defaultReviewAgents?: string[];
   gitlabUrl?: string;
   gitlabKey?: string;

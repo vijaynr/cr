@@ -1,5 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { Alert } from "@mariozechner/mini-lit/dist/Alert.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import "./cr-icon.js";
 
 type SelectedInlineTarget = {
@@ -13,7 +15,7 @@ type SelectedInlineTarget = {
 };
 
 const sectionEyebrowClass =
-  "text-[0.72rem] font-semibold tracking-[0.08em] text-base-content/40";
+  "text-[0.72rem] font-semibold tracking-[0.08em] text-foreground/40";
 
 @customElement("cr-inline-comment-popover")
 export class CrInlineCommentPopover extends LitElement {
@@ -49,7 +51,7 @@ export class CrInlineCommentPopover extends LitElement {
       Math.max(16, window.innerHeight - 160)
     );
 
-    return `--cr-inline-comment-popover-left:${left}px;--cr-inline-comment-popover-top:${top}px;`;
+    return `left:${left}px;top:${top}px;position:fixed;z-index:30;width:${popoverWidth}px;`;
   }
 
   render() {
@@ -57,23 +59,20 @@ export class CrInlineCommentPopover extends LitElement {
 
     return html`
       <div
-        class="cr-inline-comment-popover rounded-[0.75rem] border border-base-300 bg-base-200/98 p-4 backdrop-blur-md"
-        style="${this.popoverStyle()}box-shadow:var(--cr-shadow-3)"
+        class="rounded-[0.75rem] border border-border bg-card/98 p-4 backdrop-blur-md"
+        style="${this.popoverStyle()}box-shadow: 0 4px 16px rgba(0,0,0,0.2)"
       >
         <div class="flex items-start justify-between gap-3">
           <div>
-            <h3 class="text-sm font-semibold text-base-content/92">
+            <h3 class="text-sm font-semibold text-foreground/92">
               Inline comment
             </h3>
             <div class=${sectionEyebrowClass}>Comment on selected line</div>
           </div>
-          <button
-            class="btn btn-ghost btn-xs"
-            type="button"
-            @click=${() => this.emit("close-inline")}
-          >
-            Close
-          </button>
+          ${Button({ variant: "ghost", size: "sm",
+            onClick: () => this.emit("close-inline"),
+            children: "Close"
+          })}
         </div>
 
         <div
@@ -83,21 +82,18 @@ export class CrInlineCommentPopover extends LitElement {
             ${this.selectedLine.filePath}:${this.selectedLine.line}
             (${this.selectedLine.positionType})
           </div>
-          <div class="mt-1 truncate font-mono text-base-content/55">
+          <div class="mt-1 truncate font-mono text-foreground/55">
             ${this.selectedLine.text}
           </div>
         </div>
 
         ${this.isReviewBoard
-          ? html`<div class="alert alert-warning mt-3 text-xs">
-              Inline comments are not available for Review Board in this
-              workspace.
-            </div>`
+          ? Alert({ variant: "default", className: "bg-muted mt-3 text-xs", children: "Inline comments are not available for Review Board in this workspace." })
           : ""}
 
         <div class="mt-3 flex flex-col gap-3">
           <textarea
-            class="textarea textarea-bordered textarea-sm min-h-28 text-sm"
+            class="cr-textarea min-h-28 text-sm w-full"
             rows="5"
             placeholder="Write a precise inline note"
             .value=${this.inlineDraft}
@@ -109,25 +105,16 @@ export class CrInlineCommentPopover extends LitElement {
             }}
           ></textarea>
           <div class="flex items-center justify-between gap-2">
-            <div class="text-xs text-base-content/50">
+            <div class="text-xs text-foreground/50">
               Inline feedback posts directly to the provider thread for this
               line.
             </div>
-            <button
-              class="btn btn-primary btn-sm gap-1.5"
-              type="button"
-              ?disabled=${this.postingInline ||
-              this.isReviewBoard ||
-              !this.inlineDraft.trim()}
-              @click=${() => this.emit("post-inline-comment")}
-            >
-              ${this.postingInline
-                ? html`<span
-                    class="loading loading-spinner loading-xs"
-                  ></span>`
-                : ""}
-              Post inline
-            </button>
+            ${Button({ variant: "default", size: "sm", className: "gap-1.5", type: "button",
+              disabled: this.postingInline || this.isReviewBoard || !this.inlineDraft.trim(),
+              loading: this.postingInline,
+              onClick: () => this.emit("post-inline-comment"),
+              children: this.postingInline ? "Posting…" : "Post inline"
+            })}
           </div>
         </div>
       </div>

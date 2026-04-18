@@ -1,6 +1,5 @@
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { Menu } from "lucide";
 import {
   answerChatQuestion,
   deleteReviewDiscussionMessage,
@@ -74,7 +73,6 @@ type ConfigDraft = {
   openaiApiUrl: string;
   openaiApiKey: string;
   openaiModel: string;
-  useCustomStreaming: boolean;
   defaultReviewAgents: string[];
   gitlabUrl: string;
   gitlabKey: string;
@@ -117,7 +115,6 @@ function emptyConfigDraft(): ConfigDraft {
     openaiApiUrl: "",
     openaiApiKey: "",
     openaiModel: "",
-    useCustomStreaming: false,
     defaultReviewAgents: ["general"],
     gitlabUrl: "",
     gitlabKey: "",
@@ -260,7 +257,6 @@ export class CrDashboardApp extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.uiTheme = this.readStoredTheme();
-    this.sidebarCollapsed = this.readStoredSidebarCollapsed();
     this.syncTheme();
     void this.loadInitialData();
   }
@@ -992,7 +988,6 @@ export class CrDashboardApp extends LitElement {
         openaiApiUrl: this.configDraft.openaiApiUrl.trim(),
         openaiApiKey: this.configDraft.openaiApiKey.trim(),
         openaiModel: this.configDraft.openaiModel.trim(),
-        useCustomStreaming: this.configDraft.useCustomStreaming,
         defaultReviewAgents:
           this.configDraft.defaultReviewAgents.length > 0
             ? this.configDraft.defaultReviewAgents
@@ -1176,7 +1171,6 @@ export class CrDashboardApp extends LitElement {
       openaiApiKey: config.openaiApiKey ?? "",
       openaiModel:
         config.openaiModel ?? dashboard?.config?.openai?.model ?? "",
-      useCustomStreaming: Boolean(config.useCustomStreaming),
       defaultReviewAgents:
         defaultAgents.length > 0 ? defaultAgents : ["general"],
       gitlabUrl:
@@ -1280,10 +1274,6 @@ export class CrDashboardApp extends LitElement {
     return this.providerRepositoriesError[this.provider];
   }
 
-  private get themeName() {
-    return this.uiTheme === "light" ? "cr-light" : "cr-black";
-  }
-
   private providerAvailabilityErrorFor(
     provider: ProviderId,
     dashboard: DashboardData | null = this.dashboard
@@ -1348,29 +1338,13 @@ export class CrDashboardApp extends LitElement {
     }
   }
 
-  private readStoredSidebarCollapsed() {
-    try {
-      return window.localStorage.getItem("pv:web-sidebar-collapsed") !== "false";
-    } catch {
-      return true;
-    }
-  }
-
-  private persistSidebarCollapsed(collapsed: boolean) {
-    try {
-      window.localStorage.setItem(
-        "pv:web-sidebar-collapsed",
-        String(collapsed)
-      );
-    } catch {
-      // Ignore storage errors in restricted environments.
-    }
-  }
-
   private syncTheme() {
-    document.documentElement.setAttribute("data-theme", this.themeName);
-    const themeColor =
-      this.uiTheme === "light" ? "#f3f7fc" : "#050608";
+    if (this.uiTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    const themeColor = this.uiTheme === "light" ? "#f3f7fc" : "#050608";
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", themeColor);
@@ -1382,57 +1356,20 @@ export class CrDashboardApp extends LitElement {
     this.syncTheme();
   }
 
-  private toggleSidebarCollapsed() {
-    this.sidebarCollapsed = !this.sidebarCollapsed;
-    this.persistSidebarCollapsed(this.sidebarCollapsed);
-  }
-
   // ── Render ──────────────────────────────────────────
 
   render() {
     const section = this.router.section;
-    const isLoading =
-      this.loadingDashboard || this.loadingTargets || this.loadingConfig;
 
     return html`
       <div
-        class="drawer lg:drawer-open min-h-screen"
-        data-theme=${this.themeName}
-        style=${`--cr-sidebar-shell-width:${this.sidebarCollapsed ? "5.5rem" : "16rem"};`}
         @section-change=${(e: CustomEvent) =>
           void this.handleSectionChange(e.detail)}
         @theme-toggle=${() => this.toggleUiTheme()}
-        @toggle-sidebar=${() => this.toggleSidebarCollapsed()}
       >
-        <input id="cr-drawer" type="checkbox" class="drawer-toggle" />
-
-        <div
-          class="drawer-content flex flex-col min-h-screen"
-        >
-          <nav
-            class="navbar sticky top-0 z-30 border-b border-base-300/75 bg-base-200/92 px-3 backdrop-blur-md lg:hidden"
-          >
-            <label
-              for="cr-drawer"
-              class="btn btn-ghost btn-sm btn-square"
-            >
-              <cr-icon .icon=${Menu} .size=${18}></cr-icon>
-            </label>
-            <span class="font-bold tracking-tight flex-1"
-              >PeerView</span
-            >
-            <cr-theme-toggle
-              .theme=${this.uiTheme}
-            ></cr-theme-toggle>
-            ${isLoading
-              ? html`<span
-                  class="loading loading-spinner loading-xs text-primary"
-                ></span>`
-              : ""}
-          </nav>
-
+        <div class="lg:ml-72 min-h-dvh flex flex-col">
           <main
-            class="cr-main-shell flex-1 min-h-0 w-full max-w-[min(100%,140rem)] mx-auto px-4 py-5 sm:px-5 lg:px-7 xl:px-10 2xl:px-14"
+            class="flex-1 flex flex-col min-w-0 w-full max-w-[min(100%,140rem)] mx-auto px-4 py-5 sm:px-5 lg:px-7 xl:px-10 2xl:px-14"
           >
             ${section === "overview"
               ? this.renderOverviewPage()
@@ -1442,19 +1379,15 @@ export class CrDashboardApp extends LitElement {
           </main>
         </div>
 
-        <div class="drawer-side z-40">
-          <label for="cr-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
-          <cr-sidebar-nav
-            .activeSection=${section}
-            .dashboard=${this.dashboard}
-            .selectedAgentCount=${this.selectedAgents.length}
-            .repositoryLabel=${this.selectedRepositories[this.provider]
-              ?.label ?? ""}
-            .isLoading=${isLoading}
-            .uiTheme=${this.uiTheme}
-            .collapsed=${this.sidebarCollapsed}
-          ></cr-sidebar-nav>
-        </div>
+        <cr-sidebar-nav
+          .activeSection=${section}
+          .dashboard=${this.dashboard}
+          .selectedAgentCount=${this.selectedAgents.length}
+          .repositoryLabel=${this.selectedRepositories[this.provider]
+            ?.label ?? ""}
+          .isLoading=${this.loadingDashboard || this.loadingTargets || this.loadingConfig}
+          .uiTheme=${this.uiTheme}
+        ></cr-sidebar-nav>
 
         <cr-toast-notification
           .message=${this.noticeMessage}

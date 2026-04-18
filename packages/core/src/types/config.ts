@@ -2,7 +2,6 @@ export type CRConfig = {
   openaiApiUrl: string;
   openaiApiKey: string;
   openaiModel: string;
-  useCustomStreaming: boolean; // Use custom SSE streaming instead of standard OpenAI SDK
   defaultReviewAgents?: string[];
   gitlabUrl: string;
   gitlabKey: string;

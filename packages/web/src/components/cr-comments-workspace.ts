@@ -1,6 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Bot, MessageSquare, ScrollText } from "lucide";
+import { Alert } from "@mariozechner/mini-lit/dist/Alert.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import type {
   ReviewDiscussionThread,
   ReviewTarget,
@@ -65,40 +67,16 @@ export class CrCommentsWorkspace extends LitElement {
           <div class="cr-discussion-composer__header">
             <div class="cr-discussion-composer__assist">
               ${this.reviewResult
-                ? html`
-                    <button
-                      class="btn btn-ghost btn-xs gap-1.5 rounded-[0.7rem]"
-                      type="button"
-                      @click=${() => {
-                        this.emit(
-                          "summary-draft-change",
-                          this.reviewResult?.overallSummary ||
-                            this.reviewResult?.output ||
-                            ""
-                        );
-                      }}
-                    >
-                      <cr-icon .icon=${Bot} .size=${12}></cr-icon>
-                      Insert AI review
-                    </button>
-                  `
+                ? Button({ variant: "ghost", size: "sm", className: "gap-1.5 rounded-[0.7rem]",
+                    onClick: () => this.emit("summary-draft-change", this.reviewResult?.overallSummary || this.reviewResult?.output || ""),
+                    children: html`<cr-icon .icon=${Bot} .size=${12}></cr-icon> Insert AI review`
+                  })
                 : ""}
               ${this.summaryResult
-                ? html`
-                    <button
-                      class="btn btn-ghost btn-xs gap-1.5 rounded-[0.7rem]"
-                      type="button"
-                      @click=${() => {
-                        this.emit(
-                          "summary-draft-change",
-                          this.summaryResult?.output || ""
-                        );
-                      }}
-                    >
-                      <cr-icon .icon=${ScrollText} .size=${12}></cr-icon>
-                      Insert summary
-                    </button>
-                  `
+                ? Button({ variant: "ghost", size: "sm", className: "gap-1.5 rounded-[0.7rem]",
+                    onClick: () => this.emit("summary-draft-change", this.summaryResult?.output || ""),
+                    children: html`<cr-icon .icon=${ScrollText} .size=${12}></cr-icon> Insert summary`
+                  })
                 : ""}
             </div>
           </div>
@@ -111,7 +89,7 @@ export class CrCommentsWorkspace extends LitElement {
             }}
           >
             <textarea
-              class="textarea textarea-bordered textarea-sm min-h-28 text-sm cr-discussion-composer__textarea"
+              class="cr-textarea min-h-28 text-sm cr-discussion-composer__textarea w-full"
               rows="5"
               placeholder="Write a comment"
               .value=${this.summaryDraft}
@@ -123,19 +101,11 @@ export class CrCommentsWorkspace extends LitElement {
               }}
             ></textarea>
             <div class="cr-discussion-composer__footer">
-              <button
-                class="btn btn-primary btn-sm gap-1.5"
-                type="submit"
-                ?disabled=${this.postingSummary ||
-                !this.summaryDraft.trim()}
-              >
-                ${this.postingSummary
-                  ? html`<span
-                      class="loading loading-spinner loading-xs"
-                    ></span>`
-                  : ""}
-                Post comment
-              </button>
+              ${Button({ variant: "default", size: "sm", className: "gap-1.5", type: "submit",
+                disabled: this.postingSummary || !this.summaryDraft.trim(),
+                loading: this.postingSummary,
+                children: "Post comment"
+              })}
             </div>
           </form>
         </section>
@@ -146,18 +116,12 @@ export class CrCommentsWorkspace extends LitElement {
             ${this.loadingDiscussions
               ? html`
                   <div class="cr-loader-shell">
-                    <span
-                      class="loading loading-spinner loading-sm text-primary"
-                    ></span>
-                    <span class="text-sm text-base-content/50"
-                      >Loading discussions…</span
-                    >
+                    <span class="cr-spinner cr-spinner--sm"></span>
+                    <span class="text-sm text-foreground/50">Loading discussions…</span>
                   </div>
                 `
               : this.discussionsError
-                ? html`<div class="alert alert-warning text-sm">
-                    ${this.discussionsError}
-                  </div>`
+                ? Alert({ variant: "default", className: "bg-muted text-sm", children: this.discussionsError })
                 : this.discussions.length === 0
                   ? html`
                       <div class="cr-empty-state" style="min-height:10rem">

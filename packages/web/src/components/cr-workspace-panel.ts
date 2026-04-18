@@ -19,6 +19,9 @@ import type {
   ReviewTarget,
   ReviewWorkflowResult,
 } from "../types.js";
+import { Alert } from "@mariozechner/mini-lit/dist/Alert.js";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import "./cr-icon.js";
 import "./cr-diff-viewer.js";
 import "./cr-inline-comment-popover.js";
@@ -98,7 +101,7 @@ export class CrWorkspacePanel extends LitElement {
     const detail = this.detailTarget;
 
     return html`
-      <section class="cr-review-workspace-panel relative h-full min-h-0 rounded-[0.55rem] border border-base-300 bg-base-200 p-4">
+      <section class="relative h-full w-full min-h-0 min-w-0 rounded-lg border border-border bg-card p-4 flex flex-col gap-3 overflow-hidden">
         ${detail
           ? this.renderContent(detail)
           : this.selectedRepository
@@ -135,33 +138,30 @@ export class CrWorkspacePanel extends LitElement {
             ${detail.title}
           </h2>
           <div class="mt-1 flex flex-wrap gap-1.5">
-            ${detail.state ? html`<span class="badge badge-sm badge-ghost">${this.formatLabel(detail.state)}</span>` : ""}
-            ${detail.author ? html`<span class="badge badge-sm badge-ghost">${detail.author}</span>` : ""}
-            ${detail.sourceBranch ? html`<span class="badge badge-sm badge-ghost font-mono">${detail.sourceBranch}${detail.targetBranch ? ` → ${detail.targetBranch}` : ""}</span>` : ""}
-            ${detail.updatedAt ? html`<span class="badge badge-sm badge-ghost">${detail.updatedAt}</span>` : ""}
+            ${detail.state ? Badge({ variant: "secondary", className: "text-xs", children: this.formatLabel(detail.state) }) : ""}
+            ${detail.author ? Badge({ variant: "secondary", className: "text-xs", children: detail.author }) : ""}
+            ${detail.sourceBranch ? Badge({ variant: "secondary", className: "text-xs font-mono", children: detail.sourceBranch + (detail.targetBranch ? ` → ${detail.targetBranch}` : "") }) : ""}
+            ${detail.updatedAt ? Badge({ variant: "secondary", className: "text-xs", children: detail.updatedAt }) : ""}
           </div>
         </div>
         <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm gap-1.5 rounded-[0.8rem] shadow-sm cr-ai-assistant-trigger"
-            @click=${() => this.emit("open-ai-assistant")}
-            aria-pressed=${String(this.assistantOpen)}
-            data-open=${String(this.assistantOpen)}
-          >
-            <cr-icon .icon=${Bot} .size=${14}></cr-icon>
-            AI Assistant
-          </button>
-          ${detail.url ? html`<a class="btn btn-ghost btn-xs shrink-0 gap-1.5" href=${detail.url} target="_blank" rel="noreferrer"><cr-icon .icon=${ArrowUpRight} .size=${12}></cr-icon>Open</a>` : ""}
+          ${Button({ variant: "default", size: "sm", className: "gap-1.5 rounded-[0.8rem] shadow-sm",
+            onClick: () => this.emit("open-ai-assistant"),
+            children: html`<cr-icon .icon=${Bot} .size=${14}></cr-icon> AI Assistant`
+          })}
+          ${detail.url ? html`<a class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-foreground/70 hover:bg-muted hover:text-foreground transition-colors" href=${detail.url} target="_blank" rel="noreferrer"><cr-icon .icon=${ArrowUpRight} .size=${12}></cr-icon>Open</a>` : ""}
         </div>
       </div>
 
-      <div class="tabs tabs-boxed cr-tab-strip cr-tab-strip--inline self-start">
+      <div class="flex border-b border-border bg-muted/50 px-1 self-stretch">
         ${(["overview", "diff", "commits", "comments"] as WorkspaceTab[]).map(
           (tab) => html`
             <button
               type="button"
-              class="tab tab-sm cr-tab ${this.workspaceTab === tab ? "tab-active" : ""} gap-1.5"
+              class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors
+                ${this.workspaceTab === tab
+                  ? "text-foreground bg-card border-b-2 border-primary"
+                  : "text-muted-foreground hover:text-foreground"}"
               @click=${() => this.emit("workspace-tab-change", tab)}
             >
               <cr-icon .icon=${this.iconForWorkspaceTab(tab)} .size=${13}></cr-icon>
@@ -173,12 +173,12 @@ export class CrWorkspacePanel extends LitElement {
 
       <div class="relative flex-1 min-h-0 overflow-hidden">
         ${this.detailError
-          ? html`<div class="alert alert-error text-sm">${this.detailError}</div>`
+          ? Alert({ variant: "destructive", className: "bg-destructive/10 text-sm", children: this.detailError })
           : this.loadingDetail
             ? html`
                 <div class="cr-loader-shell">
-                  <span class="loading loading-spinner loading-sm text-primary"></span>
-                  <span class="text-sm text-base-content/50">Loading workspace…</span>
+                  <span class="cr-spinner cr-spinner--sm"></span>
+                  <span class="text-sm text-foreground/50">Loading workspace…</span>
                 </div>
               `
             : this.workspaceTab === "overview"
@@ -231,7 +231,7 @@ export class CrWorkspacePanel extends LitElement {
   private renderOverview(detail: ReviewTarget) {
     return html`
       <div class="flex flex-col gap-4 min-h-0">
-        <div class="rounded-[0.55rem] border border-base-100/10 bg-base-300 px-4 py-4 flex flex-col gap-3">
+        <div class="rounded-[0.55rem] border border-foreground/10 bg-muted px-4 py-4 flex flex-col gap-3">
           <h3 class="text-sm font-semibold">Description</h3>
           ${renderMarkdown(detail.description || detail.summary, {
             className: "cr-markdown--muted",

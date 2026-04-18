@@ -56,7 +56,7 @@ export function getWebAppHtml(styles: string, options?: { desktop?: boolean }): 
     ? ` data-desktop-platform="${process.platform}"`
     : "";
   return `<!doctype html>
-<html lang="en" data-theme="cr-black"${desktopAttr}${desktopPlatformAttr}>
+<html lang="en" class="dark"${desktopAttr}${desktopPlatformAttr}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -69,7 +69,7 @@ export function getWebAppHtml(styles: string, options?: { desktop?: boolean }): 
   try {
     const storedTheme = window.localStorage.getItem("pv:web-theme");
     if (storedTheme === "light") {
-      document.documentElement.setAttribute("data-theme", "cr-light");
+      document.documentElement.classList.remove("dark");
       document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f3f7fc");
     }
   } catch {}
@@ -78,15 +78,10 @@ export function getWebAppHtml(styles: string, options?: { desktop?: boolean }): 
     <style>
 ${styles}
 body { margin: 0; }
-cr-dashboard-app { display: block; min-height: 100vh; }
+cr-dashboard-app { display: block; }
 cr-stat-card, cr-review-list, cr-request-item, cr-provider-card, cr-config-card, cr-diff-viewer, cr-dashboard-header, cr-overview-page, cr-provider-page, cr-settings-page, cr-theme-toggle, cr-queue-rail, cr-workspace-panel, cr-analysis-rail, cr-review-panel, cr-summary-panel, cr-chat-panel, cr-comments-workspace, cr-inline-comment-popover, cr-commits-list, cr-discussion-thread, cr-config-input, cr-provider-summary-card, cr-provider-icon, cr-toast-notification { display: contents; }
-cr-sidebar-nav { display: flex; flex-direction: column; min-height: 100vh; width: min(18.5rem, calc(100vw - 1rem)); }
-@media (min-width: 1024px) {
-  cr-sidebar-nav {
-    transition: width 220ms ease;
-    width: var(--cr-sidebar-shell-width, 16rem);
-  }
-}
+cr-sidebar-nav { display: contents; }
+mini-sidebar { display: contents; }
 ${getBootLoaderStyles()}
     </style>
   </head>

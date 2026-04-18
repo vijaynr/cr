@@ -20,28 +20,28 @@ export function renderCollapsibleCard(args: CollapsibleCardArgs) {
   return html`
     <details
       class=${joinClasses(
-        "cr-collapsible-card",
-        args.rootClass ?? "card",
+        "rounded-lg border border-border bg-card overflow-hidden",
+        args.rootClass,
         args.cardClass,
       )}
       ?open=${args.open ?? true}
     >
       <summary
         class=${joinClasses(
-          "cr-collapsible-card__summary list-none cursor-pointer px-4 py-4",
+          "list-none cursor-pointer px-4 py-3 hover:bg-muted/50 transition-colors [&::-webkit-details-marker]:hidden",
           args.summaryClass,
         )}
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">${args.summary}</div>
-          <span class="cr-collapsible-card__chevron shrink-0 text-base-content/40 transition-transform duration-200 ease-out">
+          <span class="shrink-0 text-muted-foreground transition-transform duration-200 [[open]>&]:rotate-180">
             <cr-icon .icon=${ChevronDown} .size=${16}></cr-icon>
           </span>
         </div>
       </summary>
       <div
         class=${joinClasses(
-          "cr-collapsible-card__body px-4 pb-4 pt-0",
+          "px-4 pb-4 pt-0 border-t border-border",
           args.bodyClass,
         )}
       >

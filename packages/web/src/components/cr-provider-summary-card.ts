@@ -52,7 +52,7 @@ export class CrProviderSummaryCard extends LitElement {
 
     return html`
       <div
-        class="cr-overview-card"
+        class="rounded-lg border border-border bg-card p-4 flex flex-col gap-2.5 shadow-sm transition-colors hover:shadow-md"
         role="button"
         tabindex="0"
         @click=${this.emitSectionChange}
@@ -62,31 +62,31 @@ export class CrProviderSummaryCard extends LitElement {
       >
         <div class="flex items-center justify-between gap-2">
           <div class="flex items-center gap-2 min-w-0">
-            <span class="text-base-content/60 shrink-0">
+            <span class="text-foreground/60 shrink-0">
               <cr-provider-icon
                 .provider=${this.provider}
                 .size=${14}
               ></cr-provider-icon>
             </span>
             <span
-              class="text-[0.7rem] font-semibold tracking-[0.06em] uppercase text-base-content/45"
+              class="text-[0.7rem] font-semibold tracking-[0.06em] uppercase text-foreground/45"
               >${label}</span
             >
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <span class="cr-status-dot ${statusDotClass}"></span>
-            <span class="text-[0.65rem] font-medium text-base-content/40"
+            <span class="text-[0.65rem] font-medium text-foreground/40"
               >${statusLabel}</span
             >
           </div>
         </div>
         ${repoLabel
           ? html`<div
-              class="text-sm font-semibold text-base-content/80 font-mono truncate"
+              class="text-sm font-semibold text-foreground/80 font-mono truncate"
             >
               ${repoLabel}
             </div>`
-          : html`<div class="text-xs text-base-content/35">
+          : html`<div class="text-xs text-foreground/35">
               ${data?.error || "Select a repository to begin"}
             </div>`}
         <div

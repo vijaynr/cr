@@ -51,7 +51,6 @@ type GitHubSetupAnswers = {
   openaiApiUrl?: string;
   openaiApiKey?: string;
   openaiModel?: string;
-  useCustomStreaming?: boolean;
   githubToken?: string;
 };
 
@@ -59,7 +58,6 @@ type GitLabSetupAnswers = {
   openaiApiUrl?: string;
   openaiApiKey?: string;
   openaiModel?: string;
-  useCustomStreaming?: boolean;
   gitlabUrl?: string;
   gitlabKey?: string;
 };
@@ -67,7 +65,6 @@ type GitLabSetupAnswers = {
 type ReviewBoardSetupAnswers = {
   openaiApiUrl?: string;
   openaiApiKey?: string;
-  useCustomStreaming?: boolean;
   rbUrl?: string;
   rbToken?: string;
   svnRepositoryUrl?: string;
@@ -454,7 +451,6 @@ async function runWebhookSetup(_args: string[] = []): Promise<void> {
         openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
         openaiApiKey: existing.openaiApiKey ?? "",
         openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-        useCustomStreaming: existing.useCustomStreaming ?? false,
         gitlabUrl: answers.gitlabUrl || existing.gitlabUrl || defaultConfig.gitlabUrl,
         gitlabKey: answers.gitlabKey || existing.gitlabKey || "",
         gitlabWebhookSecret: answers.gitlabWebhookSecret || undefined,
@@ -537,7 +533,6 @@ async function runSubversionSetup(_args: string[] = []): Promise<void> {
         openaiApiUrl: existing.openaiApiUrl ?? defaultConfig.openaiApiUrl,
         openaiApiKey: existing.openaiApiKey ?? "",
         openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-        useCustomStreaming: existing.useCustomStreaming ?? false,
         gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
         gitlabKey: existing.gitlabKey ?? "",
         svnRepositoryUrl: answers.svnRepositoryUrl || undefined,
@@ -583,14 +578,6 @@ async function runGitLabSetup(_args: string[] = []): Promise<void> {
             initial: existing.openaiModel ?? defaultConfig.openaiModel,
           },
           {
-            type: "toggle",
-            name: "useCustomStreaming",
-            message: "Use custom streaming (SSE format)",
-            initial: existing.useCustomStreaming ?? false,
-            active: "yes",
-            inactive: "no",
-          },
-          {
             type: "text",
             name: "gitlabUrl",
             message: "GitLab URL",
@@ -617,7 +604,6 @@ async function runGitLabSetup(_args: string[] = []): Promise<void> {
         openaiApiUrl: answers.openaiApiUrl,
         openaiApiKey: answers.openaiApiKey ?? "",
         openaiModel: answers.openaiModel,
-        useCustomStreaming: answers.useCustomStreaming ?? false,
         gitlabUrl: answers.gitlabUrl,
         gitlabKey: answers.gitlabKey ?? "",
       };
@@ -660,14 +646,6 @@ async function runGitHubSetup(_args: string[] = []): Promise<void> {
             initial: existing.openaiModel ?? defaultConfig.openaiModel,
           },
           {
-            type: "toggle",
-            name: "useCustomStreaming",
-            message: "Use custom streaming (SSE format)",
-            initial: existing.useCustomStreaming ?? false,
-            active: "yes",
-            inactive: "no",
-          },
-          {
             type: "password",
             name: "githubToken",
             message: "GitHub Personal Access Token",
@@ -688,7 +666,6 @@ async function runGitHubSetup(_args: string[] = []): Promise<void> {
         openaiApiUrl: answers.openaiApiUrl,
         openaiApiKey: answers.openaiApiKey ?? "",
         openaiModel: answers.openaiModel,
-        useCustomStreaming: answers.useCustomStreaming ?? false,
         gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
         gitlabKey: existing.gitlabKey ?? "",
         githubToken: answers.githubToken ?? "",
@@ -726,14 +703,6 @@ async function runRbSetup(_args: string[] = []): Promise<void> {
             name: "openaiApiKey",
             message: "OpenAI API Key",
             initial: existing.openaiApiKey ?? "",
-          },
-          {
-            type: "toggle",
-            name: "useCustomStreaming",
-            message: "Use custom streaming (SSE format)",
-            initial: existing.useCustomStreaming ?? false,
-            active: "yes",
-            inactive: "no",
           },
           {
             type: "text",
@@ -778,7 +747,6 @@ async function runRbSetup(_args: string[] = []): Promise<void> {
       const nextConfig: CRConfig = {
         ...existing,
         openaiModel: existing.openaiModel ?? defaultConfig.openaiModel,
-        useCustomStreaming: answers.useCustomStreaming ?? false,
         gitlabUrl: existing.gitlabUrl ?? defaultConfig.gitlabUrl,
         gitlabKey: existing.gitlabKey ?? "",
         rbUrl: answers.rbUrl,

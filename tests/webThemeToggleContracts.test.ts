@@ -1,28 +1,21 @@
 import { describe, expect, it } from "bun:test";
-import { stylesPath, themeTogglePath } from "./webContractPaths";
+import { themeTogglePath } from "./webContractPaths";
 
 describe("web theme toggle contracts", () => {
-  it("renders the theme toggle as an icon button", async () => {
+  it("renders the theme toggle as an icon button with Tailwind classes", async () => {
     const source = await Bun.file(themeTogglePath).text();
 
-    expect(source).toContain('class="cr-theme-btn"');
-    expect(source).toContain("aria-label=${nextLabel}");
-    expect(source).toContain("data-theme=${this.theme}");
-    expect(source).toContain('new CustomEvent("theme-toggle"');
-    expect(source).not.toContain("cr-theme-toggle__track");
-    expect(source).not.toContain("cr-theme-toggle__thumb");
-    expect(source).not.toContain("cr-theme-toggle__label");
-    expect(source).not.toContain("compact");
+    expect(source).toContain("@customElement(\"cr-theme-toggle\")");
+    expect(source).toContain("theme-toggle");
+    expect(source).toContain("SunMedium");
+    expect(source).toContain("MoonStar");
+    expect(source).toContain("isDark");
   });
 
-  it("defines icon button styling with light theme variant", async () => {
-    const source = await Bun.file(stylesPath).text();
+  it("dispatches a theme-toggle event on click", async () => {
+    const source = await Bun.file(themeTogglePath).text();
 
-    expect(source).toContain(".cr-theme-btn {");
-    expect(source).toContain(".cr-theme-btn:hover {");
-    expect(source).toContain('.cr-theme-btn[data-theme="light"]');
-    expect(source).toContain('html[data-theme="cr-light"] .cr-theme-btn {');
-    expect(source).not.toContain(".cr-theme-toggle__track {");
-    expect(source).not.toContain(".cr-theme-toggle__thumb {");
+    expect(source).toContain('new CustomEvent("theme-toggle"');
+    expect(source).toContain("@click=${this.toggle}");
   });
 });

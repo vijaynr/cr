@@ -32,13 +32,13 @@ export class CrCommitsList extends LitElement {
         ${this.commits.map(
           (commit) => html`
             <div
-              class="rounded-[0.55rem] border border-base-100/10 bg-base-300 px-4 py-3.5 flex flex-col gap-1"
+              class="rounded-[0.55rem] border border-foreground/10 bg-muted px-4 py-3.5 flex flex-col gap-1"
             >
               <div class="font-semibold text-sm">${commit.title}</div>
-              <div class="font-mono text-xs text-base-content/40">
+              <div class="font-mono text-xs text-foreground/40">
                 ${commit.id}
               </div>
-              <div class="text-xs text-base-content/50">
+              <div class="text-xs text-foreground/50">
                 ${commit.author || "Unknown author"}${commit.createdAt
                   ? ` · ${commit.createdAt}`
                   : ""}

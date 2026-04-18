@@ -1,30 +1,12 @@
-import DOMPurify from "dompurify";
-import { Marked } from "marked";
+import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
+import "@mariozechner/mini-lit/dist/CodeBlock.js";
 import { html, nothing } from "lit";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-
-const markdownParser = new Marked({
-  async: false,
-  breaks: true,
-  gfm: true,
-});
 
 type MarkdownRenderOptions = {
   className?: string;
   compact?: boolean;
   emptyText?: string;
 };
-
-function joinClasses(...values: Array<string | undefined | false>) {
-  return values.filter(Boolean).join(" ");
-}
-
-function renderMarkdownToHtml(content: string) {
-  const parsed = markdownParser.parse(content) as string;
-  return DOMPurify.sanitize(parsed, {
-    USE_PROFILES: { html: true },
-  });
-}
 
 export function renderMarkdown(
   content: string | null | undefined,
@@ -34,19 +16,19 @@ export function renderMarkdown(
 
   if (!trimmed) {
     return options.emptyText
-      ? html`<p class="text-sm text-base-content/50">${options.emptyText}</p>`
+      ? html`<p class="text-sm text-muted-foreground">${options.emptyText}</p>`
       : nothing;
   }
 
-  return html`
-    <div
-      class=${joinClasses(
-        "cr-markdown",
-        options.compact && "cr-markdown--compact",
-        options.className,
-      )}
-    >
-      ${unsafeHTML(renderMarkdownToHtml(trimmed))}
-    </div>
-  `;
+  const cls = [
+    options.className,
+    options.compact ? "cr-markdown--compact" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return html`<markdown-block
+    .content=${trimmed}
+    class=${cls || nothing}
+  ></markdown-block>`;
 }

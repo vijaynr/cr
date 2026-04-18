@@ -61,7 +61,6 @@ describe("WorkQueue default review agents", () => {
       openaiApiUrl: "https://api.example.com/v1",
       openaiApiKey: "openai-key",
       openaiModel: "gpt-4o",
-      useCustomStreaming: false,
       defaultReviewAgents: ["general", "security"],
     });
 
@@ -96,7 +95,6 @@ describe("WorkQueue default review agents", () => {
       openaiApiUrl: "https://api.example.com/v1",
       openaiApiKey: "openai-key",
       openaiModel: "gpt-4o",
-      useCustomStreaming: false,
       defaultReviewAgents: ["general", "security"],
     });
 

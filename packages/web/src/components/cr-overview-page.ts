@@ -1,6 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Bot, FolderSearch, Settings2, ShieldCheck } from "lucide";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import {
   providerOrder,
   type DashboardData,
@@ -44,7 +45,7 @@ export class CrOverviewPage extends LitElement {
         <div class="cr-fade-in flex flex-col gap-7">
           <div>
             <h1 class="text-2xl font-bold tracking-tight">Overview</h1>
-            <p class="text-base-content/50 text-sm mt-1">
+            <p class="text-foreground/50 text-sm mt-1">
               Loading dashboard…
             </p>
           </div>
@@ -93,28 +94,20 @@ export class CrOverviewPage extends LitElement {
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 class="text-2xl font-bold tracking-tight">Overview</h1>
-            <p class="text-base-content/45 text-sm mt-1">
+            <p class="text-foreground/45 text-sm mt-1">
               Provider readiness, workspace routing, and configuration at a
               glance.
             </p>
           </div>
           <div class="flex gap-2 flex-wrap">
-            <button
-              class="btn btn-primary btn-sm gap-1.5"
-              type="button"
-              @click=${() => this.emitSectionChange(this.activeProvider)}
-            >
-              <cr-icon .icon=${FolderSearch} .size=${14}></cr-icon>
-              Open workspace
-            </button>
-            <button
-              class="btn btn-ghost btn-sm gap-1.5"
-              type="button"
-              @click=${() => this.emitSectionChange("settings")}
-            >
-              <cr-icon .icon=${Settings2} .size=${14}></cr-icon>
-              Settings
-            </button>
+            ${Button({ variant: "default", size: "sm", className: "gap-1.5",
+              onClick: () => this.emitSectionChange(this.activeProvider),
+              children: html`<cr-icon .icon=${FolderSearch} .size=${14}></cr-icon> Open workspace`
+            })}
+            ${Button({ variant: "ghost", size: "sm", className: "gap-1.5",
+              onClick: () => this.emitSectionChange("settings"),
+              children: html`<cr-icon .icon=${Settings2} .size=${14}></cr-icon> Settings`
+            })}
           </div>
         </div>
 

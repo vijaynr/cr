@@ -30,18 +30,11 @@ export type WorkflowRuntime = {
   openaiApiUrl: string;
   openaiApiKey: string;
   openaiModel: string;
-  useCustomStreaming: boolean;
   defaultReviewAgents: string[];
 };
 
 export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
   const config = await loadPVConfig();
-
-  const envCustomStreaming = process.env.USE_CUSTOM_STREAMING;
-  const useCustomStreaming =
-    envCustomStreaming !== undefined
-      ? envCustomStreaming.toLowerCase() === "true"
-      : (config.useCustomStreaming ?? false);
 
   const runtime: WorkflowRuntime = {
     gitlabUrl: envOrConfig("GITLAB_URL", config.gitlabUrl, ""),
@@ -92,7 +85,6 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     openaiApiUrl: envOrConfig("OPENAI_API_URL", config.openaiApiUrl, ""),
     openaiApiKey: envOrConfig("OPENAI_API_KEY", config.openaiApiKey, ""),
     openaiModel: envOrConfig("OPENAI_MODEL", config.openaiModel, "gpt-4o"),
-    useCustomStreaming,
     defaultReviewAgents: config.defaultReviewAgents?.length
       ? config.defaultReviewAgents
       : ["general"],
@@ -115,7 +107,6 @@ export async function loadWorkflowRuntime(): Promise<WorkflowRuntime> {
     openaiApiUrl: runtime.openaiApiUrl,
     openaiApiKey: runtime.openaiApiKey ? "***" : "(not set)",
     openaiModel: runtime.openaiModel,
-    useCustomStreaming: runtime.useCustomStreaming,
     defaultReviewAgents: runtime.defaultReviewAgents,
   });
 
@@ -127,7 +118,6 @@ export function createRuntimeLlmClient(runtime: WorkflowRuntime): LlmClient {
     apiKey: runtime.openaiApiKey,
     apiUrl: runtime.openaiApiUrl,
     model: runtime.openaiModel,
-    useCustomStreaming: runtime.useCustomStreaming,
   });
 }
 

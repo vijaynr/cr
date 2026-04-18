@@ -1,4 +1,5 @@
 import { LitElement, html } from "lit";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
 import type { DashboardRequest, ProviderId } from "../types.js";
 
 function getRequestPrefix(provider: ProviderId, id: DashboardRequest["id"]): string {
@@ -42,18 +43,16 @@ export class CrRequestItem extends LitElement {
   render() {
     return html`
       <a href=${this.item.url} target="_blank" rel="noreferrer" class="block no-underline">
-        <div class="rounded-lg bg-base-300/75 hover:bg-base-200 border border-base-100/10 hover:border-primary/30 transition-all cursor-pointer px-3 py-2.5">
+        <div class="rounded-lg bg-muted/75 hover:bg-card border border-foreground/10 hover:border-primary/30 transition-all cursor-pointer px-3 py-2.5">
           <div class="flex flex-col gap-2">
             <div class="font-semibold text-sm leading-snug break-words">
               <span class="text-primary font-mono text-xs mr-1">${getRequestPrefix(this.provider, this.item.id)}</span>
               ${this.item.title}
             </div>
-            <div class="flex flex-wrap gap-2 text-xs text-base-content/50">
+            <div class="flex flex-wrap gap-2 text-xs text-foreground/50">
               ${this.item.state
                 ? html`
-                    <span class="badge badge-ghost badge-xs">
-                      ${formatLabel(this.item.state)}${this.item.draft ? " · Draft" : ""}
-                    </span>
+                    ${Badge({ variant: "secondary", className: "text-[0.65rem]", children: `${formatLabel(this.item.state)}${this.item.draft ? " · Draft" : ""}` })}
                   `
                 : ""}
               ${this.item.author ? html`<span>${this.item.author}</span>` : ""}

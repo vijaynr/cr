@@ -10,7 +10,6 @@ const configSchema = z.object({
   openaiApiUrl: z.string(),
   openaiApiKey: z.string(),
   openaiModel: z.string(),
-  useCustomStreaming: z.boolean(),
   defaultReviewAgents: z.array(z.string()).optional(),
   gitlabUrl: z.string(),
   gitlabKey: z.string(),
@@ -189,7 +188,6 @@ export async function loadPVConfig(): Promise<Partial<CRConfig>> {
       section.openai_api_key_enc ?? section.openai_api_key ?? ""
     ),
     openaiModel: section.openai_model ?? "",
-    useCustomStreaming: (section.use_custom_streaming ?? "false").toLowerCase() === "true",
     defaultReviewAgents: section.default_review_agents
       ? section.default_review_agents
           .split(",")
@@ -267,7 +265,6 @@ export async function saveCRConfig(config: CRConfig): Promise<void> {
       openai_api_url: parsed.openaiApiUrl,
       ...(encryptedSecrets.openaiApiKey && { openai_api_key_enc: encryptedSecrets.openaiApiKey }),
       openai_model: parsed.openaiModel,
-      use_custom_streaming: parsed.useCustomStreaming ? "true" : "false",
       ...(parsed.defaultReviewAgents?.length && {
         default_review_agents: parsed.defaultReviewAgents.join(","),
       }),

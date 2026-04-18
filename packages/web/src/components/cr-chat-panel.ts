@@ -1,6 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { MessageSquare, RefreshCw, Send } from "lucide";
+import { Alert } from "@mariozechner/mini-lit/dist/Alert.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import type { ReviewChatContext, ReviewChatHistoryEntry } from "../types.js";
 import "./cr-icon.js";
 import { renderMarkdown } from "./render-markdown.js";
@@ -39,9 +41,7 @@ export class CrChatPanel extends LitElement {
     if (!this.canRunWorkflows) {
       return html`
         <div class="cr-chat-shell">
-          <div class="alert alert-warning text-xs">
-            Chat requires a connected repository source.
-          </div>
+          ${Alert({ variant: "default", className: "bg-muted text-xs", children: "Chat requires a connected repository source." })}
         </div>
       `;
     }
@@ -58,17 +58,14 @@ export class CrChatPanel extends LitElement {
               Load the review context to ask questions about risks, test gaps,
               intent, or specific files.
             </div>
-            <button
-              class="btn btn-primary btn-sm gap-1.5 mt-2"
-              type="button"
-              ?disabled=${this.loadingChat}
-              @click=${() => this.emit("load-chat-context")}
-            >
-              ${this.loadingChat
-                ? html`<span class="loading loading-spinner loading-xs"></span>`
-                : html`<cr-icon .icon=${MessageSquare} .size=${14}></cr-icon>`}
-              ${this.loadingChat ? "Loading…" : "Load context"}
-            </button>
+            ${Button({ variant: "default", size: "sm", className: "gap-1.5 mt-2",
+              disabled: this.loadingChat,
+              onClick: () => this.emit("load-chat-context"),
+              children: html`
+                ${this.loadingChat ? html`<span class="cr-spinner cr-spinner--xs"></span>` : html`<cr-icon .icon=${MessageSquare} .size=${14}></cr-icon>`}
+                ${this.loadingChat ? "Loading…" : "Load context"}
+              `
+            })}
           </div>
         </div>
       `;
@@ -81,15 +78,11 @@ export class CrChatPanel extends LitElement {
           <div class="cr-chat-context-bar__text">
             Context loaded
           </div>
-          <button
-            class="btn btn-ghost btn-xs gap-1"
-            type="button"
-            ?disabled=${this.loadingChat}
-            @click=${() => this.emit("load-chat-context")}
-          >
-            <cr-icon .icon=${RefreshCw} .size=${12}></cr-icon>
-            Refresh
-          </button>
+          ${Button({ variant: "ghost", size: "sm", className: "gap-1",
+            disabled: this.loadingChat,
+            onClick: () => this.emit("load-chat-context"),
+            children: html`<cr-icon .icon=${RefreshCw} .size=${12}></cr-icon> Refresh`
+          })}
         </div>
 
         <!-- Message feed -->

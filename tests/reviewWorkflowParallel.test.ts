@@ -103,7 +103,6 @@ mock.module("@pv/core", () =>
       openaiApiUrl: "https://api.example.com/v1",
       openaiApiKey: "openai-key",
       openaiModel: "gpt-4o",
-      useCustomStreaming: false,
       defaultReviewAgents: ["general"],
     }),
     assert: (value: unknown, message: string) => {

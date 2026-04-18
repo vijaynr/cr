@@ -8,7 +8,6 @@ const loadPVConfigMock = mock(async () => ({
   openaiApiUrl: "https://api.example.com/v1",
   openaiApiKey: "openai-key",
   openaiModel: "gpt-4o",
-  useCustomStreaming: false,
   gitlabUrl: "https://gitlab.example.com",
   gitlabKey: "gitlab-key",
   githubToken: "github-token",

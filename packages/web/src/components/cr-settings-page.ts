@@ -1,6 +1,28 @@
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { BrainCircuit, GitBranch, Webhook } from "lucide";
+import {
+  BrainCircuit,
+  Check,
+  ChevronRight,
+  GitBranch,
+  Globe,
+  KeyRound,
+  Lock,
+  Radio,
+  RotateCcw,
+  Save,
+  Server,
+  Shield,
+  Webhook,
+  Zap,
+} from "lucide";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
+import { Checkbox } from "@mariozechner/mini-lit/dist/Checkbox.js";
+import { Select } from "@mariozechner/mini-lit/dist/Select.js";
+import { Switch } from "@mariozechner/mini-lit/dist/Switch.js";
+import { Separator } from "@mariozechner/mini-lit/dist/Separator.js";
+import { Input } from "@mariozechner/mini-lit/dist/Input.js";
 import type {
   DashboardData,
   ReviewAgentOption,
@@ -9,16 +31,11 @@ import type {
 import type { TestConnectionResult } from "../api.js";
 import { isDesktop } from "../desktop-bridge.js";
 import "./cr-icon.js";
-import "./cr-config-input.js";
-
-const sectionEyebrowClass =
-  "text-[0.72rem] font-semibold tracking-[0.08em] text-base-content/40";
 
 type ConfigDraft = {
   openaiApiUrl: string;
   openaiApiKey: string;
   openaiModel: string;
-  useCustomStreaming: boolean;
   defaultReviewAgents: string[];
   gitlabUrl: string;
   gitlabKey: string;
@@ -51,6 +68,14 @@ type TestResults = Partial<
   >
 >;
 
+// ── Tiny helpers ──────────────────────────────────────────────────
+
+function statusDot(ok: boolean) {
+  return html`<span class="inline-block w-2 h-2 rounded-full ${ok ? "bg-emerald-500" : "bg-destructive"} ring-2 ring-background"></span>`;
+}
+
+// ── Component ─────────────────────────────────────────────────────
+
 @customElement("cr-settings-page")
 export class CrSettingsPage extends LitElement {
   @property({ attribute: false }) configDraft!: ConfigDraft;
@@ -61,619 +86,321 @@ export class CrSettingsPage extends LitElement {
   @property({ type: Boolean }) savingConfig = false;
   @property({ type: Boolean }) loadingConfig = false;
 
-  override createRenderRoot() {
-    return this;
-  }
+  override createRenderRoot() { return this; }
 
   private get configDirty() {
-    return (
-      JSON.stringify(this.configDraft) !==
-      JSON.stringify(this.configBaseline)
-    );
+    return JSON.stringify(this.configDraft) !== JSON.stringify(this.configBaseline);
   }
 
   private emit(name: string, detail?: unknown) {
-    this.dispatchEvent(
-      new CustomEvent(name, { detail, bubbles: true, composed: true })
-    );
+    this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
   }
 
-  private handleField<K extends keyof ConfigDraft>(
-    key: K,
-    value: ConfigDraft[K]
-  ) {
+  private handleField<K extends keyof ConfigDraft>(key: K, value: ConfigDraft[K]) {
     this.emit("config-field-change", { key, value });
   }
 
-  private handleAgentDefaultToggle(value: string, checked: boolean) {
-    this.emit("agent-default-toggle", { value, checked });
+  // ── Reusable fragments ──────────────────────────────────────────
+
+  private sectionHeader(icon: unknown, title: string, trailing?: unknown) {
+    return html`
+      <div class="flex items-center gap-3 mb-1">
+        <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground">
+          <cr-icon .icon=${icon} .size=${16}></cr-icon>
+        </div>
+        <h2 class="text-base font-bold tracking-tight text-foreground">${title}</h2>
+        ${trailing || nothing}
+      </div>
+    `;
   }
 
-  private renderTestResult(
-    provider: "gitlab" | "github" | "reviewboard" | "openai"
+  private fieldRow(
+    label: string,
+    note: string,
+    key: keyof ConfigDraft,
+    opts: { type?: string; mono?: boolean } = {}
   ) {
+    return html`
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-semibold tracking-wide uppercase text-muted-foreground">${label}</label>
+        ${Input({
+          size: "sm",
+          type: (opts.type || "text") as "text" | "password",
+          value: String(this.configDraft[key] ?? ""),
+          placeholder: note,
+          className: `w-full ${opts.mono !== false ? "font-mono" : ""}`,
+          onInput: (e) => this.handleField(key, (e.target as HTMLInputElement).value as ConfigDraft[typeof key]),
+        })}
+      </div>
+    `;
+  }
+
+  private testBtn(provider: "gitlab" | "github" | "reviewboard" | "openai") {
     const r = this.testResults[provider];
-    if (!r || r.testing) return "";
+    const testing = r?.testing;
     return html`
-      <span class="text-sm ${r.ok ? "text-success" : "text-error"}">
-        ${r.ok ? "✓" : "✗"} ${r.message}
-      </span>
+      <div class="flex items-center gap-2.5 flex-wrap">
+        ${Button({
+          variant: "outline", size: "sm",
+          disabled: !!testing, loading: !!testing,
+          onClick: () => this.emit("test-connection", provider),
+          children: html`<cr-icon .icon=${Zap} .size=${13}></cr-icon> Verify`
+        })}
+        ${r && !r.testing
+          ? html`<span class="text-xs font-medium font-mono ${r.ok ? "text-emerald-500" : "text-destructive"}">${r.ok ? "✓ Connected" : `✗ ${r.message}`}</span>`
+          : nothing}
+      </div>
     `;
   }
 
-  private renderTestButton(
-    provider: "gitlab" | "github" | "reviewboard" | "openai"
-  ) {
-    const testing = this.testResults[provider]?.testing;
-    return html`
-      <button
-        class="btn btn-outline btn-sm gap-1.5"
-        type="button"
-        ?disabled=${testing}
-        @click=${() => this.emit("test-connection", provider)}
-      >
-        ${testing
-          ? html`<span
-              class="loading loading-spinner loading-xs"
-            ></span>`
-          : ""}
-        Test connection
-      </button>
-    `;
-  }
-
-  private renderProviderBlock(
+  private providerCard(
     name: string,
     enabledKey: "gitlabEnabled" | "githubEnabled" | "reviewboardEnabled",
     testKey: "gitlab" | "github" | "reviewboard",
     configured: boolean | undefined,
-    fields: Array<{
-      label: string;
-      note: string;
-      key: keyof ConfigDraft;
-      type?: string;
-    }>
+    fields: Array<{ label: string; note: string; key: keyof ConfigDraft; type?: string }>
   ) {
+    const enabled = this.configDraft[enabledKey] as boolean;
     return html`
-      <div
-        class="rounded-xl border border-base-300 bg-base-200 divide-y divide-base-300"
-      >
-        <div
-          class="px-6 py-4 flex items-center justify-between gap-3 flex-wrap"
-        >
+      <div class="rounded-lg border border-border bg-card overflow-hidden transition-all
+        ${enabled ? "" : "opacity-60"}">
+        <!-- Header -->
+        <div class="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-border bg-muted/30">
           <div class="flex items-center gap-3">
-            <label class="cursor-pointer flex items-center gap-2.5">
-              <input
-                type="checkbox"
-                class="toggle toggle-sm toggle-primary"
-                .checked=${this.configDraft[enabledKey] as boolean}
-                @change=${(e: Event) =>
-                  this.handleField(
-                    enabledKey,
-                    (e.target as HTMLInputElement).checked
-                  )}
-              />
-              <span class="text-sm font-semibold">${name}</span>
-            </label>
-            <span
-              class="badge ${configured
-                ? "badge-success"
-                : "badge-ghost"} badge-sm"
-            >
-              ${configured ? "Connected" : "Not configured"}
-            </span>
+            ${statusDot(!!configured)}
+            <span class="text-sm font-bold tracking-tight">${name}</span>
+            ${configured
+              ? Badge({ variant: "outline", className: "text-[0.65rem] border-emerald-500/30 text-emerald-500", children: "Connected" })
+              : Badge({ variant: "secondary", className: "text-[0.65rem]", children: "Pending" })}
           </div>
-          ${this.renderTestButton(testKey)}
+          ${Switch({
+            checked: enabled,
+            onChange: (checked) => this.handleField(enabledKey, checked as ConfigDraft[typeof enabledKey])
+          })}
         </div>
-        ${this.testResults[testKey] && !this.testResults[testKey]?.testing
-          ? html`
-              <div class="px-6 py-3">
-                ${this.renderTestResult(testKey)}
-              </div>
-            `
-          : ""}
-        <div class="px-6 py-5">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            ${fields.map(
-              (f) => html`
-                <cr-config-input
-                  .label=${f.label}
-                  .note=${f.note}
-                  .value=${String(this.configDraft[f.key] ?? "")}
-                  .type=${f.type || "text"}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField(
-                      f.key,
-                      e.detail as ConfigDraft[typeof f.key]
-                    )}
-                ></cr-config-input>
-              `
-            )}
+        <!-- Fields -->
+        <div class="px-5 py-4 flex flex-col gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ${fields.map((f) => this.fieldRow(f.label, f.note, f.key, { type: f.type }))}
           </div>
+          ${this.testBtn(testKey)}
         </div>
       </div>
     `;
   }
 
-  private renderWebhookToggle(
+  private webhookRoute(
     name: string,
-    key:
-      | "gitlabWebhookEnabled"
-      | "githubWebhookEnabled"
-      | "reviewboardWebhookEnabled",
+    key: "gitlabWebhookEnabled" | "githubWebhookEnabled" | "reviewboardWebhookEnabled",
     route: string,
     note: string
   ) {
-    const enabled = this.configDraft[key];
-
+    const on = this.configDraft[key];
     return html`
-      <div
-        class="rounded-xl border border-base-300 bg-base-100/60 px-4 py-4 flex flex-col gap-3"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <div class="text-sm font-semibold">${name}</div>
-            <div class="text-xs text-base-content/55">${note}</div>
+      <div class="flex items-center justify-between gap-3 py-2.5">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="inline-block w-1.5 h-1.5 rounded-full flex-none ${on ? "bg-emerald-500" : "bg-muted-foreground/40"}"></span>
+          <div class="min-w-0">
+            <div class="text-sm font-medium truncate">${name}</div>
+            <div class="text-xs text-muted-foreground truncate">${note}</div>
           </div>
-          <input
-            type="checkbox"
-            class="toggle toggle-sm toggle-primary"
-            .checked=${enabled}
-            @change=${(e: Event) =>
-              this.handleField(key, (e.target as HTMLInputElement).checked)}
-          />
         </div>
-        <div class="flex items-center justify-between gap-3 flex-wrap">
-          <code class="text-xs px-2.5 py-1.5 rounded-lg bg-base-300/60"
-            >${route}</code
-          >
-          <span class="badge ${enabled ? "badge-success" : "badge-ghost"} badge-sm">
-            ${enabled ? "Enabled" : "Disabled"}
-          </span>
+        <div class="flex items-center gap-3 shrink-0">
+          <code class="hidden sm:block text-[0.65rem] text-muted-foreground font-mono bg-muted rounded px-1.5 py-0.5">${route}</code>
+          ${Switch({ checked: on, onChange: (checked) => this.handleField(key, checked) })}
         </div>
       </div>
     `;
   }
+
+  // ── Render ──────────────────────────────────────────────────────
 
   render() {
     if (this.loadingConfig && !this.dashboard) {
       return html`
-        <div class="cr-fade-in flex flex-col gap-10 pb-32 md:pb-28">
+        <div class="cr-fade-in flex flex-col gap-8 pb-28">
           <div>
             <h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-            <p class="mt-1 text-sm text-base-content/50">
-              Loading configuration…
-            </p>
+            <p class="mt-1 text-sm text-muted-foreground">Loading configuration…</p>
           </div>
-          <div class="flex flex-col gap-6">
-            ${[1, 2, 3].map(
-              () =>
-                html`<div class="cr-skeleton h-32 rounded-xl"></div>`
-            )}
-          </div>
+          ${[1, 2, 3].map(() => html`<div class="cr-skeleton h-28 rounded-lg"></div>`)}
         </div>
       `;
     }
 
-    const gitlabConfigured = this.dashboard?.config?.gitlab?.configured;
-    const githubConfigured = this.dashboard?.config?.github?.configured;
-    const reviewBoardConfigured =
-      this.dashboard?.config?.reviewboard?.configured;
+    const openai = this.dashboard?.config?.openai;
+    const gl = this.dashboard?.config?.gitlab?.configured;
+    const gh = this.dashboard?.config?.github?.configured;
+    const rb = this.dashboard?.config?.reviewboard?.configured;
+    const wh = this.dashboard?.config?.webhook;
 
     return html`
-      <div class="cr-fade-in flex flex-col gap-10 pb-32 md:pb-28">
-        <!-- Page header -->
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">Settings</h1>
-          <p class="mt-1 text-sm text-base-content/50">
-            Configure providers, AI runtime, webhooks, and server options.
-          </p>
+      <div class="cr-fade-in flex flex-col gap-8 pb-28">
+
+        <!-- ─── Page header ───────────────────────────────────── -->
+        <div class="flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight">Settings</h1>
+            <p class="mt-1 text-sm text-muted-foreground">
+              Configure providers, AI runtime, webhooks, and server options.
+            </p>
+          </div>
+          <!-- Readiness summary pills -->
+          <div class="flex gap-2 flex-wrap">
+            ${this.pill("AI", !!openai?.configured)}
+            ${this.pill("GitLab", !!gl)}
+            ${this.pill("GitHub", !!gh)}
+            ${this.pill("RB", !!rb)}
+          </div>
         </div>
 
-        <!-- AI Section -->
-        <section class="flex flex-col gap-5">
-          <div class="flex items-center gap-2.5">
-            <cr-icon .icon=${BrainCircuit} .size=${18}></cr-icon>
-            <h2 class="text-lg font-semibold">AI</h2>
-            <span
-              class="badge ${this.dashboard?.config?.openai?.configured
-                ? "badge-success"
-                : "badge-error"} badge-sm ml-1"
-            >
-              ${this.dashboard?.config?.openai?.configured
-                ? "Ready"
-                : "Needs setup"}
-            </span>
-          </div>
+        <!-- ─── AI Runtime ────────────────────────────────────── -->
+        <section class="flex flex-col gap-4">
+          ${this.sectionHeader(BrainCircuit, "AI Runtime",
+            openai?.configured
+              ? Badge({ variant: "outline", className: "text-[0.65rem] border-emerald-500/30 text-emerald-500 ml-auto", children: html`<cr-icon .icon=${Check} .size=${11}></cr-icon> Ready` })
+              : Badge({ variant: "destructive", className: "text-[0.65rem] ml-auto", children: "Needs setup" })
+          )}
 
-          <div
-            class="rounded-xl border border-base-300 bg-base-200 divide-y divide-base-300"
-          >
-            <!-- Model & API -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">Model &amp; API</div>
-                <div class=${sectionEyebrowClass}>
-                  OpenAI-compatible endpoint for all AI workflows
+          <div class="rounded-lg border border-border bg-card overflow-hidden">
+            <!-- Endpoint -->
+            <div class="px-5 py-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${Globe} .size=${13}></cr-icon> Endpoint &amp; Model
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${this.fieldRow("API URL", "https://api.openai.com/v1", "openaiApiUrl")}
+                ${this.fieldRow("API key", "sk-…", "openaiApiKey", { type: "password" })}
+                ${this.fieldRow("Model", "gpt-4o", "openaiModel")}
+              </div>
+              ${this.testBtn("openai")}
+            </div>
+
+            ${Separator({})}
+
+            <!-- Behaviour -->
+            <div class="px-5 py-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${Zap} .size=${13}></cr-icon> Behaviour
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-semibold tracking-wide uppercase text-muted-foreground">Terminal theme</label>
+                  ${Select({
+                    value: this.configDraft.terminalTheme || "",
+                    width: "100%", size: "sm",
+                    options: [
+                      { value: "", label: "Auto" },
+                      { value: "light", label: "Light" },
+                      { value: "dark", label: "Dark" },
+                    ],
+                    onChange: (v) => this.handleField("terminalTheme", v as TerminalTheme | "")
+                  })}
                 </div>
-              </div>
-              <div
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                <cr-config-input
-                  label="API URL"
-                  note="Compatible base URL for review, summarize, and chat."
-                  .value=${this.configDraft.openaiApiUrl}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("openaiApiUrl", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="API key"
-                  note="Stored in CR config for all AI workflows."
-                  .value=${this.configDraft.openaiApiKey}
-                  type="password"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("openaiApiKey", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="Model"
-                  note="Default model name for CR review workflows."
-                  .value=${this.configDraft.openaiModel}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("openaiModel", e.detail)}
-                ></cr-config-input>
-              </div>
-              <div class="flex items-center gap-3 flex-wrap">
-                ${this.renderTestButton("openai")}
-                ${this.renderTestResult("openai")}
               </div>
             </div>
 
-            <!-- Options -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">Options</div>
-                <div class=${sectionEyebrowClass}>
-                  Runtime behaviour and terminal rendering
-                </div>
-              </div>
-              <div
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                <div class="form-control gap-1">
-                  <label class="label py-0"
-                    ><span class="label-text text-sm font-medium"
-                      >Terminal theme</span
-                    ></label
-                  >
-                  <div class="text-xs text-base-content/50 mb-1">
-                    Optional override for terminal-facing surfaces.
-                  </div>
-                  <select
-                    class="select select-bordered select-sm"
-                    .value=${this.configDraft.terminalTheme}
-                    @change=${(e: Event) =>
-                      this.handleField(
-                        "terminalTheme",
-                        (e.target as HTMLSelectElement).value as
-                          | TerminalTheme
-                          | ""
-                      )}
-                  >
-                    <option value="">Auto</option>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </div>
-              </div>
-              <label class="cursor-pointer flex items-start gap-3">
-                <input
-                  type="checkbox"
-                  class="checkbox checkbox-sm mt-0.5"
-                  .checked=${this.configDraft.useCustomStreaming}
-                  @change=${(e: Event) =>
-                    this.handleField(
-                      "useCustomStreaming",
-                      (e.target as HTMLInputElement).checked
-                    )}
-                />
-                <div>
-                  <div class="text-sm font-medium">
-                    Use custom streaming
-                  </div>
-                  <div class="text-xs text-base-content/50 mt-0.5">
-                    Enable CR's custom SSE streaming instead of the default
-                    SDK.
-                  </div>
-                </div>
-              </label>
-            </div>
+            ${Separator({})}
 
-            <!-- Default review agents -->
-            <div class="px-6 py-5 flex flex-col gap-4">
-              <div>
-                <div class="text-sm font-semibold">
-                  Default review agents
-                </div>
-                <div class=${sectionEyebrowClass}>
-                  Pre-selected agents when opening the review workflow
-                </div>
+            <!-- Agent defaults -->
+            <div class="px-5 py-4 flex flex-col gap-3">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${Radio} .size=${13}></cr-icon> Default review agents
               </div>
-              <div class="flex flex-wrap gap-2">
-                ${this.agentOptions.map(
-                  (option) => html`
-                    <label
-                      class="cursor-pointer flex items-center gap-1.5 badge badge-ghost badge-lg"
-                    >
-                      <input
-                        type="checkbox"
-                        class="checkbox checkbox-xs"
-                        .checked=${this.configDraft.defaultReviewAgents.includes(
-                          option.value
-                        )}
-                        @change=${(e: Event) =>
-                          this.handleAgentDefaultToggle(
-                            option.value,
-                            (e.target as HTMLInputElement).checked
-                          )}
-                      />
-                      ${option.title}
-                    </label>
-                  `
-                )}
+              <div class="flex flex-wrap gap-3">
+                ${this.agentOptions.map((opt) => html`
+                  <label class="flex items-center gap-2 rounded-lg border border-border px-3 py-2 cursor-pointer transition-colors
+                    ${this.configDraft.defaultReviewAgents.includes(opt.value) ? "bg-primary/5 border-primary/30" : "hover:bg-muted"}">
+                    ${Checkbox({
+                      checked: this.configDraft.defaultReviewAgents.includes(opt.value),
+                      onChange: (c) => this.emit("agent-default-toggle", { value: opt.value, checked: c })
+                    })}
+                    <span class="text-sm font-medium">${opt.title}</span>
+                  </label>
+                `)}
               </div>
             </div>
           </div>
         </section>
 
-        <!-- Source Control Section -->
-        <section class="flex flex-col gap-5">
-          <div class="flex items-center gap-2.5 flex-wrap">
-            <cr-icon .icon=${GitBranch} .size=${18}></cr-icon>
-            <h2 class="text-lg font-semibold">Source Control</h2>
-            <div class="flex gap-1.5 ml-1 flex-wrap">
-              <span
-                class="badge ${gitlabConfigured
-                  ? "badge-success"
-                  : "badge-error"} badge-sm"
-                >GitLab</span
-              >
-              <span
-                class="badge ${githubConfigured
-                  ? "badge-success"
-                  : "badge-error"} badge-sm"
-                >GitHub</span
-              >
-              <span
-                class="badge ${reviewBoardConfigured
-                  ? "badge-success"
-                  : "badge-error"} badge-sm"
-                >Review Board</span
-              >
-            </div>
+        <!-- ─── Source Control ─────────────────────────────────── -->
+        <section class="flex flex-col gap-4">
+          ${this.sectionHeader(GitBranch, "Source Control")}
+          <div class="flex flex-col gap-4">
+            ${this.providerCard("GitLab", "gitlabEnabled", "gitlab", gl, [
+              { label: "URL", note: "https://gitlab.example.com", key: "gitlabUrl" },
+              { label: "Token", note: "glpat-…", key: "gitlabKey", type: "password" },
+            ])}
+            ${this.providerCard("GitHub", "githubEnabled", "github", gh, [
+              { label: "URL", note: "Leave blank for github.com", key: "githubUrl" },
+              { label: "Token", note: "ghp_…", key: "githubToken", type: "password" },
+            ])}
+            ${this.providerCard("Review Board", "reviewboardEnabled", "reviewboard", rb, [
+              { label: "URL", note: "https://reviews.example.com", key: "rbUrl" },
+              { label: "Token", note: "API token", key: "rbToken", type: "password" },
+            ])}
           </div>
-
-          ${this.renderProviderBlock(
-            "GitLab",
-            "gitlabEnabled",
-            "gitlab",
-            gitlabConfigured,
-            [
-              {
-                label: "GitLab URL",
-                note: "Base URL for merge request and inline comment APIs.",
-                key: "gitlabUrl",
-              },
-              {
-                label: "GitLab token",
-                note: "Private token for CR GitLab workflows.",
-                key: "gitlabKey",
-                type: "password",
-              },
-            ]
-          )}
-          ${this.renderProviderBlock(
-            "GitHub",
-            "githubEnabled",
-            "github",
-            githubConfigured,
-            [
-              {
-                label: "GitHub URL",
-                note: "Leave blank for github.com. Set for GitHub Enterprise.",
-                key: "githubUrl",
-              },
-              {
-                label: "GitHub token",
-                note: "PAT to list pull requests and post review comments.",
-                key: "githubToken",
-                type: "password",
-              },
-            ]
-          )}
-          ${this.renderProviderBlock(
-            "Review Board",
-            "reviewboardEnabled",
-            "reviewboard",
-            reviewBoardConfigured,
-            [
-              {
-                label: "Review Board URL",
-                note: "Base URL for review request and diff APIs.",
-                key: "rbUrl",
-              },
-              {
-                label: "Review Board token",
-                note: "Token for review publishing and queue access.",
-                key: "rbToken",
-                type: "password",
-              },
-            ]
-          )}
         </section>
 
-        <!-- Automation Section (hidden in desktop mode) -->
-        ${isDesktop() ? html`` : html`
-        <section class="flex flex-col gap-5">
-          <div class="flex items-center gap-2.5">
-            <cr-icon .icon=${Webhook} .size=${18}></cr-icon>
-            <h2 class="text-lg font-semibold">Automation</h2>
-            <span
-              class="badge ${this.dashboard?.config?.webhook?.sslEnabled
-                ? "badge-success"
-                : "badge-ghost"} badge-sm ml-1"
-            >
-              ${this.dashboard?.config?.webhook?.sslEnabled
-                ? "SSL enabled"
-                : "HTTP only"}
-            </span>
-          </div>
+        <!-- ─── Automation (hidden in desktop) ─────────────────── -->
+        ${isDesktop() ? nothing : html`
+        <section class="flex flex-col gap-4">
+          ${this.sectionHeader(Webhook, "Automation",
+            wh?.sslEnabled
+              ? Badge({ variant: "outline", className: "text-[0.65rem] border-emerald-500/30 text-emerald-500 ml-auto", children: html`<cr-icon .icon=${Lock} .size=${11}></cr-icon> SSL` })
+              : Badge({ variant: "secondary", className: "text-[0.65rem] ml-auto", children: "HTTP" })
+          )}
 
-          <div
-            class="rounded-xl border border-base-300 bg-base-200 divide-y divide-base-300"
-          >
-            <!-- Webhook secrets -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">Webhook routes</div>
-                <div class=${sectionEyebrowClass}>
-                  Turn incoming automation on or off per provider without
-                  disabling the provider workspace itself
-                </div>
+          <div class="rounded-lg border border-border bg-card overflow-hidden">
+            <!-- Routes -->
+            <div class="px-5 py-4 flex flex-col gap-1">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground mb-2">
+                <cr-icon .icon=${ChevronRight} .size=${13}></cr-icon> Webhook routes
               </div>
-              <div
-                class="grid grid-cols-1 lg:grid-cols-3 gap-4"
-              >
-                ${this.renderWebhookToggle(
-                  "GitLab webhook",
-                  "gitlabWebhookEnabled",
-                  "/webhook/gitlab",
-                  "Accept merge request events from GitLab."
-                )}
-                ${this.renderWebhookToggle(
-                  "GitHub webhook",
-                  "githubWebhookEnabled",
-                  "/webhook/github",
-                  "Accept pull request events from GitHub or GitHub Enterprise."
-                )}
-                ${this.renderWebhookToggle(
-                  "Review Board webhook",
-                  "reviewboardWebhookEnabled",
-                  "/webhook/reviewboard",
-                  "Accept review_request_published events from Review Board."
-                )}
+              ${this.webhookRoute("GitLab", "gitlabWebhookEnabled", "/webhook/gitlab", "Merge request events")}
+              ${this.webhookRoute("GitHub", "githubWebhookEnabled", "/webhook/github", "Pull request events")}
+              ${this.webhookRoute("Review Board", "reviewboardWebhookEnabled", "/webhook/reviewboard", "Review published events")}
+            </div>
+
+            ${Separator({})}
+
+            <!-- Secrets -->
+            <div class="px-5 py-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${KeyRound} .size=${13}></cr-icon> Webhook secrets
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${this.fieldRow("GitLab secret", "Optional shared secret", "gitlabWebhookSecret", { type: "password" })}
+                ${this.fieldRow("GitHub secret", "Optional shared secret", "githubWebhookSecret", { type: "password" })}
+                ${this.fieldRow("RB secret", "Optional shared secret", "rbWebhookSecret", { type: "password" })}
               </div>
             </div>
 
-            <!-- Webhook secrets -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">Webhook secrets</div>
-                <div class=${sectionEyebrowClass}>
-                  Optional shared secrets to validate incoming webhook
-                  payloads
-                </div>
+            ${Separator({})}
+
+            <!-- Queue -->
+            <div class="px-5 py-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${Server} .size=${13}></cr-icon> Queue &amp; timeouts
               </div>
-              <div
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                <cr-config-input
-                  label="GitLab webhook secret"
-                  note="Shared secret for GitLab webhook events."
-                  .value=${this.configDraft.gitlabWebhookSecret}
-                  type="password"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("gitlabWebhookSecret", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="GitHub webhook secret"
-                  note="Shared secret for GitHub webhook events."
-                  .value=${this.configDraft.githubWebhookSecret}
-                  type="password"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("githubWebhookSecret", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="Review Board webhook secret"
-                  note="Shared secret for Review Board webhook events."
-                  .value=${this.configDraft.rbWebhookSecret}
-                  type="password"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("rbWebhookSecret", e.detail)}
-                ></cr-config-input>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                ${this.fieldRow("Concurrency", "3", "webhookConcurrency", { mono: true })}
+                ${this.fieldRow("Queue limit", "50", "webhookQueueLimit", { mono: true })}
+                ${this.fieldRow("Timeout (ms)", "600000", "webhookJobTimeoutMs", { mono: true })}
               </div>
             </div>
 
-            <!-- Queue settings -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">Queue settings</div>
-                <div class=${sectionEyebrowClass}>
-                  Control parallelism, backlog size, and job timeouts
-                </div>
-              </div>
-              <div
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                <cr-config-input
-                  label="Concurrency"
-                  note="Number of parallel webhook jobs."
-                  .value=${this.configDraft.webhookConcurrency}
-                  input-mode="numeric"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("webhookConcurrency", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="Queue limit"
-                  note="Max queued jobs before rejection."
-                  .value=${this.configDraft.webhookQueueLimit}
-                  input-mode="numeric"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("webhookQueueLimit", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="Timeout (ms)"
-                  note="Per-job execution timeout."
-                  .value=${this.configDraft.webhookJobTimeoutMs}
-                  input-mode="numeric"
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("webhookJobTimeoutMs", e.detail)}
-                ></cr-config-input>
-              </div>
-            </div>
+            ${Separator({})}
 
             <!-- SSL -->
-            <div class="px-6 py-5 flex flex-col gap-5">
-              <div>
-                <div class="text-sm font-semibold">SSL / HTTPS</div>
-                <div class=${sectionEyebrowClass}>
-                  Certificate paths for enabling HTTPS on the server
-                </div>
+            <div class="px-5 py-4 flex flex-col gap-4">
+              <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                <cr-icon .icon=${Shield} .size=${13}></cr-icon> SSL / HTTPS
               </div>
-              <div
-                class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-              >
-                <cr-config-input
-                  label="SSL cert path"
-                  note="Certificate file path for HTTPS."
-                  .value=${this.configDraft.sslCertPath}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("sslCertPath", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="SSL key path"
-                  note="Private key file path for HTTPS."
-                  .value=${this.configDraft.sslKeyPath}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("sslKeyPath", e.detail)}
-                ></cr-config-input>
-                <cr-config-input
-                  label="SSL CA path"
-                  note="CA file path for custom trust chain."
-                  .value=${this.configDraft.sslCaPath}
-                  @value-change=${(e: CustomEvent) =>
-                    this.handleField("sslCaPath", e.detail)}
-                ></cr-config-input>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                ${this.fieldRow("Cert path", "/path/to/cert.pem", "sslCertPath", { mono: true })}
+                ${this.fieldRow("Key path", "/path/to/key.pem", "sslKeyPath", { mono: true })}
+                ${this.fieldRow("CA path", "/path/to/ca.pem", "sslCaPath", { mono: true })}
               </div>
             </div>
           </div>
@@ -681,42 +408,44 @@ export class CrSettingsPage extends LitElement {
         `}
       </div>
 
-      <!-- Sticky footer -->
-      <div
-        class="cr-settings-footer fixed bottom-0 bg-base-200/95 backdrop-blur-sm border-t border-base-300 z-20"
-      >
-        <div class="cr-settings-footer__inner">
-          <div class="cr-settings-footer__status text-xs text-base-content/50">
+      <!-- ─── Sticky footer ─────────────────────────────────── -->
+      <div class="cr-settings-footer">
+        <div class="flex items-center gap-4 justify-between mx-auto max-w-[min(100%,140rem)] px-5 py-3">
+          <div class="flex-1 min-w-0 text-xs text-muted-foreground font-medium">
             ${this.configDirty
-              ? html`<span class="text-warning font-semibold"
-                  >● Unsaved changes</span
-                >`
-              : ""}
+              ? html`<span class="inline-flex items-center gap-1.5 text-amber-500 font-semibold">
+                  <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Unsaved changes
+                </span>`
+              : html`<span class="text-muted-foreground/60">All changes saved</span>`}
           </div>
-          <div class="cr-settings-footer__actions">
-            <button
-              class="btn btn-ghost btn-sm"
-              type="button"
-              ?disabled=${this.savingConfig || !this.configDirty}
-              @click=${() => this.emit("config-reset")}
-            >
-              Reset
-            </button>
-            <button
-              class="btn btn-primary btn-sm gap-1.5"
-              type="button"
-              ?disabled=${this.savingConfig || !this.configDirty}
-              @click=${() => this.emit("config-save")}
-            >
-              ${this.savingConfig
-                ? html`<span
-                    class="loading loading-spinner loading-xs"
-                  ></span>`
-                : ""}
-              Save configuration
-            </button>
+          <div class="flex gap-2">
+            ${Button({ variant: "ghost", size: "sm", className: "gap-1.5",
+              disabled: this.savingConfig || !this.configDirty,
+              onClick: () => this.emit("config-reset"),
+              children: html`<cr-icon .icon=${RotateCcw} .size=${13}></cr-icon> Reset`
+            })}
+            ${Button({ variant: "default", size: "sm", className: "gap-1.5",
+              disabled: this.savingConfig || !this.configDirty,
+              loading: this.savingConfig,
+              onClick: () => this.emit("config-save"),
+              children: html`<cr-icon .icon=${Save} .size=${13}></cr-icon> Save`
+            })}
           </div>
         </div>
+      </div>
+    `;
+  }
+
+  // Readiness pill for the page header
+  private pill(label: string, ok: boolean) {
+    return html`
+      <div class="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.65rem] font-semibold tracking-wide
+        ${ok
+          ? "border-emerald-500/25 text-emerald-500 bg-emerald-500/5"
+          : "border-destructive/25 text-destructive bg-destructive/5"}">
+        ${statusDot(ok)}
+        ${label}
       </div>
     `;
   }

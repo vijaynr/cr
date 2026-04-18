@@ -98,7 +98,6 @@ function getBaseConfig(existing: Partial<CRConfig>): CRConfig {
     openaiApiUrl: existing.openaiApiUrl || defaultConfig.openaiApiUrl,
     openaiApiKey: existing.openaiApiKey || "",
     openaiModel: existing.openaiModel || defaultConfig.openaiModel,
-    useCustomStreaming: existing.useCustomStreaming ?? false,
     defaultReviewAgents: existing.defaultReviewAgents,
     gitlabUrl: existing.gitlabUrl || defaultConfig.gitlabUrl,
     gitlabKey: existing.gitlabKey || "",

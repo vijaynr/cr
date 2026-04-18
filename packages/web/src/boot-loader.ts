@@ -57,14 +57,14 @@ export function getBootLoaderStyles(): string {
   animation: boot-spin 0.7s linear infinite;
 }
 
-[data-theme="cr-black"] .boot-spinner {
+.dark .boot-spinner {
   border-top-color: #7dd3fc;
   border-right-color: rgba(125, 211, 252, 0.3);
   border-bottom-color: rgba(125, 211, 252, 0.14);
   box-shadow: 0 0 24px rgba(56, 189, 248, 0.18);
 }
 
-[data-theme="cr-light"] .boot-spinner {
+:root:not(.dark) .boot-spinner {
   border-top-color: #2563eb;
   border-right-color: rgba(37, 99, 235, 0.28);
   border-bottom-color: rgba(37, 99, 235, 0.14);

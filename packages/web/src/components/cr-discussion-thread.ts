@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { ArrowUpRight, Check, Pencil, Reply, Trash2, X } from "lucide";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import type { ReviewDiscussionMessage, ReviewDiscussionThread } from "../types.js";
 import { renderMarkdown } from "./render-markdown.js";
 import "./cr-icon.js";
@@ -135,7 +136,7 @@ export class CrDiscussionThread extends LitElement {
             ${thread.messages[0]?.url
               ? html`
                   <a
-                    class="cr-discussion-thread__action cr-discussion-thread__action--secondary"
+                    class="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
                     href=${thread.messages[0].url}
                     target="_blank"
                     rel="noreferrer"
@@ -146,9 +147,9 @@ export class CrDiscussionThread extends LitElement {
             ${thread.replyable
               ? html`
                   <button
-                    class="cr-discussion-thread__action ${replying
-                      ? "cr-discussion-thread__action--primary"
-                      : "cr-discussion-thread__action--secondary"}"
+                    class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${replying
+                      ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                      : "border-border text-foreground hover:bg-muted"}"
                     type="button"
                     @click=${() => {
                       if (replying) {
@@ -226,7 +227,7 @@ export class CrDiscussionThread extends LitElement {
                       >`
                     : ""}
                 </div>
-                <div class="cr-discussion-message__actions">
+                <div class="flex flex-wrap items-center gap-2">
                   ${message.url
                     ? html`
                         <a
@@ -260,7 +261,7 @@ export class CrDiscussionThread extends LitElement {
     return html`
       <button
         type="button"
-        class="cr-discussion-thread__action cr-discussion-thread__action--secondary"
+        class="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
         ?disabled=${disabled}
         @click=${() =>
           this.emit("start-edit-discussion-message", { thread, message })}
@@ -270,7 +271,7 @@ export class CrDiscussionThread extends LitElement {
       </button>
       <button
         type="button"
-        class="cr-discussion-thread__action cr-discussion-thread__action--secondary"
+        class="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
         ?disabled=${disabled}
         @click=${() =>
           this.emit("delete-discussion-message", {
@@ -279,7 +280,7 @@ export class CrDiscussionThread extends LitElement {
           })}
       >
         ${isDeleting
-          ? html`<span class="loading loading-spinner loading-xs"></span>`
+          ? html`<span class="cr-spinner cr-spinner--xs"></span>`
           : html`<cr-icon .icon=${Trash2} .size=${12}></cr-icon>`}
         Delete
       </button>
@@ -296,7 +297,7 @@ export class CrDiscussionThread extends LitElement {
       return html`
         <div class="cr-discussion-message__bubble">
           ${renderMarkdown(message.body, {
-            className: "cr-discussion-message__markdown cr-markdown--muted",
+            className: "cr-markdown--muted",
             compact: true,
             emptyText: "No comment body.",
           })}
@@ -317,7 +318,7 @@ export class CrDiscussionThread extends LitElement {
         }}
       >
         <textarea
-          class="textarea textarea-bordered textarea-sm min-h-24 text-sm w-full"
+          class="cr-textarea min-h-24 text-sm w-full"
           rows="4"
           .value=${this.editingDraft}
           @input=${(e: Event) =>
@@ -327,23 +328,15 @@ export class CrDiscussionThread extends LitElement {
             )}
         ></textarea>
         <div class="cr-discussion-edit__footer">
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            @click=${() => this.emit("cancel-edit-discussion-message")}
-          >
-            Cancel
-          </button>
-          <button
-            class="btn btn-primary btn-sm gap-1.5"
-            type="submit"
-            ?disabled=${this.savingEdit || !this.editingDraft.trim()}
-          >
-            ${this.savingEdit
-              ? html`<span class="loading loading-spinner loading-xs"></span>`
-              : html`<cr-icon .icon=${Check} .size=${12}></cr-icon>`}
-            Save
-          </button>
+          ${Button({ variant: "ghost", size: "sm",
+            onClick: () => this.emit("cancel-edit-discussion-message"),
+            children: "Cancel"
+          })}
+          ${Button({ variant: "default", size: "sm", className: "gap-1.5", type: "submit",
+            disabled: this.savingEdit || !this.editingDraft.trim(),
+            loading: this.savingEdit,
+            children: this.savingEdit ? "Saving…" : html`<cr-icon .icon=${Check} .size=${12}></cr-icon> Save`
+          })}
         </div>
       </form>
     `;
@@ -363,7 +356,7 @@ export class CrDiscussionThread extends LitElement {
         }}
       >
         <textarea
-          class="textarea textarea-bordered textarea-sm min-h-24 text-sm w-full"
+          class="cr-textarea min-h-24 text-sm w-full"
           rows="4"
           placeholder="Write a reply"
           .value=${this.discussionReplyDraft}
@@ -375,26 +368,15 @@ export class CrDiscussionThread extends LitElement {
           }}
         ></textarea>
         <div class="cr-discussion-reply__footer">
-          <button
-            class="btn btn-ghost btn-sm"
-            type="button"
-            @click=${() => this.emit("cancel-reply")}
-          >
-            Cancel
-          </button>
-          <button
-            class="btn btn-primary btn-sm gap-1.5"
-            type="submit"
-            ?disabled=${this.postingReply ||
-            !this.discussionReplyDraft.trim()}
-          >
-            ${this.postingReply
-              ? html`<span
-                  class="loading loading-spinner loading-xs"
-                ></span>`
-              : ""}
-            Post reply
-          </button>
+          ${Button({ variant: "ghost", size: "sm",
+            onClick: () => this.emit("cancel-reply"),
+            children: "Cancel"
+          })}
+          ${Button({ variant: "default", size: "sm", className: "gap-1.5", type: "submit",
+            disabled: this.postingReply || !this.discussionReplyDraft.trim(),
+            loading: this.postingReply,
+            children: "Post reply"
+          })}
         </div>
       </form>
     `;

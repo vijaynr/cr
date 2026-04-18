@@ -118,7 +118,6 @@ mock.module("@pv/core", () =>
       openaiApiUrl: "https://api.openai.com/v1",
       openaiApiKey: "openai-token",
       openaiModel: "gpt-4o",
-      useCustomStreaming: false,
     })),
     isSvnWorkingCopy: isSvnWorkingCopyMock,
     getSvnDiff: getSvnDiffMock,

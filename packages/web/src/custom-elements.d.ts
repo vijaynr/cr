@@ -1,3 +1,6 @@
+import type { Sidebar } from "@mariozechner/mini-lit/dist/Sidebar.js";
+import type { MarkdownBlock } from "@mariozechner/mini-lit/dist/MarkdownBlock.js";
+import type { CodeBlock } from "@mariozechner/mini-lit/dist/CodeBlock.js";
 import type { CrToastNotification } from "./components/cr-toast-notification.js";
 import type { CrThemeToggle } from "./components/cr-theme-toggle.js";
 import type { CrConfigInput } from "./components/cr-config-input.js";
@@ -20,6 +23,9 @@ import type { CrDashboardApp } from "./components/cr-dashboard-app.js";
 
 declare global {
   interface HTMLElementTagNameMap {
+    "mini-sidebar": Sidebar;
+    "markdown-block": MarkdownBlock;
+    "code-block": CodeBlock;
     "cr-toast-notification": CrToastNotification;
     "cr-theme-toggle": CrThemeToggle;
     "cr-config-input": CrConfigInput;

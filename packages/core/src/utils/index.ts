@@ -94,7 +94,6 @@ export {
 export { type RpiTarget, setupRpi } from "./rpi.js";
 // Specs exports
 export { type SpecTarget, setupSpecs } from "./specs.js";
-export { parseCRSseStream } from "./streamParser.js";
 export { resolveSvnFileUrl, svnGetFile } from "./svn.js";
 export {
   getSvnDiff,

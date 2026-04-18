@@ -4,7 +4,7 @@
 
 PeerView is a desktop-first code review workspace. The UI should feel like a focused review console rather than a general productivity app or a marketing surface.
 
-This file is the visual and interaction brief for generating or editing PeerView UI. It is based on the current implementation in `packages/web/src/styles.css` and `packages/web/src/styles.ts`.
+This file is the visual and interaction brief for generating or editing PeerView UI. It is based on the current implementation using `@mariozechner/mini-lit` components with shadcn/ui theming and Tailwind CSS v4.
 
 ## Product Surface
 
@@ -42,88 +42,59 @@ Avoid:
 
 ## Themes
 
-PeerView has two themes:
+PeerView uses the shadcn/ui default theme provided by `@mariozechner/mini-lit`:
 
-- `cr-black` as the default dark theme
-- `cr-light` as the optional light theme
+- Dark mode is the default (`.dark` class on `<html>`)
+- Light mode activates when the `.dark` class is removed
+- Theme switching is handled by toggling the `.dark` class and persisting the preference to localStorage
 
-Both themes should preserve the same structure, spacing, and interaction model. Light mode is not a separate aesthetic direction; it is the same product translated into a lighter environment.
+Both themes are defined entirely through shadcn CSS variables (`--background`, `--foreground`, `--card`, `--primary`, `--muted`, `--border`, etc.) — no custom color overrides.
 
 ## Color System
 
-### Dark Theme
+PeerView uses the shadcn/ui neutral color palette from `@mariozechner/mini-lit/styles/themes/default.css`. All colors are referenced through CSS variables and Tailwind utility classes:
 
-Base colors:
+### Core tokens
 
-- `--color-base-100: oklch(18.5% 0.008 260)`
-- `--color-base-200: oklch(21.5% 0.009 260)`
-- `--color-base-300: oklch(25.5% 0.01 260)`
-- `--color-base-content: oklch(91% 0.006 260)`
+- `--background` / `--foreground` — page background and default text
+- `--card` / `--card-foreground` — card surfaces
+- `--muted` / `--muted-foreground` — secondary surfaces and subdued text
+- `--primary` / `--primary-foreground` — interactive elements
+- `--secondary` / `--secondary-foreground` — subtle buttons and labels
+- `--accent` / `--accent-foreground` — hover highlights
+- `--destructive` / `--destructive-foreground` — error states
+- `--border` — default border color
+- `--input` — form input borders
+- `--ring` — focus ring color
+- `--radius` — border radius token
 
-Semantic colors:
+### Custom semantic tokens
 
-- `--color-primary: oklch(68% 0.14 248)`
-- `--color-secondary: oklch(66% 0.09 205)`
-- `--color-accent: oklch(76% 0.1 95)`
-- `--color-info: oklch(72% 0.09 232)`
-- `--color-success: oklch(73% 0.11 158)`
-- `--color-warning: oklch(80% 0.12 85)`
-- `--color-error: oklch(65% 0.17 22)`
+These are defined as custom CSS in `styles.css` since shadcn does not include success/warning:
 
-Dark theme background:
-
-- top radial blue glow fading into deep blue-black
-- linear gradient from `#141822` to `#0c1018`
-
-Dark theme supporting tokens:
-
-- subtle borders from `rgb(255 255 255 / 0.06)` to `rgb(255 255 255 / 0.12)`
-- surface overlay `rgb(255 255 255 / 0.03)`
-- shadows that stay soft and close to the surface
-
-### Light Theme
-
-Base colors:
-
-- `--color-base-100: oklch(97.8% 0.014 78)`
-- `--color-base-200: oklch(95.4% 0.02 85)`
-- `--color-base-300: oklch(90.8% 0.03 236)`
-- `--color-base-content: oklch(28% 0.03 248)`
-
-Semantic colors:
-
-- `--color-primary: oklch(55% 0.18 255)`
-- `--color-secondary: oklch(64% 0.11 196)`
-- `--color-accent: oklch(76% 0.14 66)`
-- `--color-info: oklch(66% 0.12 240)`
-- `--color-success: oklch(67% 0.13 160)`
-- `--color-warning: oklch(78% 0.15 78)`
-- `--color-error: oklch(63% 0.2 28)`
-
-Light theme background:
-
-- layered radial blue, orange, and teal glows
-- warm off-white to cool paper gradient
-- overall tone should feel editorial and airy, not stark white
-
-Light theme supporting tokens:
-
-- border system uses cool slate values with blue emphasis for elevated states
-- stronger ambient shadows than dark mode, but still soft
+- Green status: `oklch(0.72 0.17 162)` (used for success states via `.cr-status-dot--ready`)
+- Yellow status: `oklch(0.75 0.18 85)` (pending via `.cr-status-dot--pending`)
+- Red status: `var(--destructive)` (missing/error states)
 
 ## Typography
 
 Primary typeface:
 
-- `Manrope`
+- `Manrope` — used for all UI text, labels, headings, and body copy
+- Bundled via `@fontsource/manrope` (weights: 400, 500, 600, 700)
 
-Fallback stack:
+Monospace typeface:
 
-- `"Avenir Next", "Segoe UI", sans-serif`
+- `IBM Plex Mono` — used for all code, paths, diff content, and technical metadata
+- Bundled via `@fontsource/ibm-plex-mono` (weights: 400, 400-italic, 500, 600, 700)
 
-Monospace:
+No other typefaces are used. Both fonts are self-hosted and bundled with the application — there are no external font requests and no system-font fallbacks beyond the generic `sans-serif` and `monospace` keywords as a last-resort safety net.
 
-- system monospace stack for code, paths, and technical metadata
+CSS variables:
+
+- `--cr-font-sans: "Manrope", sans-serif`
+- `--cr-font-display: var(--cr-font-sans)`
+- `--cr-font-mono: "IBM Plex Mono", monospace`
 
 Typography direction:
 
@@ -485,16 +456,10 @@ Avoid:
 
 This document is grounded in:
 
-- `packages/web/src/styles.css`
-- `packages/web/src/styles.ts`
+- `@mariozechner/mini-lit` — UI component library with shadcn/ui theming
+- `packages/web/src/styles.css` — minimal custom CSS (spinner, textarea, diff viewer, discussions, chat)
+- Tailwind CSS v4 utility classes applied directly in component templates
 
-Specific implementation cues already present:
-
-- gradient application background
-- dark glass sidebar with blur
-- compact segmented tabs
-- collapsible cards with internal scroll areas
-- restrained toast animation
-- muted diff background highlights with blue active-line outline
+All component styling uses Tailwind utilities with shadcn color tokens (`bg-card`, `text-foreground`, `border-border`, etc.) directly in the Lit templates. The custom stylesheet is kept minimal (~400 lines) for structural components that require multi-rule CSS (diff viewer, chat, discussions).
 
 If the UI evolves, update this file when the visual system changes, not just when a single screen changes.

@@ -1,6 +1,8 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { Bot, Sparkles, X } from "lucide";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import type {
   ProviderId,
   ProviderRepositoryOption,
@@ -26,8 +28,6 @@ export class CrAnalysisRail extends LitElement {
   @property({ type: Boolean }) open = false;
   @property({ attribute: false }) selectedRepository: ProviderRepositoryOption | null = null;
   @property({ type: Boolean }) canRunWorkflows = false;
-
-  // Review panel props
   @property({ attribute: false }) agentOptions: ReviewAgentOption[] = [];
   @property({ attribute: false }) selectedAgents: string[] = [];
   @property({ type: Boolean }) inlineCommentsEnabled = true;
@@ -36,25 +36,17 @@ export class CrAnalysisRail extends LitElement {
   @property({ type: Boolean }) postingGeneratedReview = false;
   @property({ attribute: false }) reviewResult: ReviewWorkflowResult | null = null;
   @property({ attribute: false }) reviewWarnings: string[] = [];
-
-  // Summary panel props
   @property({ type: Boolean }) runningSummary = false;
   @property({ attribute: false }) summaryResult: ReviewWorkflowResult | null = null;
-
-  // Chat panel props
   @property({ attribute: false }) chatContext: ReviewChatContext | null = null;
   @property({ attribute: false }) chatHistory: ReviewChatHistoryEntry[] = [];
   @property() chatQuestion = "";
   @property({ type: Boolean }) loadingChat = false;
 
-  override createRenderRoot() {
-    return this;
-  }
+  override createRenderRoot() { return this; }
 
   private emit(name: string, detail?: unknown) {
-    this.dispatchEvent(
-      new CustomEvent(name, { detail, bubbles: true, composed: true })
-    );
+    this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
   }
 
   private formatLabel(value: string) {
@@ -68,27 +60,30 @@ export class CrAnalysisRail extends LitElement {
 
     return html`
       <section
-        class="cr-assistant-overlay"
-        data-open=${String(this.open)}
+        class="fixed inset-0 z-40 ${this.open ? "pointer-events-auto" : "pointer-events-none"}"
         aria-hidden=${String(!this.open)}
       >
         <button
           type="button"
-          class="cr-assistant-overlay__backdrop"
+          class="absolute inset-0 bg-black/40 transition-opacity duration-200 border-0
+            ${this.open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}"
           ?disabled=${!this.open}
           aria-label="Close AI Assistant"
           @click=${() => this.emit("close-analysis-panel")}
         ></button>
 
-        <aside class="cr-assistant-overlay__panel">
-          <header class="cr-assistant-overlay__header">
-            <div class="cr-assistant-overlay__header-copy">
-              <div class="cr-assistant-overlay__eyebrow">
+        <aside class="absolute top-0 right-0 h-dvh w-[min(38rem,100vw-1rem)] bg-card border-l border-border
+          flex flex-col overflow-hidden shadow-xl transition-all duration-300
+          ${this.open ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8 pointer-events-none"}">
+
+          <header class="flex items-start justify-between gap-3 p-4 border-b border-border">
+            <div class="flex flex-col gap-1 min-w-0">
+              <div class="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                 <cr-icon .icon=${Sparkles} .size=${13}></cr-icon>
                 ${detail ? "Merge request context" : "Assistant ready"}
               </div>
-              <h2 class="cr-assistant-overlay__title">AI Assistant</h2>
-              <div class="cr-assistant-overlay__subtitle">
+              <h2 class="text-lg font-bold text-foreground leading-tight">AI Assistant</h2>
+              <div class="text-sm text-muted-foreground">
                 ${detail
                   ? `Loaded for ${label} ${detail.provider === "gitlab" ? `!${detail.id}` : `#${detail.id}`} · ${detail.title}`
                   : this.selectedRepository
@@ -98,35 +93,32 @@ export class CrAnalysisRail extends LitElement {
             </div>
             <div class="flex items-center gap-2 shrink-0">
               ${detail
-                ? html`<div class="badge badge-primary badge-sm">${label}</div>`
-                : html`<div class="badge badge-ghost badge-sm">Standby</div>`}
-              <button
-                class="btn btn-ghost btn-sm btn-square"
-                type="button"
-                @click=${() => this.emit("close-analysis-panel")}
-                aria-label="Close AI Assistant"
-                title="Close AI Assistant"
-              >
-                <cr-icon .icon=${X} .size=${16}></cr-icon>
-              </button>
+                ? Badge({ variant: "default", className: "text-xs", children: label })
+                : Badge({ variant: "secondary", className: "text-xs", children: "Standby" })}
+              ${Button({ variant: "ghost", size: "icon",
+                onClick: () => this.emit("close-analysis-panel"),
+                title: "Close AI Assistant",
+                children: html`<cr-icon .icon=${X} .size=${16}></cr-icon>`
+              })}
             </div>
           </header>
 
-          <nav class="cr-panel-tabs">
+          <nav class="flex border-b border-border bg-muted/50 px-1">
             ${(["review", "summary", "chat"] as AnalysisTab[]).map(
               (tab) => html`
                 <button
                   type="button"
-                  class="cr-panel-tab ${this.analysisTab === tab ? "cr-panel-tab--active" : ""}"
+                  class="px-3 py-2 text-xs font-medium transition-colors
+                    ${this.analysisTab === tab
+                      ? "text-foreground bg-card border-b-2 border-primary"
+                      : "text-muted-foreground hover:text-foreground"}"
                   @click=${() => this.emit("analysis-tab-change", tab)}
-                >
-                  ${this.formatLabel(tab)}
-                </button>
+                >${this.formatLabel(tab)}</button>
               `
             )}
           </nav>
 
-          <div class="cr-assistant-overlay__content">
+          <div class="flex flex-col flex-auto min-h-0 p-4 overflow-hidden">
             ${!detail
               ? html`
                   <div class="cr-empty-state" style="min-height:12rem">
@@ -140,36 +132,23 @@ export class CrAnalysisRail extends LitElement {
                   </div>
                 `
               : this.analysisTab === "review"
-                ? html`
-                    <cr-review-panel
-                      .agentOptions=${this.agentOptions}
-                      .selectedAgents=${this.selectedAgents}
-                      .inlineCommentsEnabled=${this.inlineCommentsEnabled}
-                      .feedbackDraft=${this.feedbackDraft}
-                      .runningReview=${this.runningReview}
-                      .postingGeneratedReview=${this.postingGeneratedReview}
-                      .reviewResult=${this.reviewResult}
-                      .reviewWarnings=${this.reviewWarnings}
-                      .canRunWorkflows=${this.canRunWorkflows}
-                    ></cr-review-panel>
-                  `
+                ? html`<cr-review-panel
+                    .agentOptions=${this.agentOptions} .selectedAgents=${this.selectedAgents}
+                    .inlineCommentsEnabled=${this.inlineCommentsEnabled} .feedbackDraft=${this.feedbackDraft}
+                    .runningReview=${this.runningReview} .postingGeneratedReview=${this.postingGeneratedReview}
+                    .reviewResult=${this.reviewResult} .reviewWarnings=${this.reviewWarnings}
+                    .canRunWorkflows=${this.canRunWorkflows}
+                  ></cr-review-panel>`
                 : this.analysisTab === "summary"
-                  ? html`
-                      <cr-summary-panel
-                        .runningSummary=${this.runningSummary}
-                        .summaryResult=${this.summaryResult}
-                        .canRunWorkflows=${this.canRunWorkflows}
-                      ></cr-summary-panel>
-                    `
-                  : html`
-                      <cr-chat-panel
-                        .chatContext=${this.chatContext}
-                        .chatHistory=${this.chatHistory}
-                        .chatQuestion=${this.chatQuestion}
-                        .loadingChat=${this.loadingChat}
-                        .canRunWorkflows=${this.canRunWorkflows}
-                      ></cr-chat-panel>
-                    `}
+                  ? html`<cr-summary-panel
+                      .runningSummary=${this.runningSummary} .summaryResult=${this.summaryResult}
+                      .canRunWorkflows=${this.canRunWorkflows}
+                    ></cr-summary-panel>`
+                  : html`<cr-chat-panel
+                      .chatContext=${this.chatContext} .chatHistory=${this.chatHistory}
+                      .chatQuestion=${this.chatQuestion} .loadingChat=${this.loadingChat}
+                      .canRunWorkflows=${this.canRunWorkflows}
+                    ></cr-chat-panel>`}
           </div>
         </aside>
       </section>

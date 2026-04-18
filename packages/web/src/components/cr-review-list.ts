@@ -1,5 +1,6 @@
 import { LitElement, html } from "lit";
 import { FolderSearch } from "lucide";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
 import { providerLabels, type ProviderId, type ReviewTarget } from "../types.js";
 import "./cr-icon.js";
 
@@ -47,15 +48,14 @@ export class CrReviewList extends LitElement {
       })
     );
   }
-
-  private stateBadgeClass(state: string | undefined) {
-    if (!state) return "badge-ghost";
-    if (state.includes("open") || state.includes("pending")) return "badge-success";
-    if (state.includes("merge") || state.includes("submitted")) return "badge-primary";
-    return "badge-error";
+  private stateBadgeVariant(state: string | undefined): "default" | "secondary" | "destructive" | "outline" {
+    if (!state) return "secondary";
+    if (state.includes("open") || state.includes("pending")) return "outline";
+    if (state.includes("merge") || state.includes("submitted")) return "default";
+    return "destructive";
   }
 
-  private formatLabel(value: string | undefined) {
+private formatLabel(value: string | undefined) {
     if (!value) {
       return "";
     }
@@ -109,8 +109,8 @@ export class CrReviewList extends LitElement {
       return html`
         <div class="min-h-0 flex-1 overflow-y-auto pr-1">
           <div class="cr-loader-shell">
-            <span class="loading loading-spinner loading-sm text-primary"></span>
-            <span class="text-sm text-base-content/50">Loading ${this.requestLabel()}…</span>
+            <span class="cr-spinner cr-spinner--sm"></span>
+            <span class="text-sm text-foreground/50">Loading ${this.requestLabel()}…</span>
           </div>
         </div>
       `;
@@ -144,10 +144,10 @@ export class CrReviewList extends LitElement {
         ${this.targets.map(
           (target) => html`
             <div
-              class="rounded-lg bg-base-300/75 border cursor-pointer transition-all px-3 py-2.5
+              class="rounded-lg bg-muted/75 border cursor-pointer transition-all px-3 py-2.5
                 ${target.id === this.selectedId
                   ? "border-primary/50 bg-primary/10"
-                  : "border-base-100/10 hover:border-primary/40 hover:bg-base-200"}"
+                  : "border-foreground/10 hover:border-primary/40 hover:bg-card"}"
               @click=${() => this.emitSelect(target)}
             >
               <div class="flex flex-col gap-1.5">
@@ -157,18 +157,14 @@ export class CrReviewList extends LitElement {
                     ${target.title}
                   </h3>
                   ${target.state
-                    ? html`
-                        <span class="badge badge-xs ${this.stateBadgeClass(target.state)} shrink-0">
-                          ${this.formatLabel(target.state)}
-                        </span>
-                      `
+                    ? Badge({ variant: this.stateBadgeVariant(target.state), className: "shrink-0 text-[0.65rem]", children: this.formatLabel(target.state) })
                     : ""}
                 </div>
-                <div class="flex flex-wrap gap-2 text-xs text-base-content/50">
+                <div class="flex flex-wrap gap-2 text-xs text-foreground/50">
                   <span>${target.author || "Unknown author"}</span>
                   ${target.updatedAt ? html`<span>· ${target.updatedAt}</span>` : ""}
                   ${target.sourceBranch ? html`<span class="font-mono">${target.sourceBranch}${target.targetBranch ? ` → ${target.targetBranch}` : ""}</span>` : ""}
-                  ${target.draft ? html`<span class="badge badge-ghost badge-xs">Draft</span>` : ""}
+                  ${target.draft ? Badge({ variant: "secondary", className: "text-[0.65rem]", children: "Draft" }) : ""}
                 </div>
               </div>
             </div>

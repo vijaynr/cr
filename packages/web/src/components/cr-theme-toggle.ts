@@ -19,11 +19,10 @@ export class CrThemeToggle extends LitElement {
     return html`
       <button
         type="button"
-        class="cr-theme-btn"
+        class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
         @click=${this.toggle}
         aria-label=${nextLabel}
         title=${nextLabel}
-        data-theme=${this.theme}
       >
         <cr-icon
           .icon=${isDark ? SunMedium : MoonStar}

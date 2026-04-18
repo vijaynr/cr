@@ -294,7 +294,7 @@ export class CrDiffViewer extends LitElement {
         ${target
           ? html`
               <button
-                class="btn btn-ghost btn-xs cr-diff-viewer__comment-button"
+                class="inline-flex items-center justify-center rounded-md p-1 text-foreground/55 hover:text-foreground hover:bg-muted transition-colors"
                 type="button"
                 @click=${(event: Event) => {
                   const button = event.currentTarget as HTMLButtonElement;
@@ -353,7 +353,7 @@ export class CrDiffViewer extends LitElement {
     if (isLoadingFile) {
       return html`
         <div class="cr-diff-viewer__empty">
-          <span class="loading loading-spinner loading-sm"></span>
+          <span class="cr-spinner cr-spinner--sm"></span>
           Loading patch…
         </div>
       `;
@@ -403,22 +403,22 @@ export class CrDiffViewer extends LitElement {
           data-active=${String(isActive)}
         >
           <div class="flex items-center gap-3 min-w-0">
-            <span class="text-base-content/45 shrink-0">
+            <span class="text-foreground/45 shrink-0">
               <cr-icon
                 .icon=${isOpen ? ChevronDown : ChevronRight}
                 .size=${14}
               ></cr-icon>
             </span>
-            <span class="text-base-content/55 shrink-0">
+            <span class="text-foreground/55 shrink-0">
               <cr-icon .icon=${FileDiff} .size=${14}></cr-icon>
             </span>
             <div class="min-w-0 flex flex-col">
-              <span class="font-mono text-xs text-base-content/90 truncate">
+              <span class="font-mono text-xs text-foreground/90 truncate">
                 ${file.path}
               </span>
               ${file.oldPath && file.oldPath !== file.path
                 ? html`
-                    <span class="font-mono text-[10px] text-base-content/45 truncate">
+                    <span class="font-mono text-[10px] text-foreground/45 truncate">
                       from ${file.oldPath}
                     </span>
                   `
@@ -426,8 +426,8 @@ export class CrDiffViewer extends LitElement {
             </div>
           </div>
           <div class="flex items-center gap-3 shrink-0 pl-3">
-            <span class="font-mono text-xs text-success">+${additions}</span>
-            <span class="font-mono text-xs text-error">-${deletions}</span>
+            <span class="font-mono text-xs text-[var(--cr-success)]">+${additions}</span>
+            <span class="font-mono text-xs text-destructive">-${deletions}</span>
           </div>
         </summary>
         <div class="cr-diff-viewer__file-body">
@@ -440,13 +440,13 @@ export class CrDiffViewer extends LitElement {
   render() {
     if (this.error) {
       return html`
-        <div class="cr-diff-viewer__empty text-error">${this.error}</div>
+        <div class="cr-diff-viewer__empty text-destructive">${this.error}</div>
       `;
     }
 
     if (this.files.length === 0) {
       return html`
-        <div class="cr-diff-viewer__empty text-base-content/50">
+        <div class="cr-diff-viewer__empty text-foreground/50">
           No diff files are available for this review target.
         </div>
       `;

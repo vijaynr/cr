@@ -1,14 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import {
-  BrainCircuit,
-  GitBranch,
-  LayoutDashboard,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings2,
-  type IconNode,
-} from "lucide";
+import { BrainCircuit, GitBranch, LayoutDashboard, Settings2 } from "lucide";
+import "@mariozechner/mini-lit/dist/Sidebar.js";
 import {
   providerLabels,
   providerOrder,
@@ -29,21 +22,9 @@ export class CrSidebarNav extends LitElement {
   @property() repositoryLabel = "";
   @property({ type: Boolean }) isLoading = false;
   @property() uiTheme: UITheme = "dark";
-  @property({ type: Boolean }) collapsed = false;
 
   override createRenderRoot() {
     return this;
-  }
-
-  private iconForSection(section: DashboardSection): IconNode {
-    switch (section) {
-      case "overview":
-        return LayoutDashboard;
-      case "settings":
-        return Settings2;
-      default:
-        return LayoutDashboard;
-    }
   }
 
   private emitSectionChange(section: DashboardSection) {
@@ -56,16 +37,7 @@ export class CrSidebarNav extends LitElement {
     );
   }
 
-  private emitToggleSidebar() {
-    this.dispatchEvent(
-      new CustomEvent("toggle-sidebar", {
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  private renderNavItem(section: DashboardSection, label: string) {
+  private renderNavLink(section: DashboardSection, label: string) {
     const isActive = this.activeSection === section;
     const isProvider =
       section === "gitlab" || section === "github" || section === "reviewboard";
@@ -73,60 +45,25 @@ export class CrSidebarNav extends LitElement {
     return html`
       <a
         href="#/${section}"
-        class="cr-app-sidebar__nav-link ${isActive
-          ? "cr-app-sidebar__nav-link--active"
-          : ""}"
-        title=${label}
-        aria-label=${label}
+        class="flex items-center gap-2.5 px-2.5 py-2 text-sm transition-colors
+          ${isActive
+            ? "bg-accent text-accent-foreground font-medium"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground"}"
         @click=${(e: Event) => {
           e.preventDefault();
           this.emitSectionChange(section);
         }}
       >
-        <span class="cr-app-sidebar__nav-icon">
+        <span class="flex-none w-4 flex items-center justify-center">
           ${isProvider
-            ? html`
-                <cr-provider-icon
-                  .provider=${section}
-                  .size=${15}
-                ></cr-provider-icon>
-              `
-            : html`
-                <cr-icon
-                  .icon=${this.iconForSection(section)}
-                  .size=${15}
-                ></cr-icon>
-              `}
+            ? html`<cr-provider-icon .provider=${section} .size=${15}></cr-provider-icon>`
+            : html`<cr-icon
+                .icon=${section === "overview" ? LayoutDashboard : Settings2}
+                .size=${15}
+              ></cr-icon>`}
         </span>
-        <span class="cr-app-sidebar__label">${label}</span>
+        <span class="truncate">${label}</span>
       </a>
-    `;
-  }
-
-  private renderSidebarToggle() {
-    const isCollapsed = this.collapsed;
-    const label = isCollapsed ? "Expand sidebar" : "Collapse sidebar";
-
-    return html`
-      <button
-        type="button"
-        class="cr-app-sidebar__toggle"
-        aria-label=${label}
-        title=${label}
-        @click=${() => this.emitToggleSidebar()}
-      >
-        ${isCollapsed
-          ? html`
-              <span class="cr-app-sidebar__toggle-icon" aria-hidden="true">
-                <cr-icon .icon=${PanelLeftOpen} .size=${14}></cr-icon>
-              </span>
-            `
-          : html`
-              <span class="cr-app-sidebar__toggle-icon" aria-hidden="true">
-                <cr-icon .icon=${PanelLeftClose} .size=${14}></cr-icon>
-              </span>
-            `}
-      </button>
     `;
   }
 
@@ -135,84 +72,57 @@ export class CrSidebarNav extends LitElement {
       (p) => this.dashboard?.providers?.[p]?.configured
     ).length;
 
+    const logo = html`
+      <div class="flex items-center justify-between w-full">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <img
+            src=${WEB_APP_ICON_ROUTE}
+            alt="PeerView"
+            width="28"
+            height="28"
+            class="rounded-lg flex-none"
+          />
+          <span class="font-semibold text-sm tracking-tight text-sidebar-foreground">PeerView</span>
+        </div>
+        <cr-theme-toggle .theme=${this.uiTheme}></cr-theme-toggle>
+      </div>
+    `;
+
+    const content = html`
+      <nav class="flex flex-col gap-1 -mx-4 -mt-2" aria-label="Main navigation">
+        ${this.renderNavLink("overview", "Overview")}
+        ${providerOrder.map((p) => this.renderNavLink(p, providerLabels[p]))}
+        ${this.renderNavLink("settings", "Settings")}
+      </nav>
+
+      <div class="flex flex-col gap-1.5 -mx-4 mt-3 pt-3 border-t border-sidebar-border">
+        <div class="flex items-center gap-2 px-2.5 text-xs text-muted-foreground" title="${configuredProviders}/3 providers configured">
+          <cr-icon .icon=${LayoutDashboard} .size=${12}></cr-icon>
+          <span>${configuredProviders}/3 providers</span>
+        </div>
+        <div class="flex items-center gap-2 px-2.5 text-xs text-muted-foreground" title="${this.selectedAgentCount || 1} active agents">
+          <cr-icon .icon=${BrainCircuit} .size=${12}></cr-icon>
+          <span>${this.selectedAgentCount || 1} agents</span>
+        </div>
+        ${this.repositoryLabel
+          ? html`
+              <div class="flex items-center gap-2 px-2.5 text-xs text-muted-foreground font-mono truncate" title=${this.repositoryLabel}>
+                <cr-icon .icon=${GitBranch} .size=${12}></cr-icon>
+                <span class="truncate">${this.repositoryLabel}</span>
+              </div>
+            `
+          : ""}
+      </div>
+    `;
+
     return html`
-      <aside
-        class="cr-app-sidebar ${this.collapsed ? "cr-app-sidebar--collapsed" : ""}"
-      >
-        <div class="cr-app-sidebar__header electrobun-webkit-app-region-drag">
-          <div class="cr-app-sidebar__brand electrobun-webkit-app-region-no-drag">
-            ${this.collapsed
-              ? ""
-              : html`<img
-                  src=${WEB_APP_ICON_ROUTE}
-                  alt="PeerView"
-                  width="40"
-                  height="40"
-                  class="cr-app-sidebar__brand-mark"
-                />`}
-            <div class="cr-app-sidebar__brand-copy">
-              <div class="cr-app-sidebar__brand-title">
-                PeerView
-              </div>
-            </div>
-          </div>
-          <div class="cr-app-sidebar__header-actions electrobun-webkit-app-region-no-drag">
-            ${this.renderSidebarToggle()}
-          </div>
-        </div>
-
-        <nav class="cr-app-sidebar__nav" aria-label="Main navigation">
-          ${this.renderNavItem("overview", "Overview")}
-          ${providerOrder.map((p) =>
-            this.renderNavItem(p, providerLabels[p])
-          )}
-          ${this.renderNavItem("settings", "Settings")}
-        </nav>
-
-        ${this.collapsed
-          ? ""
-          : html`
-              <div class="cr-app-sidebar__status">
-                <div
-                  class="cr-app-sidebar__status-item"
-                  title="${configuredProviders}/3 providers configured"
-                >
-                  <cr-icon .icon=${LayoutDashboard} .size=${12}></cr-icon>
-                  <span class="cr-app-sidebar__label"
-                    >${configuredProviders}/3 providers configured</span
-                  >
-                </div>
-                <div
-                  class="cr-app-sidebar__status-item"
-                  title="${this.selectedAgentCount || 1} active agents"
-                >
-                  <cr-icon .icon=${BrainCircuit} .size=${12}></cr-icon>
-                  <span class="cr-app-sidebar__label"
-                    >${this.selectedAgentCount || 1} active agents</span
-                  >
-                </div>
-                ${this.repositoryLabel
-                  ? html`
-                      <div
-                        class="cr-app-sidebar__status-item"
-                        title=${this.repositoryLabel}
-                      >
-                        <cr-icon .icon=${GitBranch} .size=${12}></cr-icon>
-                        <span class="cr-app-sidebar__label truncate font-mono"
-                          >${this.repositoryLabel}</span
-                        >
-                      </div>
-                    `
-                  : ""}
-              </div>
-            `}
-
-        <div class="cr-app-sidebar__footer">
-          <cr-theme-toggle
-            .theme=${this.uiTheme}
-          ></cr-theme-toggle>
-        </div>
-      </aside>
+      <mini-sidebar
+        breakpoint="lg"
+        .logo=${logo}
+        .content=${content}
+        .footer=${html``}
+        .className=${"cr-app-sidebar"}
+      ></mini-sidebar>
     `;
   }
 }

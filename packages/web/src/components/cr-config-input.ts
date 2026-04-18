@@ -1,5 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { Input } from "@mariozechner/mini-lit/dist/Input.js";
+import type { InputType } from "@mariozechner/mini-lit/dist/Input.js";
 
 @customElement("cr-config-input")
 export class CrConfigInput extends LitElement {
@@ -15,18 +17,18 @@ export class CrConfigInput extends LitElement {
 
   render() {
     return html`
-      <div class="form-control gap-1">
-        <label class="label py-0">
-          <span class="label-text text-sm font-medium">${this.label}</span>
-        </label>
-        <div class="text-xs text-base-content/50 mb-1">${this.note}</div>
-        <input
-          class="input input-bordered input-sm font-mono w-full"
-          type=${this.type}
-          .value=${this.value}
-          inputmode=${this.inputMode}
-          @input=${this.handleInput}
-        />
+      <div class="flex flex-col gap-1">
+        ${Input({
+          size: "sm",
+          label: this.label,
+          type: this.type as InputType,
+          value: this.value,
+          className: "font-mono w-full",
+          onInput: (e) => this.handleInput(e),
+        })}
+        ${this.note
+          ? html`<div class="text-xs text-muted-foreground">${this.note}</div>`
+          : ""}
       </div>
     `;
   }

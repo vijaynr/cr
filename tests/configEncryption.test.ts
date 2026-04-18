@@ -50,7 +50,6 @@ describe("config encryption", () => {
       openaiApiUrl: "https://api.example.com/v1",
       openaiApiKey: "openai-key",
       openaiModel: "gpt-4o",
-      useCustomStreaming: false,
       defaultReviewAgents: ["general", "security"],
       gitlabUrl: "https://gitlab.example.com",
       gitlabKey: "gitlab-key",

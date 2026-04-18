@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { ChevronDown, RefreshCw, Search, X } from "lucide";
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
 import type { ProviderId, ProviderRepositoryOption } from "../types.js";
 import "./cr-icon.js";
 
@@ -166,7 +167,7 @@ export class CrProviderRepositoryPicker extends LitElement {
     if (this.open) {
       this.query = "";
       requestAnimationFrame(() => {
-        const input = this.querySelector<HTMLInputElement>('.cr-provider-picker__panel input[type="search"]');
+        const input = this.querySelector<HTMLInputElement>('input[type="search"]');
         input?.focus();
       });
     }
@@ -182,24 +183,24 @@ export class CrProviderRepositoryPicker extends LitElement {
     const selected = this.selectedOption;
 
     return html`
-      <div class="cr-provider-picker ${!selected ? "cr-provider-picker--idle" : ""} relative flex flex-col gap-2">
+      <div class="relative flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="cr-provider-picker__trigger btn btn-sm min-h-11 flex-1 items-center justify-between gap-3 rounded-[0.55rem] px-3 text-left"
+            class="inline-flex min-h-11 flex-1 items-center justify-between gap-3 rounded-[0.55rem] border border-border bg-card/60 px-3 text-left text-sm hover:bg-card hover:border-border/80 transition-colors"
             @click=${() => this.handleToggle()}
             aria-expanded=${String(this.open)}
             aria-haspopup="listbox"
           >
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-semibold text-base-content/92">
+              <div class="truncate text-sm font-semibold text-foreground/92">
                 ${selected?.label || this.placeholderLabel}
               </div>
-              <div class="truncate text-xs text-base-content/50">
+              <div class="truncate text-xs text-foreground/50">
                 ${this.selectedCaption(selected)}
               </div>
             </div>
-            <span class="shrink-0 text-base-content/45 transition-transform duration-200 ${this.open ? "rotate-180" : ""}">
+            <span class="shrink-0 text-foreground/45 transition-transform duration-200 ${this.open ? "rotate-180" : ""}">
               <cr-icon .icon=${ChevronDown} .size=${16}></cr-icon>
             </span>
           </button>
@@ -207,7 +208,7 @@ export class CrProviderRepositoryPicker extends LitElement {
           ${selected
             ? html`<button
                 type="button"
-                class="cr-picker-icon-btn"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
                 @click=${(e: Event) => this.emitClear(e)}
                 aria-label="Clear repository selection"
                 title="Clear selection"
@@ -216,30 +217,30 @@ export class CrProviderRepositoryPicker extends LitElement {
 
           <button
             type="button"
-            class="cr-picker-icon-btn"
+            class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
             @click=${() => this.emitRefresh()}
             ?disabled=${this.loading}
             aria-label="Refresh repositories"
             title="Refresh repositories"
           >
             ${this.loading
-              ? html`<span class="loading loading-spinner loading-xs text-primary"></span>`
+              ? html`<span class="cr-spinner cr-spinner--xs"></span>`
               : html`<cr-icon .icon=${RefreshCw} .size=${15}></cr-icon>`}
           </button>
         </div>
 
         ${this.error
-          ? html`<div class="rounded-[0.55rem] border border-error/20 bg-error/10 px-3 py-2 text-xs text-error-content">${this.error}</div>`
+          ? html`<div class="rounded-[0.55rem] border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">${this.error}</div>`
           : ""}
 
         ${this.open
           ? html`
-              <div class="cr-provider-picker__panel absolute left-0 right-0 top-full z-20 mt-1.5 rounded-[0.75rem] p-3 backdrop-blur-md" style="box-shadow:var(--cr-shadow-3)">
-                <label class="input input-sm flex h-10 w-full items-center gap-2 rounded-[0.55rem] border border-base-300 bg-base-100/60 px-3">
+              <div class="bg-popover border border-border rounded-lg p-3 backdrop-blur-md absolute left-0 right-0 top-full z-20 mt-1.5 rounded-[0.75rem] p-3 backdrop-blur-md" style="box-shadow: 0 4px 16px rgba(0,0,0,0.2)">
+                <label class="input input-sm flex h-10 w-full items-center gap-2 rounded-[0.55rem] border border-border bg-background/60 px-3">
                   <cr-icon .icon=${Search} .size=${14}></cr-icon>
                   <input
                     type="search"
-                    class="grow text-sm"
+                    class="grow text-sm bg-transparent outline-none"
                     placeholder="Search repositories"
                     .value=${this.query}
                     @input=${(event: Event) => {
@@ -258,26 +259,20 @@ export class CrProviderRepositoryPicker extends LitElement {
                                 type="button"
                                 class="flex w-full flex-col gap-1 rounded-[0.55rem] border px-3 py-2.5 text-left transition-colors ${option.id === this.selectedId
                                   ? "border-primary/35 bg-primary/10"
-                                  : "border-base-300/60 bg-base-100/30 hover:border-primary/22 hover:bg-base-100/60"}"
+                                  : "border-border/60 bg-background/30 hover:border-primary/22 hover:bg-background/60"}"
                                 @click=${() => this.handleOptionSelected(option)}
                               >
                                 <div class="flex items-center justify-between gap-2">
-                                  <span class="truncate text-sm font-semibold text-base-content/92">
+                                  <span class="truncate text-sm font-semibold text-foreground/92">
                                     ${option.label}
                                   </span>
                                   ${option.visibility || option.private !== undefined
-                                    ? html`
-                                        <span class="badge badge-ghost badge-xs shrink-0">
-                                          ${option.visibility
-                                            ? this.formatLabel(option.visibility)
-                                            : option.private
-                                              ? "Private"
-                                              : "Public"}
-                                        </span>
-                                      `
+                                    ? Badge({ variant: "secondary", className: "shrink-0 text-[0.65rem]",
+                                        children: option.visibility ? this.formatLabel(option.visibility) : option.private ? "Private" : "Public"
+                                      })
                                     : ""}
                                 </div>
-                                <div class="truncate text-xs text-base-content/55">
+                                <div class="truncate text-xs text-foreground/55">
                                   ${option.description || option.subtitle || "No extra repository detail"}
                                 </div>
                               </button>

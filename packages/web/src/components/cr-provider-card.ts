@@ -1,4 +1,5 @@
 import { LitElement, html } from "lit";
+import { Alert } from "@mariozechner/mini-lit/dist/Alert.js";
 import {
   providerLabels,
   type ProviderDashboard,
@@ -32,16 +33,16 @@ export class CrProviderCard extends LitElement {
     const providerLabel = providerLabels[this.provider];
 
     return html`
-      <div class="cr-overview-card">
+      <div class="rounded-lg border border-border bg-card p-4 flex flex-col gap-2.5 shadow-sm transition-colors hover:shadow-md">
         <div class="flex items-center justify-between gap-2">
-          <span class="text-[0.7rem] font-semibold tracking-[0.06em] uppercase text-base-content/45">${providerLabel}</span>
+          <span class="text-[0.7rem] font-semibold tracking-[0.06em] uppercase text-foreground/45">${providerLabel}</span>
           <div class="flex items-center gap-1.5 shrink-0">
             <span class="cr-status-dot ${configured ? "cr-status-dot--ready" : "cr-status-dot--missing"}"></span>
-            <span class="text-[0.65rem] font-medium text-base-content/40">${configured ? "Configured" : "Missing"}</span>
+            <span class="text-[0.65rem] font-medium text-foreground/40">${configured ? "Configured" : "Missing"}</span>
           </div>
         </div>
-        ${repository ? html`<div class="text-xs text-base-content/55 font-mono truncate">${repository}</div>` : ""}
-        ${error ? html`<div class="alert alert-error text-xs py-2">${error}</div>` : ""}
+        ${repository ? html`<div class="text-xs text-foreground/55 font-mono truncate">${repository}</div>` : ""}
+        ${error ? Alert({ variant: "destructive", className: "bg-destructive/10 text-xs py-2", children: error }) : ""}
         ${!error && items.length === 0 ? html`<div class="cr-empty-state"><p>No open review requests</p></div>` : ""}
         ${items.length > 0 ? html`
           <div class="flex flex-col gap-2">

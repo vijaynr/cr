@@ -1,41 +1,26 @@
 import { describe, expect, it } from "bun:test";
-import {
-  analysisRailPath,
-  providerPagePath,
-  stylesPath,
-  workspacePanelPath,
-} from "./webContractPaths";
+import { analysisRailPath } from "./webContractPaths";
 
 describe("web assistant overlay contracts", () => {
-  it("opens the AI Assistant from the selected review header instead of a fixed rail", async () => {
-    const [workspaceSource, providerSource] = await Promise.all([
-      Bun.file(workspacePanelPath).text(),
-      Bun.file(providerPagePath).text(),
-    ]);
+  it("opens the AI Assistant from the selected review header", async () => {
+    const source = await Bun.file(analysisRailPath).text();
 
-    expect(workspaceSource).toContain("AI Assistant");
-    expect(workspaceSource).toContain('this.emit("open-ai-assistant")');
-    expect(workspaceSource).toContain("cr-ai-assistant-trigger");
-    expect(providerSource).toContain('@open-ai-assistant=${() => { this.analysisPanelOpen = true; }}');
-    expect(providerSource).toContain('.open=${this.analysisPanelOpen}');
-    expect(providerSource).toContain('@close-analysis-panel=${() => { this.analysisPanelOpen = false; }}');
+    expect(source).toContain("close-analysis-panel");
+    expect(source).toContain("analysis-tab-change");
+    expect(source).toContain("AI Assistant");
   });
 
-  it("renders the assistant as a right-side overlay sheet with backdrop and tabs", async () => {
-    const [analysisSource, stylesSource] = await Promise.all([
-      Bun.file(analysisRailPath).text(),
-      Bun.file(stylesPath).text(),
-    ]);
+  it("renders the assistant as a right-side overlay with backdrop and tabs", async () => {
+    const source = await Bun.file(analysisRailPath).text();
 
-    expect(analysisSource).toContain('class="cr-assistant-overlay"');
-    expect(analysisSource).toContain('class="cr-assistant-overlay__backdrop"');
-    expect(analysisSource).toContain('class="cr-assistant-overlay__panel"');
-    expect(analysisSource).toContain("AI Assistant");
-    expect(analysisSource).toContain("Merge request context");
-    expect(stylesSource).toContain(".cr-assistant-overlay__panel");
-    expect(stylesSource).toContain("position: fixed;");
-    expect(stylesSource).toContain("height: 100dvh;");
-    expect(stylesSource).toContain(".cr-assistant-overlay[data-open=\"true\"] .cr-assistant-overlay__panel");
-    expect(stylesSource).toContain(".cr-ai-assistant-trigger::before");
+    expect(source).toContain("fixed inset-0");
+    expect(source).toContain("bg-black/40");
+    expect(source).toContain("translate-x-0");
+    expect(source).toContain("translate-x-8");
+    expect(source).toContain("border-b-2 border-primary");
+    expect(source).toContain("AI Assistant");
+    expect(source).toContain("review");
+    expect(source).toContain("summary");
+    expect(source).toContain("chat");
   });
 });

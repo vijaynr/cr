@@ -1,26 +1,25 @@
 import { describe, expect, it } from "bun:test";
-import { reviewPanelPath, stylesPath } from "./webContractPaths";
+import { reviewPanelPath } from "./webContractPaths";
 
 describe("web review panel contracts", () => {
-  it("renders review output as flowing sections with a sticky action bar", async () => {
+  it("renders review output with action buttons and agent results", async () => {
     const source = await Bun.file(reviewPanelPath).text();
 
-    expect(source).toContain('class="cr-review-panel"');
-    expect(source).toContain("Overall Review");
-    expect(source).toContain("result.agentResults?.map(");
-    expect(source).toContain('class="cr-review-section"');
-    expect(source).toContain('class="cr-review-actions"');
-    expect(source).toContain('class="cr-review-info-banner"');
+    expect(source).toContain("Run review");
+    expect(source).toContain("Post review");
+    expect(source).toContain("run-review");
+    expect(source).toContain("post-generated-review");
+    expect(source).toContain("renderResult");
+    expect(source).toContain("agentResults");
   });
 
-  it("provides a single scroll area with agent selection and sticky actions", async () => {
-    const source = await Bun.file(stylesPath).text();
+  it("provides agent selection with inline comment toggle", async () => {
+    const source = await Bun.file(reviewPanelPath).text();
 
-    expect(source).toContain(".cr-review-scroll");
-    expect(source).toContain("overflow-y: auto;");
-    expect(source).toContain(".cr-review-section");
-    expect(source).toContain(".cr-review-actions");
-    expect(source).toContain(".cr-review-agents");
-    expect(source).toContain(".cr-review-info-banner");
+    expect(source).toContain("agent-toggle");
+    expect(source).toContain("inline-toggle");
+    expect(source).toContain("inlineCommentsEnabled");
+    expect(source).toContain("selectedAgents");
+    expect(source).toContain("Checkbox");
   });
 });

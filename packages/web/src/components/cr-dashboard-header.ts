@@ -1,3 +1,5 @@
+import { Badge } from "@mariozechner/mini-lit/dist/Badge.js";
+import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { LitElement, html } from "lit";
 import { GitBranch, RefreshCw } from "lucide";
 import "./cr-icon.js";
@@ -34,36 +36,22 @@ export class CrDashboardHeader extends LitElement {
 
   render() {
     return html`
-      <div class="bg-base-200 rounded-xl border border-base-300 p-4 flex flex-col gap-3">
+      <div class="bg-card rounded-xl border border-border p-4 flex flex-col gap-3">
         <div class="flex items-center justify-between gap-4">
           <div>
             <h1 class="text-2xl font-bold tracking-tight">Review Ops</h1>
             <div class="flex flex-wrap gap-2 mt-1.5">
-              ${this.repositoryLabel ? html`
-                <div class="badge badge-ghost badge-sm gap-1 font-mono">
-                  <cr-icon .icon=${GitBranch} .size=${12}></cr-icon>
-                  ${this.repositoryLabel}
-                </div>
-              ` : ""}
-              ${this.generatedAt ? html`
-                <div class="badge badge-ghost badge-sm">${this.generatedAt}</div>
-              ` : ""}
-              ${this.remoteUrl ? html`
-                <div class="badge badge-success badge-sm">● remote detected</div>
-              ` : ""}
+              ${this.repositoryLabel ? Badge({ variant: "secondary", className: "gap-1 font-mono", children: html`<cr-icon .icon=${GitBranch} .size=${12}></cr-icon> ${this.repositoryLabel}` }) : ""}
+              ${this.generatedAt ? Badge({ variant: "secondary", children: this.generatedAt }) : ""}
+              ${this.remoteUrl ? Badge({ variant: "outline", className: "border-[var(--cr-success)]/30 text-[var(--cr-success)]", children: "● remote detected" }) : ""}
             </div>
           </div>
-          <button
-            class="btn btn-ghost btn-sm gap-1.5"
-            type="button"
-            ?disabled=${this.loading}
-            @click=${this.handleRefresh}
-          >
-            ${this.loading
-              ? html`<span class="loading loading-spinner loading-xs"></span>`
-              : html`<cr-icon .icon=${RefreshCw} .size=${14}></cr-icon>`}
-            ${this.loading ? "Refreshing…" : "Refresh"}
-          </button>
+          ${Button({ variant: "ghost", size: "sm", className: "gap-1.5",
+            disabled: this.loading,
+            loading: this.loading,
+            onClick: () => this.handleRefresh(),
+            children: this.loading ? "Refreshing…" : html`<cr-icon .icon=${RefreshCw} .size=${14}></cr-icon> Refresh`
+          })}
         </div>
       </div>
     `;
